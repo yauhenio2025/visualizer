@@ -1,0 +1,7 @@
+#!/bin/bash
+# Nano Banana 4K Visualizer startup script
+
+export FLASK_PORT=5010
+export FLASK_DEBUG=true
+
+python /home/evgeny/projects/visualizer/app.py

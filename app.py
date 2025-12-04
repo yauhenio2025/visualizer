@@ -12,9 +12,10 @@ Features:
   - Google Search grounding option
 
 Usage:
-  1. pip install flask google-genai Pillow
-  2. python app.py
-  3. Open http://localhost:5000
+  1. pip install flask google-genai Pillow python-dotenv
+  2. Create .env file with GEMINI_API_KEY=your_key
+  3. python app.py
+  4. Open http://localhost:5000
 """
 
 import os
@@ -29,12 +30,15 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from flask import Flask, request, jsonify, Response
 from PIL import Image
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configuration
-API_KEY = os.environ.get(
-    "GEMINI_API_KEY",
-    "AIzaSyAv2Dn8RitDPbsFCs_Y9B9_IFlJd5p2vwA"
-)
+API_KEY = os.environ.get("GEMINI_API_KEY")
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY not found. Create a .env file with GEMINI_API_KEY=your_key")
 
 # Model Definitions
 MODELS = {

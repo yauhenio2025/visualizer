@@ -3517,8 +3517,15 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             if (data.isImage && data.imageUrl) {
                 var url = data.imageUrl;
-                if (url.startsWith('/static/')) {
-                    url = 'http://localhost:8847' + url;
+                // Handle data URLs (base64 embedded images)
+                if (url.startsWith('data:')) {
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.key.replace(/_/g, '-') + '.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    return;
                 }
                 window.open(url, '_blank');
                 return;

@@ -3060,7 +3060,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     if (typeof v === 'number') return k + ': ' + v;
                     if (Array.isArray(v)) return k + ': [' + v.length + ' items]';
                     return k + ': {...}';
-                }).join('\n');
+                }).join('\\n');
             }
             return String(data);
         }

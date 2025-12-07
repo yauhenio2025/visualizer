@@ -613,15 +613,19 @@ def extract_document_content(file_path: Path) -> Tuple[str, str]:
     """
     suffix = file_path.suffix.lower()
 
+    # Text-based formats that can be read directly
+    TEXT_FORMATS = {'.md', '.txt', '.json', '.xml', '.html', '.htm', '.csv',
+                    '.py', '.js', '.ts', '.yaml', '.yml', '.rst', '.tex', '.log'}
+
     try:
         if suffix == '.pdf':
             content = extract_pdf_text(file_path)
             return content, None
-        elif suffix in {'.md', '.txt'}:
+        elif suffix in TEXT_FORMATS:
             content = file_path.read_text(encoding='utf-8', errors='replace')
             return content, None
         else:
-            return None, f"Unsupported file type: {suffix}"
+            return None, f"Unsupported file type: {suffix}. Supported: PDF, TXT, MD, JSON, XML, HTML, CSV, and more text formats"
     except Exception as e:
         return None, f"Error reading {file_path.name}: {str(e)}"
 
@@ -762,50 +766,103 @@ def list_analyzer_output_modes():
         return jsonify({"error": str(e)}), 500
 
 
+def extract_pdf_from_base64(base64_content: str) -> str:
+    """Extract text from base64-encoded PDF."""
+    import base64
+    import io
+
+    if not PDF_SUPPORT:
+        return "[PDF support not available. Install pymupdf: pip install pymupdf]"
+
+    try:
+        pdf_bytes = base64.b64decode(base64_content)
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text_parts = []
+        for page_num, page in enumerate(doc):
+            text = page.get_text()
+            if text.strip():
+                text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
+        doc.close()
+        return "\n\n".join(text_parts) if text_parts else "[No text extracted from PDF]"
+    except Exception as e:
+        return f"[Error reading PDF: {str(e)}]"
+
+
 @app.route('/api/analyzer/analyze', methods=['POST'])
 def submit_analysis():
     """
     Submit documents for analysis.
 
-    Request: {
+    Request (file paths):
+    {
         "file_paths": ["/path/to/doc.pdf", ...],
         "engine": "thematic_synthesis",
         "output_mode": "structured_text_report",
         "collection_mode": "single" | "individual"
     }
+
+    Request (inline documents - for browser uploads):
+    {
+        "documents": [{"id": "doc_1", "title": "...", "content": "...", "encoding": "text|base64"}],
+        "engine": "thematic_synthesis",
+        "output_mode": "executive_memo"
+    }
     """
     data = request.json or {}
     file_paths = data.get('file_paths', [])
+    inline_documents = data.get('documents', [])
     engine = data.get('engine')
     output_mode = data.get('output_mode', 'structured_text_report')
     collection_mode = data.get('collection_mode', 'single')
 
-    if not file_paths:
+    if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
 
     if not engine:
         return jsonify({"success": False, "error": "No engine selected"})
 
-    # Extract content from all files
     documents = []
     errors = []
 
-    for i, file_path in enumerate(file_paths):
-        path = Path(file_path).expanduser().resolve()
-        if not path.exists():
-            errors.append(f"File not found: {file_path}")
-            continue
+    # Handle inline documents (from browser upload)
+    if inline_documents:
+        for i, doc in enumerate(inline_documents):
+            doc_id = doc.get('id', f'doc_{i+1}')
+            title = doc.get('title', f'Document {i+1}')
+            content = doc.get('content', '')
+            encoding = doc.get('encoding', 'text')
 
-        content, error = extract_document_content(path)
-        if error:
-            errors.append(error)
-            continue
+            if encoding == 'base64':
+                # PDF - decode and extract text
+                content = extract_pdf_from_base64(content)
 
-        documents.append({
-            "id": f"doc_{i+1}",
-            "title": path.stem,
-            "content": content
-        })
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": doc_id,
+                    "title": title,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to extract content from {title}")
+
+    # Handle file paths (from server folder scan)
+    else:
+        for i, file_path in enumerate(file_paths):
+            path = Path(file_path).expanduser().resolve()
+            if not path.exists():
+                errors.append(f"File not found: {file_path}")
+                continue
+
+            content, error = extract_document_content(path)
+            if error:
+                errors.append(error)
+                continue
+
+            documents.append({
+                "id": f"doc_{i+1}",
+                "title": path.stem,
+                "content": content
+            })
 
     if not documents:
         return jsonify({
@@ -886,35 +943,57 @@ def submit_bundle_analysis():
     """Submit documents for bundle analysis (multiple engines)."""
     data = request.json or {}
     file_paths = data.get('file_paths', [])
+    inline_documents = data.get('documents', [])
     bundle = data.get('bundle')
     output_modes = data.get('output_modes', {})
 
-    if not file_paths:
+    if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
 
     if not bundle:
         return jsonify({"success": False, "error": "No bundle selected"})
 
-    # Extract content from all files
     documents = []
     errors = []
 
-    for i, file_path in enumerate(file_paths):
-        path = Path(file_path).expanduser().resolve()
-        if not path.exists():
-            errors.append(f"File not found: {file_path}")
-            continue
+    # Handle inline documents (from browser upload)
+    if inline_documents:
+        for i, doc in enumerate(inline_documents):
+            doc_id = doc.get('id', f'doc_{i+1}')
+            title = doc.get('title', f'Document {i+1}')
+            content = doc.get('content', '')
+            encoding = doc.get('encoding', 'text')
 
-        content, error = extract_document_content(path)
-        if error:
-            errors.append(error)
-            continue
+            if encoding == 'base64':
+                content = extract_pdf_from_base64(content)
 
-        documents.append({
-            "id": f"doc_{i+1}",
-            "title": path.stem,
-            "content": content
-        })
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": doc_id,
+                    "title": title,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to extract content from {title}")
+
+    # Handle file paths (from server folder scan)
+    else:
+        for i, file_path in enumerate(file_paths):
+            path = Path(file_path).expanduser().resolve()
+            if not path.exists():
+                errors.append(f"File not found: {file_path}")
+                continue
+
+            content, error = extract_document_content(path)
+            if error:
+                errors.append(error)
+                continue
+
+            documents.append({
+                "id": f"doc_{i+1}",
+                "title": path.stem,
+                "content": content
+            })
 
     if not documents:
         return jsonify({
@@ -2151,13 +2230,74 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
+        // Read file as text or base64 for PDFs
+        async function readFileContent(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+                reader.onload = function(e) {
+                    if (isPdf) {
+                        // For PDFs, send as base64
+                        const base64 = e.target.result.split(',')[1];
+                        resolve({ content: base64, encoding: 'base64' });
+                    } else {
+                        resolve({ content: e.target.result, encoding: 'text' });
+                    }
+                };
+                reader.onerror = function() { reject(new Error('Failed to read file')); };
+
+                if (isPdf) {
+                    reader.readAsDataURL(file);
+                } else {
+                    reader.readAsText(file);
+                }
+            });
+        }
+
+        // Get documents for analysis - either paths or inline content
+        async function getDocumentsForAnalysis() {
+            const selectedPaths = Array.from(selectedDocs);
+            const selectedDocObjects = scannedDocs.filter(d => selectedPaths.includes(d.path));
+
+            // Check if these are browser-uploaded files (have file object) or server-scanned (have full paths)
+            const hasBrowserFiles = selectedDocObjects.some(d => d.file && d.file instanceof File);
+
+            if (!hasBrowserFiles) {
+                // Server-scanned files - just return paths
+                return { type: 'paths', file_paths: selectedPaths };
+            }
+
+            // Browser-uploaded files - read contents
+            $('analyze-btn').textContent = 'Reading files...';
+            const documents = [];
+
+            for (let i = 0; i < selectedDocObjects.length; i++) {
+                const doc = selectedDocObjects[i];
+                if (doc.file && doc.file instanceof File) {
+                    try {
+                        const { content, encoding } = await readFileContent(doc.file);
+                        documents.push({
+                            id: 'doc_' + (i + 1),
+                            title: doc.name.replace(/\.[^/.]+$/, ''),
+                            content: content,
+                            encoding: encoding
+                        });
+                    } catch (e) {
+                        console.error('Failed to read file:', doc.name, e);
+                    }
+                }
+            }
+
+            return { type: 'inline', documents: documents };
+        }
+
         // Run Analysis
         async function runAnalysis() {
-            const filePaths = Array.from(selectedDocs);
             const outputMode = $('output-mode').value;
 
             $('analyze-btn').disabled = true;
-            $('analyze-btn').textContent = 'Submitting...';
+            $('analyze-btn').textContent = 'Preparing...';
             $('progress-section').classList.add('show');
             $('results-grid').innerHTML = '';
             $('results-gallery').style.display = 'none';
@@ -2166,17 +2306,29 @@ HTML_PAGE = '''<!DOCTYPE html>
             resetStages();
 
             try {
+                // Get documents (either paths or inline content)
+                const docData = await getDocumentsForAnalysis();
+
+                $('analyze-btn').textContent = 'Submitting...';
+
                 let response;
                 if (engineMode === 'engine') {
+                    const payload = {
+                        engine: selectedEngine,
+                        output_mode: outputMode,
+                        collection_mode: collectionMode
+                    };
+
+                    if (docData.type === 'paths') {
+                        payload.file_paths = docData.file_paths;
+                    } else {
+                        payload.documents = docData.documents;
+                    }
+
                     response = await fetch('/api/analyzer/analyze', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            file_paths: filePaths,
-                            engine: selectedEngine,
-                            output_mode: outputMode,
-                            collection_mode: collectionMode
-                        })
+                        body: JSON.stringify(payload)
                     });
                 } else {
                     var outputModes = {};
@@ -2185,18 +2337,26 @@ HTML_PAGE = '''<!DOCTYPE html>
                         bundle.member_engines.forEach(function(e) { outputModes[e] = outputMode; });
                     }
 
+                    const payload = {
+                        bundle: selectedBundle,
+                        output_modes: outputModes
+                    };
+
+                    if (docData.type === 'paths') {
+                        payload.file_paths = docData.file_paths;
+                    } else {
+                        payload.documents = docData.documents;
+                    }
+
                     response = await fetch('/api/analyzer/analyze/bundle', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            file_paths: filePaths,
-                            bundle: selectedBundle,
-                            output_modes: outputModes
-                        })
+                        body: JSON.stringify(payload)
                     });
                 }
 
                 const data = await response.json();
+                console.log('Analysis response:', data);
 
                 if (data.success) {
                     if (data.mode === 'individual') {
@@ -2206,6 +2366,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         pollJobStatus(data.job_id);
                     }
                 } else {
+                    console.log('Analysis failed:', data.error, data);
                     showAnalysisError(data.error || 'Failed to submit analysis');
                 }
             } catch (e) {

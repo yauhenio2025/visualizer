@@ -629,51 +629,86 @@ def extract_document_content(file_path: Path) -> Tuple[str, str]:
 @app.route('/api/analyzer/scan-folder', methods=['POST'])
 def scan_folder():
     """
-    Scan a folder for documents (PDFs, MD, TXT files).
+    Scan a folder for documents OR accept a single file.
 
-    Request: {"path": "/path/to/folder"}
+    Request: {"path": "/path/to/folder"} or {"path": "/path/to/file.pdf"}
     Response: {"success": true, "files": [...], "count": N}
     """
+    from urllib.parse import unquote
+
     data = request.json or {}
-    folder_path = data.get('path', '').strip()
+    input_path = data.get('path', '').strip()
 
-    if not folder_path:
-        return jsonify({"success": False, "error": "No folder path provided"})
+    if not input_path:
+        return jsonify({"success": False, "error": "No path provided"})
 
-    folder = Path(folder_path).expanduser().resolve()
+    # Clean up path - remove file:// prefix if present
+    if input_path.startswith('file://'):
+        input_path = input_path[7:]
+    # Handle URL encoding (%20 -> space, etc.)
+    input_path = unquote(input_path)
 
-    if not folder.exists():
-        return jsonify({"success": False, "error": f"Folder not found: {folder_path}"})
+    path = Path(input_path).expanduser().resolve()
 
-    if not folder.is_dir():
-        return jsonify({"success": False, "error": f"Path is not a folder: {folder_path}"})
+    if not path.exists():
+        return jsonify({"success": False, "error": f"Path not found: {input_path}"})
 
-    # Scan for documents
     files = []
-    for ext in DOCUMENT_EXTENSIONS:
-        for file_path in folder.glob(f"*{ext}"):
-            if file_path.is_file():
-                stat = file_path.stat()
-                size_kb = stat.st_size / 1024
 
-                files.append({
-                    "name": file_path.name,
-                    "path": str(file_path),
-                    "type": file_path.suffix.lower()[1:],  # pdf, md, txt
-                    "size": f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB",
-                    "size_bytes": stat.st_size
-                })
+    if path.is_file():
+        # Single file mode
+        if path.suffix.lower() not in DOCUMENT_EXTENSIONS:
+            return jsonify({"success": False, "error": f"Unsupported file type: {path.suffix}. Supported: PDF, MD, TXT"})
 
-    # Sort by name
-    files.sort(key=lambda x: x["name"].lower())
+        stat = path.stat()
+        size_kb = stat.st_size / 1024
 
-    return jsonify({
-        "success": True,
-        "files": files,
-        "count": len(files),
-        "folder": str(folder),
-        "pdf_support": PDF_SUPPORT
-    })
+        files.append({
+            "name": path.name,
+            "path": str(path),
+            "type": path.suffix.lower()[1:],
+            "size": f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB",
+            "size_bytes": stat.st_size
+        })
+
+        return jsonify({
+            "success": True,
+            "files": files,
+            "count": 1,
+            "folder": str(path.parent),
+            "pdf_support": PDF_SUPPORT,
+            "mode": "single_file"
+        })
+
+    elif path.is_dir():
+        # Folder mode - scan for documents
+        for ext in DOCUMENT_EXTENSIONS:
+            for file_path in path.glob(f"*{ext}"):
+                if file_path.is_file():
+                    stat = file_path.stat()
+                    size_kb = stat.st_size / 1024
+
+                    files.append({
+                        "name": file_path.name,
+                        "path": str(file_path),
+                        "type": file_path.suffix.lower()[1:],
+                        "size": f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB",
+                        "size_bytes": stat.st_size
+                    })
+
+        files.sort(key=lambda x: x["name"].lower())
+
+        return jsonify({
+            "success": True,
+            "files": files,
+            "count": len(files),
+            "folder": str(path),
+            "pdf_support": PDF_SUPPORT,
+            "mode": "folder"
+        })
+
+    else:
+        return jsonify({"success": False, "error": f"Invalid path: {input_path}"})
 
 
 @app.route('/api/analyzer/engines', methods=['GET'])
@@ -1635,7 +1670,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         .result-card .content {
             padding: 1rem;
-            max-height: 500px;
+            max-height: 70vh;
             overflow: auto;
         }
 
@@ -1648,6 +1683,47 @@ HTML_PAGE = '''<!DOCTYPE html>
         .result-card img {
             max-width: 100%;
             border-radius: 8px;
+        }
+
+        .result-card .markdown-content {
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+        .result-card .markdown-content h1 { font-size: 1.5rem; margin: 1.5rem 0 1rem; color: var(--accent); }
+        .result-card .markdown-content h2 { font-size: 1.25rem; margin: 1.25rem 0 0.75rem; color: var(--purple); border-bottom: 1px solid var(--bg-hover); padding-bottom: 0.5rem; }
+        .result-card .markdown-content h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--text); }
+        .result-card .markdown-content p { margin: 0.75rem 0; }
+        .result-card .markdown-content ul, .result-card .markdown-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+        .result-card .markdown-content li { margin: 0.25rem 0; }
+        .result-card .markdown-content strong { color: var(--accent); }
+        .result-card .markdown-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .result-card .markdown-content th, .result-card .markdown-content td { padding: 0.5rem; border: 1px solid var(--bg-hover); text-align: left; }
+        .result-card .markdown-content th { background: var(--bg-hover); }
+
+        .result-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .result-actions button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            background: var(--bg-input);
+            border: 1px solid var(--text-dim);
+            border-radius: 4px;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .result-actions button:hover {
+            background: var(--accent);
+            color: var(--bg-dark);
+            border-color: var(--accent);
+        }
+        .result-meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--bg-hover);
         }
 
         .analyzer-status {
@@ -1827,7 +1903,7 @@ Example prompts:
                     </div>
 
                     <!-- Folder Input -->
-                    <label>Folder Path</label>
+                    <label>File or Folder Path</label>
                     <div class="folder-input-row">
                         <input type="text" id="folder-path" placeholder="~/Documents/articles">
                         <button class="btn btn-outline" onclick="scanFolder()">Scan</button>
@@ -1894,7 +1970,7 @@ Example prompts:
                             <label>Output Format</label>
                             <select id="output-mode">
                                 <option value="structured_text_report">Text Report</option>
-                                <option value="gemini_toulmin_diagram">Visual Diagram (Gemini)</option>
+                                <option value="gemini_image">Visual Diagram (Gemini)</option>
                                 <option value="mermaid">Mermaid Diagram</option>
                                 <option value="d3_interactive">Interactive D3</option>
                                 <option value="comparative_matrix_table">Comparison Table</option>
@@ -2576,34 +2652,86 @@ Example prompts:
             }
         }
 
+        // Simple markdown to HTML converter
+        function markdownToHtml(md) {
+            if (!md) return '';
+            return md
+                // Headers
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                // Bold and italic
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                // Lists
+                .replace(/^\- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+                // Tables
+                .replace(/\|(.+)\|/g, (match, content) => {
+                    const cells = content.split('|').map(c => c.trim());
+                    if (cells.every(c => /^-+$/.test(c))) return '';
+                    const tag = cells.some(c => c.includes('---')) ? 'th' : 'td';
+                    return '<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>';
+                })
+                .replace(/(<tr>.*<\/tr>\n?)+/g, '<table>$&</table>')
+                // Paragraphs
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^(.+)$/gm, (match) => {
+                    if (match.startsWith('<')) return match;
+                    return match;
+                });
+        }
+
         // Display Result
         function displayResult(result, title = null) {
             const container = $('results-container');
+            const metadata = result.metadata || {};
 
             // Display outputs
             const outputs = result.outputs || {};
             for (const [key, output] of Object.entries(outputs)) {
                 const card = document.createElement('div');
                 card.className = 'result-card fade-in';
+                const cardId = 'result-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
                 let contentHtml = '';
+                let rawContent = '';
+
                 if (output.image_url) {
                     contentHtml = `<img src="${output.image_url}" alt="${key}">`;
                 } else if (output.html_content) {
                     contentHtml = output.html_content;
+                    rawContent = output.html_content;
                 } else if (output.content) {
-                    contentHtml = `<pre>${escapeHtml(output.content)}</pre>`;
+                    contentHtml = `<div class="markdown-content">${markdownToHtml(output.content)}</div>`;
+                    rawContent = output.content;
                 } else if (output.data) {
-                    contentHtml = `<pre>${JSON.stringify(output.data, null, 2)}</pre>`;
+                    rawContent = JSON.stringify(output.data, null, 2);
+                    contentHtml = `<pre>${rawContent}</pre>`;
+                }
+
+                // Build metadata string
+                let metaHtml = '';
+                if (metadata.total_ms || metadata.cost_usd) {
+                    const time = metadata.total_ms ? `${(metadata.total_ms / 1000).toFixed(1)}s` : '';
+                    const cost = metadata.cost_usd ? `$${metadata.cost_usd.toFixed(4)}` : '';
+                    metaHtml = `<div class="result-meta">⏱️ ${time} | 💰 ${cost}</div>`;
                 }
 
                 card.innerHTML = `
                     <div class="header">
-                        <span>${title ? title + ' - ' : ''}${key}</span>
-                        <span class="badge">${output.mode || output.renderer_type || ''}</span>
+                        <span>${title ? title + ' - ' : ''}${key.replace(/_/g, ' ')}</span>
+                        <div class="result-actions">
+                            <button onclick="downloadResult('${cardId}', '${key}')">📥 Download</button>
+                            <span class="badge">${output.mode || output.renderer_type || ''}</span>
+                        </div>
                     </div>
-                    <div class="content">${contentHtml}</div>
+                    <div class="content" id="${cardId}">${contentHtml}${metaHtml}</div>
                 `;
+
+                // Store raw content for download
+                card.dataset.rawContent = rawContent;
+                card.dataset.filename = key;
 
                 container.appendChild(card);
             }
@@ -2612,12 +2740,48 @@ Example prompts:
             if (Object.keys(outputs).length === 0 && result.canonical_data) {
                 const card = document.createElement('div');
                 card.className = 'result-card fade-in';
+                const rawJson = JSON.stringify(result.canonical_data, null, 2);
                 card.innerHTML = `
-                    <div class="header">Canonical Data</div>
-                    <div class="content"><pre>${JSON.stringify(result.canonical_data, null, 2)}</pre></div>
+                    <div class="header">
+                        <span>Canonical Data</span>
+                        <div class="result-actions">
+                            <button onclick="downloadJson(this, 'canonical_data.json')">📥 Download JSON</button>
+                        </div>
+                    </div>
+                    <div class="content"><pre>${rawJson}</pre></div>
                 `;
+                card.dataset.rawContent = rawJson;
                 container.appendChild(card);
             }
+        }
+
+        // Download result as file
+        function downloadResult(contentId, filename) {
+            const card = document.getElementById(contentId)?.closest('.result-card');
+            if (!card) return;
+
+            const content = card.dataset.rawContent || card.querySelector('.content')?.innerText || '';
+            const ext = content.startsWith('{') || content.startsWith('[') ? '.json' : '.md';
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.replace(/_/g, '-') + ext;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadJson(btn, filename) {
+            const card = btn.closest('.result-card');
+            const content = card.dataset.rawContent || '';
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         function displayError(title, message) {

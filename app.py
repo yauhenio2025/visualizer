@@ -2717,36 +2717,38 @@ HTML_PAGE = '''<!DOCTYPE html>
                 $('progress-counter').textContent = docCount + ' document' + (docCount > 1 ? 's' : '');
             }
 
+            // Show document names on the right
+            if (currentDocNames.length > 0) {
+                if (currentDocNames.length === 1) {
+                    $('progress-doc-name').textContent = currentDocNames[0];
+                } else if (currentDocNames.length <= 3) {
+                    $('progress-doc-name').textContent = currentDocNames.join(', ');
+                } else {
+                    $('progress-doc-name').textContent = currentDocNames.slice(0, 2).join(', ') + ' +' + (currentDocNames.length - 2) + ' more';
+                }
+            }
+
             // Match status or stage (API may return either) and set status text
             if (status === 'pending' || status === 'queued') {
-                statusText = 'Queued...';
-                $('progress-doc-name').textContent = 'Waiting to start';
+                statusText = 'Queued... waiting to start';
             } else if (stage.includes('extract') || status.includes('extract')) {
-                statusText = 'Stage 1/4: Extraction (' + percent + '%)';
-                $('progress-doc-name').textContent = 'Reading and extracting content';
+                statusText = 'Stage 1/4: Extracting content (' + percent + '%)';
             } else if (stage.includes('curat') || status.includes('curat')) {
-                statusText = 'Stage 2/4: Curation (' + percent + '%)';
-                $('progress-doc-name').textContent = 'Curating insights';
+                statusText = 'Stage 2/4: Curating insights (' + percent + '%)';
             } else if (stage.includes('concret') || status.includes('concret')) {
-                statusText = 'Stage 3/4: Concretization (' + percent + '%)';
-                $('progress-doc-name').textContent = 'Refining labels';
+                statusText = 'Stage 3/4: Refining labels (' + percent + '%)';
             } else if (stage.includes('render') || status.includes('render')) {
-                statusText = 'Stage 4/4: Rendering (' + percent + '%)';
-                $('progress-doc-name').textContent = 'Generating output';
+                statusText = 'Stage 4/4: Generating output (' + percent + '%)';
             } else if (status === 'completed') {
                 statusText = 'Complete!';
-                $('progress-doc-name').textContent = 'All done';
             } else if (status === 'failed') {
                 statusText = 'Failed';
-                $('progress-doc-name').textContent = '';
             } else if (stage || status) {
                 // Capitalize first letter for display
                 const displayStage = stage || status;
                 statusText = displayStage.charAt(0).toUpperCase() + displayStage.slice(1) + '... (' + percent + '%)';
-                $('progress-doc-name').textContent = '';
             } else {
                 statusText = 'Processing... (' + percent + '%)';
-                $('progress-doc-name').textContent = '';
             }
 
             $('progress-text').textContent = statusText;

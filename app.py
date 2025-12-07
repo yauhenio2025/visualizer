@@ -25,12 +25,21 @@ import base64
 import datetime
 import traceback
 import uuid
+import httpx
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 
 from flask import Flask, request, jsonify, Response
 from PIL import Image
 from dotenv import load_dotenv
+
+# Try to import PDF support
+try:
+    import fitz  # PyMuPDF
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+    print("Warning: PyMuPDF not installed. PDF support disabled. Run: pip install pymupdf")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -65,6 +74,13 @@ DOWNLOAD_FOLDER.mkdir(exist_ok=True)
 # Supported file types for context
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff'}
 TEXT_EXTENSIONS = {'.txt', '.md', '.json', '.csv', '.xml', '.py', '.js', '.html', '.css', '.yaml', '.yml'}
+
+# Analyzer API Configuration
+ANALYZER_API_URL = os.environ.get("ANALYZER_API_URL", "http://localhost:8000")
+ANALYZER_API_KEY = os.environ.get("ANALYZER_API_KEY", "dev-key-12345")
+
+# Document extensions for analysis
+DOCUMENT_EXTENSIONS = {'.pdf', '.md', '.txt'}
 
 # Application Initialization
 app = Flask(__name__)
@@ -568,6 +584,369 @@ def generate_image():
         })
 
 
+# ============================================================================
+# ANALYZER INTEGRATION - Document Analysis API
+# ============================================================================
+
+def extract_pdf_text(file_path: Path) -> str:
+    """Extract text content from a PDF file."""
+    if not PDF_SUPPORT:
+        return f"[PDF support not available. Install pymupdf: pip install pymupdf]"
+
+    try:
+        doc = fitz.open(str(file_path))
+        text_parts = []
+        for page_num, page in enumerate(doc):
+            text = page.get_text()
+            if text.strip():
+                text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
+        doc.close()
+        return "\n\n".join(text_parts) if text_parts else "[No text extracted from PDF]"
+    except Exception as e:
+        return f"[Error reading PDF: {str(e)}]"
+
+
+def extract_document_content(file_path: Path) -> Tuple[str, str]:
+    """
+    Extract content from a document file.
+    Returns: (content, error_message)
+    """
+    suffix = file_path.suffix.lower()
+
+    try:
+        if suffix == '.pdf':
+            content = extract_pdf_text(file_path)
+            return content, None
+        elif suffix in {'.md', '.txt'}:
+            content = file_path.read_text(encoding='utf-8', errors='replace')
+            return content, None
+        else:
+            return None, f"Unsupported file type: {suffix}"
+    except Exception as e:
+        return None, f"Error reading {file_path.name}: {str(e)}"
+
+
+@app.route('/api/analyzer/scan-folder', methods=['POST'])
+def scan_folder():
+    """
+    Scan a folder for documents (PDFs, MD, TXT files).
+
+    Request: {"path": "/path/to/folder"}
+    Response: {"success": true, "files": [...], "count": N}
+    """
+    data = request.json or {}
+    folder_path = data.get('path', '').strip()
+
+    if not folder_path:
+        return jsonify({"success": False, "error": "No folder path provided"})
+
+    folder = Path(folder_path).expanduser().resolve()
+
+    if not folder.exists():
+        return jsonify({"success": False, "error": f"Folder not found: {folder_path}"})
+
+    if not folder.is_dir():
+        return jsonify({"success": False, "error": f"Path is not a folder: {folder_path}"})
+
+    # Scan for documents
+    files = []
+    for ext in DOCUMENT_EXTENSIONS:
+        for file_path in folder.glob(f"*{ext}"):
+            if file_path.is_file():
+                stat = file_path.stat()
+                size_kb = stat.st_size / 1024
+
+                files.append({
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "type": file_path.suffix.lower()[1:],  # pdf, md, txt
+                    "size": f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB",
+                    "size_bytes": stat.st_size
+                })
+
+    # Sort by name
+    files.sort(key=lambda x: x["name"].lower())
+
+    return jsonify({
+        "success": True,
+        "files": files,
+        "count": len(files),
+        "folder": str(folder),
+        "pdf_support": PDF_SUPPORT
+    })
+
+
+@app.route('/api/analyzer/engines', methods=['GET'])
+def list_analyzer_engines():
+    """Fetch available engines from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/engines",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch engines: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/bundles', methods=['GET'])
+def list_analyzer_bundles():
+    """Fetch available bundles from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/bundles",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch bundles: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/output-modes', methods=['GET'])
+def list_analyzer_output_modes():
+    """Fetch available output modes from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/output-modes",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch output modes: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/analyze', methods=['POST'])
+def submit_analysis():
+    """
+    Submit documents for analysis.
+
+    Request: {
+        "file_paths": ["/path/to/doc.pdf", ...],
+        "engine": "thematic_synthesis",
+        "output_mode": "structured_text_report",
+        "collection_mode": "single" | "individual"
+    }
+    """
+    data = request.json or {}
+    file_paths = data.get('file_paths', [])
+    engine = data.get('engine')
+    output_mode = data.get('output_mode', 'structured_text_report')
+    collection_mode = data.get('collection_mode', 'single')
+
+    if not file_paths:
+        return jsonify({"success": False, "error": "No files provided"})
+
+    if not engine:
+        return jsonify({"success": False, "error": "No engine selected"})
+
+    # Extract content from all files
+    documents = []
+    errors = []
+
+    for i, file_path in enumerate(file_paths):
+        path = Path(file_path).expanduser().resolve()
+        if not path.exists():
+            errors.append(f"File not found: {file_path}")
+            continue
+
+        content, error = extract_document_content(path)
+        if error:
+            errors.append(error)
+            continue
+
+        documents.append({
+            "id": f"doc_{i+1}",
+            "title": path.stem,
+            "content": content
+        })
+
+    if not documents:
+        return jsonify({
+            "success": False,
+            "error": "No documents could be read",
+            "details": errors
+        })
+
+    # For individual mode, we'll return multiple job IDs
+    if collection_mode == "individual":
+        jobs = []
+        for doc in documents:
+            try:
+                response = httpx.post(
+                    f"{ANALYZER_API_URL}/v1/analyze",
+                    headers={"X-API-Key": ANALYZER_API_KEY},
+                    json={
+                        "documents": [doc],
+                        "engine": engine,
+                        "output_mode": output_mode
+                    },
+                    timeout=60.0,
+                )
+                response.raise_for_status()
+                job_data = response.json()
+                jobs.append({
+                    "job_id": job_data.get("job_id"),
+                    "title": doc["title"],
+                    "status": "submitted"
+                })
+            except Exception as e:
+                jobs.append({
+                    "title": doc["title"],
+                    "status": "failed",
+                    "error": str(e)
+                })
+
+        return jsonify({
+            "success": True,
+            "mode": "individual",
+            "jobs": jobs,
+            "warnings": errors if errors else None
+        })
+
+    else:
+        # Single collection mode - all documents together
+        try:
+            response = httpx.post(
+                f"{ANALYZER_API_URL}/v1/analyze",
+                headers={"X-API-Key": ANALYZER_API_KEY},
+                json={
+                    "documents": documents,
+                    "engine": engine,
+                    "output_mode": output_mode
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+            job_data = response.json()
+
+            return jsonify({
+                "success": True,
+                "mode": "collection",
+                "job_id": job_data.get("job_id"),
+                "document_count": len(documents),
+                "warnings": errors if errors else None
+            })
+
+        except httpx.HTTPError as e:
+            return jsonify({
+                "success": False,
+                "error": f"API error: {str(e)}"
+            })
+
+
+@app.route('/api/analyzer/analyze/bundle', methods=['POST'])
+def submit_bundle_analysis():
+    """Submit documents for bundle analysis (multiple engines)."""
+    data = request.json or {}
+    file_paths = data.get('file_paths', [])
+    bundle = data.get('bundle')
+    output_modes = data.get('output_modes', {})
+
+    if not file_paths:
+        return jsonify({"success": False, "error": "No files provided"})
+
+    if not bundle:
+        return jsonify({"success": False, "error": "No bundle selected"})
+
+    # Extract content from all files
+    documents = []
+    errors = []
+
+    for i, file_path in enumerate(file_paths):
+        path = Path(file_path).expanduser().resolve()
+        if not path.exists():
+            errors.append(f"File not found: {file_path}")
+            continue
+
+        content, error = extract_document_content(path)
+        if error:
+            errors.append(error)
+            continue
+
+        documents.append({
+            "id": f"doc_{i+1}",
+            "title": path.stem,
+            "content": content
+        })
+
+    if not documents:
+        return jsonify({
+            "success": False,
+            "error": "No documents could be read",
+            "details": errors
+        })
+
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/analyze/bundle",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            json={
+                "documents": documents,
+                "bundle": bundle,
+                "output_modes": output_modes
+            },
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        job_data = response.json()
+
+        return jsonify({
+            "success": True,
+            "job_id": job_data.get("job_id"),
+            "bundle": bundle,
+            "document_count": len(documents),
+            "warnings": errors if errors else None
+        })
+
+    except httpx.HTTPError as e:
+        return jsonify({
+            "success": False,
+            "error": f"API error: {str(e)}"
+        })
+
+
+@app.route('/api/analyzer/jobs/<job_id>', methods=['GET'])
+def get_analysis_job(job_id):
+    """Get job status from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to get job: {str(e)}"}), 500
+
+
+@app.route('/api/analyzer/jobs/<job_id>/result', methods=['GET'])
+def get_analysis_result(job_id):
+    """Get completed job result from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}/result",
+            headers={"X-API-Key": ANALYZER_API_KEY},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to get result: {str(e)}"}), 500
+
+
 # Main Page
 
 @app.route('/')
@@ -647,6 +1026,42 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--accent);
             margin-top: 0.75rem;
         }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px 8px 0 0;
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+        .tab-btn.active {
+            background: var(--bg-card);
+            border-color: var(--accent);
+            border-bottom-color: var(--bg-card);
+            color: var(--accent);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
         /* Layout */
         .main {
@@ -1014,16 +1429,260 @@ HTML_PAGE = '''<!DOCTYPE html>
         /* Animation */
         .fade-in { animation: fadeIn 0.25s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } }
+
+        /* ========== Document Analysis Styles ========== */
+
+        .analysis-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 1100px) {
+            .analysis-container { grid-template-columns: 1fr; }
+        }
+
+        .folder-input-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .folder-input-row input { flex: 1; font-family: 'SF Mono', monospace; }
+
+        .doc-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .doc-item:last-child { border-bottom: none; }
+
+        .doc-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+
+        .doc-item .icon {
+            font-size: 1.25rem;
+            opacity: 0.7;
+        }
+
+        .doc-item .info { flex: 1; }
+        .doc-item .name { font-weight: 500; }
+        .doc-item .meta { font-size: 0.75rem; color: var(--text-dim); }
+
+        .mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 0.875rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover { border-color: var(--accent); }
+
+        .mode-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .mode-btn .title { font-weight: 600; font-size: 0.9rem; }
+        .mode-btn .desc { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem; }
+
+        .engine-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.5rem;
+            margin: 1rem 0;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 0.25rem;
+        }
+
+        .engine-card {
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .engine-card:hover { border-color: var(--text-dim); }
+
+        .engine-card.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .engine-card .name { font-weight: 500; font-size: 0.85rem; }
+        .engine-card .priority {
+            display: inline-block;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            margin-top: 0.25rem;
+        }
+
+        .priority-1 { background: var(--success); color: var(--bg-dark); }
+        .priority-2 { background: var(--warning); color: var(--bg-dark); }
+        .priority-3 { background: var(--purple); color: white; }
+
+        .bundle-card {
+            padding: 1rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .bundle-card:hover { border-color: var(--text-dim); }
+        .bundle-card.selected { border-color: var(--accent); background: var(--accent-glow); }
+
+        .bundle-card .name { font-weight: 600; }
+        .bundle-card .engines { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem; }
+
+        .output-select { margin: 1rem 0; }
+
+        .analysis-progress {
+            display: none;
+            padding: 1.5rem;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .analysis-progress.show { display: block; }
+
+        .progress-bar-outer {
+            height: 8px;
+            background: var(--bg-hover);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #f97316);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-stage {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+
+        .stage-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            background: var(--bg-hover);
+            color: var(--text-dim);
+        }
+
+        .stage-badge.active { background: var(--accent-glow); color: var(--accent); }
+        .stage-badge.completed { background: rgba(52,211,153,0.2); color: var(--success); }
+
+        .results-container {
+            margin-top: 1.5rem;
+        }
+
+        .result-card {
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .result-card .header {
+            padding: 1rem;
+            background: var(--bg-hover);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .result-card .content {
+            padding: 1rem;
+            max-height: 500px;
+            overflow: auto;
+        }
+
+        .result-card pre {
+            white-space: pre-wrap;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .result-card img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        .analyzer-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .analyzer-status.connected { background: rgba(52,211,153,0.1); color: var(--success); }
+        .analyzer-status.disconnected { background: rgba(248,113,113,0.1); color: var(--error); }
     </style>
 </head>
 <body>
     <div class="app">
         <header>
-            <h1>Nano Banana 4K Visualizer</h1>
-            <p>Generate stunning images with Gemini's advanced reasoning model</p>
-            <span class="badge">gemini-3-pro-image-preview</span>
+            <h1>Nano Banana Studio</h1>
+            <p>AI-Powered Image Generation & Document Analysis</p>
         </header>
 
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('image-gen')">
+                <span>Image Generation</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('doc-analysis')">
+                <span>Document Analysis</span>
+            </button>
+        </div>
+
+        <!-- Image Generation Tab -->
+        <div id="image-gen" class="tab-content active">
         <div class="main">
             <!-- Input Panel -->
             <div class="input-panel">
@@ -1153,6 +1812,121 @@ Example prompts:
                 </div>
             </div>
         </div>
+        </div><!-- End Image Generation Tab -->
+
+        <!-- Document Analysis Tab -->
+        <div id="doc-analysis" class="tab-content">
+            <div class="analysis-container">
+                <!-- Left Panel: Document Selection -->
+                <div class="card">
+                    <h2 class="card-title">Document Selection</h2>
+
+                    <div id="analyzer-status" class="analyzer-status disconnected">
+                        <span class="status-dot"></span>
+                        <span id="analyzer-status-text">Checking Analyzer API...</span>
+                    </div>
+
+                    <!-- Folder Input -->
+                    <label>Folder Path</label>
+                    <div class="folder-input-row">
+                        <input type="text" id="folder-path" placeholder="~/Documents/articles">
+                        <button class="btn btn-outline" onclick="scanFolder()">Scan</button>
+                    </div>
+
+                    <!-- Document List -->
+                    <div id="doc-list-container" style="display:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                            <label style="margin:0;">Documents Found</label>
+                            <div>
+                                <button class="btn btn-sm btn-ghost" onclick="selectAllDocs()">Select All</button>
+                                <button class="btn btn-sm btn-ghost" onclick="deselectAllDocs()">Deselect All</button>
+                            </div>
+                        </div>
+                        <div id="doc-list" class="doc-list"></div>
+                        <p id="doc-count" style="font-size:0.8rem; color:var(--text-dim); margin-top:0.5rem;"></p>
+                    </div>
+
+                    <!-- Collection Mode -->
+                    <label style="margin-top:1rem;">Analysis Mode</label>
+                    <div class="mode-toggle">
+                        <div class="mode-btn active" onclick="setCollectionMode('single')" id="mode-single">
+                            <div class="title">Single Collection</div>
+                            <div class="desc">Analyze all docs together as one topic</div>
+                        </div>
+                        <div class="mode-btn" onclick="setCollectionMode('individual')" id="mode-individual">
+                            <div class="title">Individual Files</div>
+                            <div class="desc">Each file is a separate topic</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Engine Selection & Results -->
+                <div>
+                    <div class="card">
+                        <h2 class="card-title">Analysis Engine</h2>
+
+                        <!-- Engine vs Bundle Toggle -->
+                        <div class="mode-toggle">
+                            <div class="mode-btn active" onclick="setEngineMode('engine')" id="engine-mode-single">
+                                <div class="title">Single Engine</div>
+                                <div class="desc">One analytical lens</div>
+                            </div>
+                            <div class="mode-btn" onclick="setEngineMode('bundle')" id="engine-mode-bundle">
+                                <div class="title">Bundle</div>
+                                <div class="desc">Multiple engines, shared extraction</div>
+                            </div>
+                        </div>
+
+                        <!-- Single Engine Selection -->
+                        <div id="engine-selection">
+                            <label>Select Engine <span id="engine-count" style="color:var(--accent);"></span></label>
+                            <div id="engine-grid" class="engine-grid"></div>
+                        </div>
+
+                        <!-- Bundle Selection -->
+                        <div id="bundle-selection" style="display:none;">
+                            <label>Select Bundle</label>
+                            <div id="bundle-list"></div>
+                        </div>
+
+                        <!-- Output Mode -->
+                        <div class="output-select">
+                            <label>Output Format</label>
+                            <select id="output-mode">
+                                <option value="structured_text_report">Text Report</option>
+                                <option value="gemini_toulmin_diagram">Visual Diagram (Gemini)</option>
+                                <option value="mermaid">Mermaid Diagram</option>
+                                <option value="d3_interactive">Interactive D3</option>
+                                <option value="comparative_matrix_table">Comparison Table</option>
+                            </select>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button id="analyze-btn" class="btn btn-primary" onclick="runAnalysis()" disabled>
+                            Select Documents & Engine to Analyze
+                        </button>
+                    </div>
+
+                    <!-- Progress -->
+                    <div id="analysis-progress" class="analysis-progress">
+                        <h3 style="margin-bottom:0.5rem;">Processing...</h3>
+                        <div class="progress-bar-outer">
+                            <div id="progress-bar" class="progress-bar-inner"></div>
+                        </div>
+                        <div id="progress-text" style="font-size:0.85rem; color:var(--text-dim);"></div>
+                        <div class="progress-stage">
+                            <span class="stage-badge" id="stage-extraction">Extraction</span>
+                            <span class="stage-badge" id="stage-curation">Curation</span>
+                            <span class="stage-badge" id="stage-concretization">Concretization</span>
+                            <span class="stage-badge" id="stage-rendering">Rendering</span>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="results-container" class="results-container"></div>
+                </div>
+            </div>
+        </div><!-- End Document Analysis Tab -->
     </div>
 
     <script>
@@ -1404,6 +2178,482 @@ Example prompts:
             $('result-img').src = `data:image/png;base64,${currentImg}`;
             $('image-box').classList.add('show');
             $('placeholder').style.display = 'none';
+        }
+
+        // ============================================================
+        // DOCUMENT ANALYSIS FUNCTIONALITY
+        // ============================================================
+
+        // Analysis State
+        let scannedDocs = [];
+        let selectedDocs = new Set();
+        let engines = [];
+        let bundles = [];
+        let selectedEngine = null;
+        let selectedBundle = null;
+        let collectionMode = 'single';
+        let engineMode = 'engine';
+        let currentJobId = null;
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.closest('.tab-btn').classList.add('active');
+
+            // Load analysis data when switching to that tab
+            if (tabId === 'doc-analysis' && engines.length === 0) {
+                loadAnalyzerData();
+            }
+        }
+
+        // Check Analyzer API Status
+        async function checkAnalyzerStatus() {
+            const statusEl = $('analyzer-status');
+            const textEl = $('analyzer-status-text');
+
+            try {
+                const res = await fetch('/api/analyzer/engines');
+                if (res.ok) {
+                    statusEl.className = 'analyzer-status connected';
+                    textEl.textContent = 'Analyzer API Connected';
+                    return true;
+                }
+            } catch (e) {}
+
+            statusEl.className = 'analyzer-status disconnected';
+            textEl.textContent = 'Analyzer API Not Available - Start the Analyzer service';
+            return false;
+        }
+
+        // Load Engines and Bundles
+        async function loadAnalyzerData() {
+            const connected = await checkAnalyzerStatus();
+            if (!connected) return;
+
+            try {
+                // Load engines
+                const enginesRes = await fetch('/api/analyzer/engines');
+                if (enginesRes.ok) {
+                    engines = await enginesRes.json();
+                    renderEngines();
+                }
+
+                // Load bundles
+                const bundlesRes = await fetch('/api/analyzer/bundles');
+                if (bundlesRes.ok) {
+                    bundles = await bundlesRes.json();
+                    renderBundles();
+                }
+            } catch (e) {
+                console.error('Failed to load analyzer data:', e);
+            }
+        }
+
+        // Render Engine Cards
+        function renderEngines() {
+            const grid = $('engine-grid');
+            $('engine-count').textContent = `(${engines.length} available)`;
+
+            grid.innerHTML = engines.map(e => `
+                <div class="engine-card ${selectedEngine === e.engine_key ? 'selected' : ''}"
+                     onclick="selectEngine('${e.engine_key}')"
+                     title="${e.description || ''}">
+                    <div class="name">${e.name || e.engine_key}</div>
+                    <span class="priority priority-${e.priority || 2}">P${e.priority || 2}</span>
+                </div>
+            `).join('');
+        }
+
+        // Render Bundle Cards
+        function renderBundles() {
+            const list = $('bundle-list');
+
+            list.innerHTML = bundles.map(b => `
+                <div class="bundle-card ${selectedBundle === b.bundle_key ? 'selected' : ''}"
+                     onclick="selectBundle('${b.bundle_key}')">
+                    <div class="name">${b.name || b.bundle_key}</div>
+                    <div class="engines">${(b.member_engines || []).length} engines: ${(b.member_engines || []).slice(0, 3).join(', ')}${(b.member_engines || []).length > 3 ? '...' : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        // Select Engine
+        function selectEngine(key) {
+            selectedEngine = key;
+            selectedBundle = null;
+            renderEngines();
+            updateAnalyzeButton();
+        }
+
+        // Select Bundle
+        function selectBundle(key) {
+            selectedBundle = key;
+            selectedEngine = null;
+            renderBundles();
+            updateAnalyzeButton();
+        }
+
+        // Scan Folder
+        async function scanFolder() {
+            const folderPath = $('folder-path').value.trim();
+            if (!folderPath) {
+                alert('Please enter a folder path');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/analyzer/scan-folder', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: folderPath })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    scannedDocs = data.files;
+                    selectedDocs = new Set(scannedDocs.map(d => d.path));
+                    renderDocList();
+                    $('doc-list-container').style.display = 'block';
+
+                    if (!data.pdf_support && scannedDocs.some(d => d.type === 'pdf')) {
+                        alert('Note: PDF support requires pymupdf. Run: pip install pymupdf');
+                    }
+                } else {
+                    alert(data.error || 'Failed to scan folder');
+                }
+            } catch (e) {
+                alert('Error scanning folder: ' + e.message);
+            }
+        }
+
+        // Render Document List
+        function renderDocList() {
+            const list = $('doc-list');
+            const icons = { pdf: '📄', md: '📝', txt: '📃' };
+
+            list.innerHTML = scannedDocs.map(d => `
+                <div class="doc-item">
+                    <input type="checkbox" ${selectedDocs.has(d.path) ? 'checked' : ''}
+                           onchange="toggleDoc('${d.path}')">
+                    <span class="icon">${icons[d.type] || '📄'}</span>
+                    <div class="info">
+                        <div class="name">${d.name}</div>
+                        <div class="meta">${d.type.toUpperCase()} - ${d.size}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            $('doc-count').textContent = `${selectedDocs.size} of ${scannedDocs.length} documents selected`;
+            updateAnalyzeButton();
+        }
+
+        // Toggle Document Selection
+        function toggleDoc(path) {
+            if (selectedDocs.has(path)) {
+                selectedDocs.delete(path);
+            } else {
+                selectedDocs.add(path);
+            }
+            renderDocList();
+        }
+
+        // Select/Deselect All
+        function selectAllDocs() {
+            selectedDocs = new Set(scannedDocs.map(d => d.path));
+            renderDocList();
+        }
+
+        function deselectAllDocs() {
+            selectedDocs.clear();
+            renderDocList();
+        }
+
+        // Set Collection Mode
+        function setCollectionMode(mode) {
+            collectionMode = mode;
+            $('mode-single').classList.toggle('active', mode === 'single');
+            $('mode-individual').classList.toggle('active', mode === 'individual');
+        }
+
+        // Set Engine Mode
+        function setEngineMode(mode) {
+            engineMode = mode;
+            $('engine-mode-single').classList.toggle('active', mode === 'engine');
+            $('engine-mode-bundle').classList.toggle('active', mode === 'bundle');
+            $('engine-selection').style.display = mode === 'engine' ? 'block' : 'none';
+            $('bundle-selection').style.display = mode === 'bundle' ? 'block' : 'none';
+        }
+
+        // Update Analyze Button
+        function updateAnalyzeButton() {
+            const btn = $('analyze-btn');
+            const hasSelection = engineMode === 'engine' ? selectedEngine : selectedBundle;
+            const hasDocs = selectedDocs.size > 0;
+
+            btn.disabled = !hasSelection || !hasDocs;
+
+            if (!hasDocs) {
+                btn.textContent = 'Select Documents First';
+            } else if (!hasSelection) {
+                btn.textContent = `Select ${engineMode === 'engine' ? 'Engine' : 'Bundle'} to Analyze`;
+            } else {
+                btn.textContent = `Analyze ${selectedDocs.size} Document${selectedDocs.size > 1 ? 's' : ''}`;
+            }
+        }
+
+        // Run Analysis
+        async function runAnalysis() {
+            const filePaths = Array.from(selectedDocs);
+            const outputMode = $('output-mode').value;
+
+            $('analyze-btn').disabled = true;
+            $('analyze-btn').textContent = 'Submitting...';
+            $('analysis-progress').classList.add('show');
+            $('results-container').innerHTML = '';
+
+            resetStages();
+
+            try {
+                let response;
+                if (engineMode === 'engine') {
+                    response = await fetch('/api/analyzer/analyze', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            file_paths: filePaths,
+                            engine: selectedEngine,
+                            output_mode: outputMode,
+                            collection_mode: collectionMode
+                        })
+                    });
+                } else {
+                    // Bundle analysis
+                    const outputModes = {};
+                    const bundle = bundles.find(b => b.bundle_key === selectedBundle);
+                    if (bundle) {
+                        bundle.member_engines.forEach(e => {
+                            outputModes[e] = outputMode;
+                        });
+                    }
+
+                    response = await fetch('/api/analyzer/analyze/bundle', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            file_paths: filePaths,
+                            bundle: selectedBundle,
+                            output_modes: outputModes
+                        })
+                    });
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.mode === 'individual') {
+                        // Multiple jobs - track all
+                        pollMultipleJobs(data.jobs);
+                    } else {
+                        // Single job
+                        currentJobId = data.job_id;
+                        pollJobStatus(data.job_id);
+                    }
+                } else {
+                    showAnalysisError(data.error || 'Failed to submit analysis');
+                }
+            } catch (e) {
+                showAnalysisError('Error: ' + e.message);
+            }
+        }
+
+        // Poll Job Status
+        async function pollJobStatus(jobId) {
+            try {
+                const res = await fetch(`/api/analyzer/jobs/${jobId}`);
+                const job = await res.json();
+
+                updateProgress(job);
+
+                if (job.status === 'completed') {
+                    await fetchAndDisplayResult(jobId);
+                } else if (job.status === 'failed') {
+                    showAnalysisError(job.error_message || 'Analysis failed');
+                } else {
+                    setTimeout(() => pollJobStatus(jobId), 2000);
+                }
+            } catch (e) {
+                showAnalysisError('Error polling status: ' + e.message);
+            }
+        }
+
+        // Poll Multiple Jobs
+        async function pollMultipleJobs(jobs) {
+            const pending = jobs.filter(j => j.status === 'submitted');
+            let allDone = true;
+
+            for (const job of pending) {
+                if (!job.job_id) continue;
+
+                try {
+                    const res = await fetch(`/api/analyzer/jobs/${job.job_id}`);
+                    const status = await res.json();
+
+                    if (status.status === 'completed') {
+                        job.status = 'completed';
+                        const resultRes = await fetch(`/api/analyzer/jobs/${job.job_id}/result`);
+                        const result = await resultRes.json();
+                        displayResult(result, job.title);
+                    } else if (status.status === 'failed') {
+                        job.status = 'failed';
+                        displayError(job.title, status.error_message);
+                    } else {
+                        allDone = false;
+                    }
+                } catch (e) {
+                    job.status = 'failed';
+                }
+            }
+
+            const completed = jobs.filter(j => j.status === 'completed' || j.status === 'failed').length;
+            updateProgressMulti(completed, jobs.length);
+
+            if (!allDone) {
+                setTimeout(() => pollMultipleJobs(jobs), 2000);
+            } else {
+                finishAnalysis();
+            }
+        }
+
+        // Update Progress Display
+        function updateProgress(job) {
+            const percent = job.progress_percent || 0;
+            $('progress-bar').style.width = `${percent}%`;
+            $('progress-text').textContent = `${job.current_stage || job.status} (${percent}%)`;
+
+            // Update stage badges
+            const stages = ['extraction', 'curation', 'concretization', 'rendering'];
+            const currentIdx = stages.indexOf(job.current_stage?.toLowerCase());
+
+            stages.forEach((stage, i) => {
+                const el = $(`stage-${stage}`);
+                if (!el) return;
+
+                if (i < currentIdx) {
+                    el.className = 'stage-badge completed';
+                } else if (i === currentIdx) {
+                    el.className = 'stage-badge active';
+                } else {
+                    el.className = 'stage-badge';
+                }
+            });
+        }
+
+        function updateProgressMulti(completed, total) {
+            const percent = Math.round((completed / total) * 100);
+            $('progress-bar').style.width = `${percent}%`;
+            $('progress-text').textContent = `${completed} of ${total} documents processed`;
+        }
+
+        function resetStages() {
+            ['extraction', 'curation', 'concretization', 'rendering'].forEach(s => {
+                const el = $(`stage-${s}`);
+                if (el) el.className = 'stage-badge';
+            });
+        }
+
+        // Fetch and Display Result
+        async function fetchAndDisplayResult(jobId) {
+            try {
+                const res = await fetch(`/api/analyzer/jobs/${jobId}/result`);
+                const result = await res.json();
+                displayResult(result);
+                finishAnalysis();
+            } catch (e) {
+                showAnalysisError('Error fetching result: ' + e.message);
+            }
+        }
+
+        // Display Result
+        function displayResult(result, title = null) {
+            const container = $('results-container');
+
+            // Display outputs
+            const outputs = result.outputs || {};
+            for (const [key, output] of Object.entries(outputs)) {
+                const card = document.createElement('div');
+                card.className = 'result-card fade-in';
+
+                let contentHtml = '';
+                if (output.image_url) {
+                    contentHtml = `<img src="${output.image_url}" alt="${key}">`;
+                } else if (output.html_content) {
+                    contentHtml = output.html_content;
+                } else if (output.content) {
+                    contentHtml = `<pre>${escapeHtml(output.content)}</pre>`;
+                } else if (output.data) {
+                    contentHtml = `<pre>${JSON.stringify(output.data, null, 2)}</pre>`;
+                }
+
+                card.innerHTML = `
+                    <div class="header">
+                        <span>${title ? title + ' - ' : ''}${key}</span>
+                        <span class="badge">${output.mode || output.renderer_type || ''}</span>
+                    </div>
+                    <div class="content">${contentHtml}</div>
+                `;
+
+                container.appendChild(card);
+            }
+
+            // If no outputs but has canonical data, show that
+            if (Object.keys(outputs).length === 0 && result.canonical_data) {
+                const card = document.createElement('div');
+                card.className = 'result-card fade-in';
+                card.innerHTML = `
+                    <div class="header">Canonical Data</div>
+                    <div class="content"><pre>${JSON.stringify(result.canonical_data, null, 2)}</pre></div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function displayError(title, message) {
+            const container = $('results-container');
+            const card = document.createElement('div');
+            card.className = 'result-card fade-in';
+            card.innerHTML = `
+                <div class="header" style="background:rgba(248,113,113,0.2);">${title}</div>
+                <div class="content" style="color:var(--error);">${message || 'Analysis failed'}</div>
+            `;
+            container.appendChild(card);
+        }
+
+        function showAnalysisError(message) {
+            $('progress-text').textContent = message;
+            $('progress-text').style.color = 'var(--error)';
+            finishAnalysis();
+        }
+
+        function finishAnalysis() {
+            $('analyze-btn').disabled = false;
+            updateAnalyzeButton();
+
+            // Mark all stages complete
+            ['extraction', 'curation', 'concretization', 'rendering'].forEach(s => {
+                const el = $(`stage-${s}`);
+                if (el && !$('progress-text').style.color.includes('error')) {
+                    el.className = 'stage-badge completed';
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>

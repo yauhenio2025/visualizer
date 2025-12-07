@@ -1090,11 +1090,21 @@ def get_analysis_result(job_id):
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/jobs/{job_id}/result",
             headers=get_analyzer_headers(),
-            timeout=30.0,
+            timeout=120.0,  # Increased for large image data URLs
         )
         response.raise_for_status()
-        return jsonify(response.json())
+        result = response.json()
+        print(f"Got result for job {job_id}, outputs: {list(result.get('outputs', {}).keys())}")
+        # Log size of any image URLs
+        for key, output in result.get('outputs', {}).items():
+            if output.get('image_url'):
+                print(f"  {key}: image_url length = {len(output['image_url'])}")
+        return jsonify(result)
     except httpx.HTTPError as e:
+        print(f"HTTPError fetching result for {job_id}: {e}")
+        return jsonify({"error": f"Failed to get result: {str(e)}"}), 500
+    except Exception as e:
+        print(f"Error fetching result for {job_id}: {e}")
         return jsonify({"error": f"Failed to get result: {str(e)}"}), 500
 
 
@@ -3187,6 +3197,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Display Result
         function displayResult(result, title) {
+            console.log('displayResult called with:', result);
+
             var gallery = $('results-gallery');
             var grid = $('results-grid');
             var countEl = $('results-count');
@@ -3197,9 +3209,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             var metadata = result.metadata || {};
             var count = 0;
 
+            console.log('Outputs:', Object.keys(outputs));
+
             for (var key in outputs) {
                 var output = outputs[key];
                 count++;
+
+                console.log('Processing output:', key, 'has image_url:', !!output.image_url, 'url length:', output.image_url ? output.image_url.length : 0);
 
                 var resultData = {
                     key: key,
@@ -3212,7 +3228,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     data: output.data || null
                 };
                 allResults.push(resultData);
-                addToLibrary(resultData);
+
+                // Try to add to library but don't let failures block display
+                try {
+                    addToLibrary(resultData);
+                } catch (e) {
+                    console.warn('Failed to add to library:', e);
+                }
 
                 var card = createGalleryCard(resultData, allResults.length - 1);
                 grid.appendChild(card);
@@ -3247,6 +3269,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             preview.className = 'gallery-card-preview';
 
             if (data.isImage && data.imageUrl) {
+                console.log('Creating image element, URL length:', data.imageUrl.length);
                 var img = document.createElement('img');
                 if (data.imageUrl.startsWith('/static/')) {
                     img.src = 'http://localhost:8847' + data.imageUrl;
@@ -3254,7 +3277,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                     img.src = data.imageUrl;
                 }
                 img.alt = data.title;
+                img.onload = function() {
+                    console.log('Image loaded successfully:', data.title);
+                };
                 img.onerror = function() {
+                    console.error('Image failed to load:', data.title);
                     this.style.display = 'none';
                     var icon = document.createElement('div');
                     icon.className = 'icon-preview';
@@ -3641,9 +3668,25 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function addToLibrary(item) {
             item.addedAt = new Date().toISOString();
-            libraryItems.unshift(item);
+
+            // Clone item for storage - don't store huge data URLs
+            var storageItem = Object.assign({}, item);
+            if (storageItem.imageUrl && storageItem.imageUrl.startsWith('data:') && storageItem.imageUrl.length > 100000) {
+                // Data URL too large for localStorage - store placeholder
+                storageItem.imageUrl = null;
+                storageItem.imageTooLarge = true;
+            }
+
+            libraryItems.unshift(storageItem);
             if (libraryItems.length > 100) libraryItems = libraryItems.slice(0, 100);
-            localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+
+            try {
+                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+            } catch (e) {
+                console.warn('Failed to save to library (storage full?):', e);
+                // Remove the item we just added if storage failed
+                libraryItems.shift();
+            }
             renderLibrary();
         }
 
@@ -3682,6 +3725,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 img.alt = data.title;
                 preview.appendChild(img);
+            } else if (data.isImage && data.imageTooLarge) {
+                // Large image that couldn't be stored - show placeholder
+                var icon = document.createElement('div');
+                icon.className = 'icon-preview';
+                icon.innerHTML = '&#128444;';
+                icon.title = 'Image too large to store in library';
+                preview.appendChild(icon);
+                var label = document.createElement('div');
+                label.style.cssText = 'font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;';
+                label.textContent = '(Image not cached)';
+                preview.appendChild(label);
             } else if (data.content && isHtmlContent(data.content)) {
                 // HTML content - render scaled preview
                 var htmlPre = document.createElement('div');

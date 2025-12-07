@@ -2655,31 +2655,22 @@ Example prompts:
         // Simple markdown to HTML converter
         function markdownToHtml(md) {
             if (!md) return '';
-            return md
-                // Headers
-                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-                // Bold and italic
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                // Lists
-                .replace(/^\- (.+)$/gm, '<li>$1</li>')
-                .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-                // Tables
-                .replace(/\|(.+)\|/g, (match, content) => {
-                    const cells = content.split('|').map(c => c.trim());
-                    if (cells.every(c => /^-+$/.test(c))) return '';
-                    const tag = cells.some(c => c.includes('---')) ? 'th' : 'td';
-                    return '<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>';
-                })
-                .replace(/(<tr>.*<\/tr>\n?)+/g, '<table>$&</table>')
-                // Paragraphs
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/^(.+)$/gm, (match) => {
-                    if (match.startsWith('<')) return match;
-                    return match;
-                });
+            let html = md;
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1<\u002Fh3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1<\u002Fh2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1<\u002Fh1>');
+            // Bold and italic
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1<\u002Fstrong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1<\u002Fem>');
+            // Lists
+            html = html.replace(/^\- (.+)$/gm, '<li>$1<\u002Fli>');
+            // Tables - simplified
+            html = html.replace(/\|([^|]+)\|([^|]+)\|/g, '<tr><td>$1<\u002Ftd><td>$2<\u002Ftd><\u002Ftr>');
+            // Line breaks
+            html = html.replace(/\n\n/g, '<br><br>');
+            html = html.replace(/\n/g, '<br>');
+            return html;
         }
 
         // Display Result
@@ -2703,31 +2694,30 @@ Example prompts:
                     contentHtml = output.html_content;
                     rawContent = output.html_content;
                 } else if (output.content) {
-                    contentHtml = `<div class="markdown-content">${markdownToHtml(output.content)}</div>`;
+                    contentHtml = '<div class="markdown-content">' + markdownToHtml(output.content) + '<\/div>';
                     rawContent = output.content;
                 } else if (output.data) {
                     rawContent = JSON.stringify(output.data, null, 2);
-                    contentHtml = `<pre>${rawContent}</pre>`;
+                    contentHtml = '<pre>' + rawContent + '<\/pre>';
                 }
 
                 // Build metadata string
                 let metaHtml = '';
                 if (metadata.total_ms || metadata.cost_usd) {
-                    const time = metadata.total_ms ? `${(metadata.total_ms / 1000).toFixed(1)}s` : '';
-                    const cost = metadata.cost_usd ? `$${metadata.cost_usd.toFixed(4)}` : '';
-                    metaHtml = `<div class="result-meta">⏱️ ${time} | 💰 ${cost}</div>`;
+                    const time = metadata.total_ms ? (metadata.total_ms / 1000).toFixed(1) + 's' : '';
+                    const cost = metadata.cost_usd ? '$' + metadata.cost_usd.toFixed(4) : '';
+                    metaHtml = '<div class="result-meta">⏱️ ' + time + ' | 💰 ' + cost + '<\/div>';
                 }
 
-                card.innerHTML = `
-                    <div class="header">
-                        <span>${title ? title + ' - ' : ''}${key.replace(/_/g, ' ')}</span>
-                        <div class="result-actions">
-                            <button onclick="downloadResult('${cardId}', '${key}')">📥 Download</button>
-                            <span class="badge">${output.mode || output.renderer_type || ''}</span>
-                        </div>
-                    </div>
-                    <div class="content" id="${cardId}">${contentHtml}${metaHtml}</div>
-                `;
+                card.innerHTML =
+                    '<div class="header">' +
+                        '<span>' + (title ? title + ' - ' : '') + key.replace(/_/g, ' ') + '<\/span>' +
+                        '<div class="result-actions">' +
+                            '<button onclick="downloadResult(\'' + cardId + '\', \'' + key + '\')">📥 Download<\/button>' +
+                            '<span class="badge">' + (output.mode || output.renderer_type || '') + '<\/span>' +
+                        '<\/div>' +
+                    '<\/div>' +
+                    '<div class="content" id="' + cardId + '">' + contentHtml + metaHtml + '<\/div>';
 
                 // Store raw content for download
                 card.dataset.rawContent = rawContent;
@@ -2741,15 +2731,14 @@ Example prompts:
                 const card = document.createElement('div');
                 card.className = 'result-card fade-in';
                 const rawJson = JSON.stringify(result.canonical_data, null, 2);
-                card.innerHTML = `
-                    <div class="header">
-                        <span>Canonical Data</span>
-                        <div class="result-actions">
-                            <button onclick="downloadJson(this, 'canonical_data.json')">📥 Download JSON</button>
-                        </div>
-                    </div>
-                    <div class="content"><pre>${rawJson}</pre></div>
-                `;
+                card.innerHTML =
+                    '<div class="header">' +
+                        '<span>Canonical Data<\/span>' +
+                        '<div class="result-actions">' +
+                            '<button onclick="downloadJson(this, \'canonical_data.json\')">📥 Download JSON<\/button>' +
+                        '<\/div>' +
+                    '<\/div>' +
+                    '<div class="content"><pre>' + rawJson + '<\/pre><\/div>';
                 card.dataset.rawContent = rawJson;
                 container.appendChild(card);
             }
@@ -2788,10 +2777,9 @@ Example prompts:
             const container = $('results-container');
             const card = document.createElement('div');
             card.className = 'result-card fade-in';
-            card.innerHTML = `
-                <div class="header" style="background:rgba(248,113,113,0.2);">${title}</div>
-                <div class="content" style="color:var(--error);">${message || 'Analysis failed'}</div>
-            `;
+            card.innerHTML =
+                '<div class="header" style="background:rgba(248,113,113,0.2);">' + title + '<\/div>' +
+                '<div class="content" style="color:var(--error);">' + (message || 'Analysis failed') + '<\/div>';
             container.appendChild(card);
         }
 

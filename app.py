@@ -2643,29 +2643,40 @@ HTML_PAGE = '''<!DOCTYPE html>
             const percent = job.progress_percent || 0;
             $('progress-bar').style.width = percent + '%';
 
-            // Build status text
+            // Debug: log job status
+            console.log('Job status update:', {
+                status: job.status,
+                stage: job.current_stage,
+                percent: percent,
+                stages_completed: job.stages_completed
+            });
+
+            // Build status text - normalize to lowercase for comparison
             let statusText = '';
-            const stage = job.current_stage ? job.current_stage.toLowerCase() : '';
-            const status = job.status || 'pending';
+            const stage = job.current_stage ? String(job.current_stage).toLowerCase() : '';
+            const status = job.status ? String(job.status).toLowerCase() : 'pending';
             const docCount = currentDocCount > 0 ? currentDocCount : '';
             const docSuffix = docCount ? ' (' + docCount + ' doc' + (docCount > 1 ? 's' : '') + ')' : '';
 
+            // Match status or stage (API may return either)
             if (status === 'pending' || status === 'queued') {
                 statusText = 'Queued...' + docSuffix;
-            } else if (stage === 'extraction' || status === 'extracting') {
+            } else if (stage.includes('extract') || status.includes('extract')) {
                 statusText = 'Extracting from ' + (docCount || '') + ' document' + (docCount > 1 ? 's' : '') + '... (' + percent + '%)';
-            } else if (stage === 'curation' || status === 'curating') {
-                statusText = 'Curating analysis... (' + percent + '%)';
-            } else if (stage === 'concretization' || status === 'concretizing') {
+            } else if (stage.includes('curat') || status.includes('curat')) {
+                statusText = 'Curating insights... (' + percent + '%)';
+            } else if (stage.includes('concret') || status.includes('concret')) {
                 statusText = 'Refining labels... (' + percent + '%)';
-            } else if (stage === 'rendering' || status === 'rendering') {
+            } else if (stage.includes('render') || status.includes('render')) {
                 statusText = 'Generating output... (' + percent + '%)';
             } else if (status === 'completed') {
                 statusText = 'Complete!' + docSuffix;
             } else if (status === 'failed') {
                 statusText = 'Failed';
             } else if (stage || status) {
-                statusText = (stage || status) + ' (' + percent + '%)';
+                // Capitalize first letter for display
+                const displayStage = stage || status;
+                statusText = displayStage.charAt(0).toUpperCase() + displayStage.slice(1) + '... (' + percent + '%)';
             } else {
                 statusText = 'Processing...' + docSuffix + ' (' + percent + '%)';
             }
@@ -2674,16 +2685,22 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Update stage badges
             const stages = ['extraction', 'curation', 'concretization', 'rendering'];
-            const stagesCompleted = job.stages_completed || [];
+            // Normalize stages_completed to lowercase strings
+            const stagesCompleted = (job.stages_completed || []).map(s => String(s).toLowerCase());
             const currentStage = stage || '';
 
             stages.forEach(function(stageName, i) {
                 const el = $('stage-' + stageName);
                 if (!el) return;
 
-                if (stagesCompleted.includes(stageName)) {
+                // Check if completed (includes partial match for flexibility)
+                const isCompleted = stagesCompleted.some(s => s.includes(stageName.substring(0, 5)));
+                // Check if current (includes partial match)
+                const isCurrent = currentStage.includes(stageName.substring(0, 5));
+
+                if (isCompleted) {
                     el.className = 'stage-badge completed';
-                } else if (currentStage === stageName) {
+                } else if (isCurrent) {
                     el.className = 'stage-badge active';
                 } else {
                     el.className = 'stage-badge';

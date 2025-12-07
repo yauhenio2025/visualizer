@@ -3030,21 +3030,12 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function cleanTextForPreview(text) {
             if (!text) return '';
-            // Remove markdown headers
-            var clean = text.replace(/^#{1,6}\s+/gm, '');
-            // Remove bold/italic markers
-            clean = clean.replace(/\*\*([^*]+)\*\*/g, '$1');
-            clean = clean.replace(/\*([^*]+)\*/g, '$1');
-            clean = clean.replace(/__([^_]+)__/g, '$1');
-            clean = clean.replace(/_([^_]+)_/g, '$1');
-            // Remove markdown links, keep text
-            clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-            // Remove horizontal rules
-            clean = clean.replace(/^-{3,}$/gm, '');
-            // Remove excessive newlines
-            clean = clean.replace(/\n{3,}/g, '\n\n');
-            // Trim and limit
-            return clean.trim();
+            // Simple cleanup - remove # headers and ** bold
+            return text
+                .replace(/^#+ /gm, '')
+                .replace(/[*][*]/g, '')
+                .replace(/^---+$/gm, '')
+                .trim();
         }
 
         function formatJsonPreview(data) {

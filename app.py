@@ -1779,7 +1779,180 @@ HTML_PAGE = '''<!DOCTYPE html>
         /* Animations */
         .fade-in { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
+
+        /* Rendered Markdown Styles */
+        .markdown-body {
+            font-family: 'Libre Baskerville', Georgia, serif;
+            font-size: 1rem;
+            line-height: 1.8;
+            color: var(--text);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .markdown-body h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0 0 1.5rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+            line-height: 1.3;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 2rem 0 1rem 0;
+            color: var(--accent);
+            line-height: 1.4;
+        }
+
+        .markdown-body h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 1.5rem 0 0.75rem 0;
+            color: var(--accent-muted);
+        }
+
+        .markdown-body h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 1.25rem 0 0.5rem 0;
+            color: var(--accent-muted);
+        }
+
+        .markdown-body p {
+            margin: 0 0 1.25rem 0;
+            text-align: justify;
+            hyphens: auto;
+        }
+
+        .markdown-body blockquote {
+            border-left: 3px solid var(--accent);
+            margin: 1.5rem 0;
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-input);
+            font-style: italic;
+            color: var(--accent-muted);
+        }
+
+        .markdown-body blockquote p:last-child { margin-bottom: 0; }
+
+        .markdown-body ul, .markdown-body ol {
+            margin: 1rem 0 1.25rem 1.5rem;
+            padding: 0;
+        }
+
+        .markdown-body li {
+            margin-bottom: 0.5rem;
+            line-height: 1.7;
+        }
+
+        .markdown-body code {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 0.875em;
+            background: var(--bg-input);
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
+            color: var(--accent-muted);
+        }
+
+        .markdown-body pre {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .markdown-body pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .markdown-body hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 2rem 0;
+        }
+
+        .markdown-body a {
+            color: var(--accent);
+            text-decoration: underline;
+            text-decoration-color: var(--border-dark);
+            text-underline-offset: 2px;
+        }
+
+        .markdown-body a:hover {
+            text-decoration-color: var(--accent);
+        }
+
+        .markdown-body strong { font-weight: 700; }
+        .markdown-body em { font-style: italic; }
+
+        /* Footnote styling */
+        .markdown-body sup {
+            font-size: 0.75em;
+            line-height: 0;
+            position: relative;
+            vertical-align: baseline;
+            top: -0.5em;
+            color: var(--accent-muted);
+        }
+
+        /* Table styling */
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        .markdown-body th, .markdown-body td {
+            border: 1px solid var(--border);
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+
+        .markdown-body th {
+            background: var(--bg-input);
+            font-weight: 600;
+        }
+
+        .markdown-body tr:nth-child(even) {
+            background: var(--bg-input);
+        }
+
+        /* Sources/References section */
+        .markdown-body h2:last-of-type + p,
+        .markdown-body h2:last-of-type ~ p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        /* Modal adjustments for markdown */
+        .result-modal-body.markdown-view {
+            padding: 2rem 3rem;
+            background: var(--bg-card);
+        }
+
+        .result-modal-content.wide {
+            max-width: 900px;
+            width: 90vw;
+        }
+
+        /* Copy button success state */
+        .btn-copied {
+            background: var(--success) !important;
+            color: white !important;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="app">
@@ -2685,6 +2858,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             return card;
         }
 
+        function isMarkdown(text) {
+            // Check if text looks like markdown
+            if (!text) return false;
+            // Has headers, or starts with # title, or has markdown links/emphasis
+            return /^#+ /m.test(text) || /\[.+\]\(.+\)/.test(text) || /\*\*.+\*\*/.test(text);
+        }
+
         function openResultModal(index) {
             var data = allResults[index];
             if (!data) return;
@@ -2712,6 +2892,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             var body = document.createElement('div');
             body.className = 'result-modal-body';
 
+            var isMarkdownContent = false;
+
             if (data.isImage && data.imageUrl) {
                 var img = document.createElement('img');
                 if (data.imageUrl.startsWith('/static/')) {
@@ -2721,6 +2903,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 img.alt = data.title;
                 body.appendChild(img);
+            } else if (data.content && isMarkdown(data.content)) {
+                // Render as formatted markdown
+                isMarkdownContent = true;
+                content.classList.add('wide');
+                body.classList.add('markdown-view');
+                var mdContainer = document.createElement('div');
+                mdContainer.className = 'markdown-body';
+                mdContainer.innerHTML = marked.parse(data.content);
+                body.appendChild(mdContainer);
             } else if (data.content) {
                 var pre = document.createElement('pre');
                 pre.textContent = data.content;
@@ -2733,6 +2924,26 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var actions = document.createElement('div');
             actions.className = 'result-modal-actions';
+
+            // Copy button for text content
+            if (data.content || data.data) {
+                var copyBtn = document.createElement('button');
+                copyBtn.className = 'btn';
+                copyBtn.style.width = 'auto';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = function() {
+                    var textToCopy = data.content || JSON.stringify(data.data, null, 2);
+                    navigator.clipboard.writeText(textToCopy).then(function() {
+                        copyBtn.textContent = 'Copied!';
+                        copyBtn.classList.add('btn-copied');
+                        setTimeout(function() {
+                            copyBtn.textContent = 'Copy';
+                            copyBtn.classList.remove('btn-copied');
+                        }, 2000);
+                    });
+                };
+                actions.appendChild(copyBtn);
+            }
 
             var dlBtn = document.createElement('button');
             dlBtn.className = 'btn btn-primary';

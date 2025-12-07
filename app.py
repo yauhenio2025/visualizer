@@ -1108,6 +1108,22 @@ def get_analysis_result(job_id):
         return jsonify({"error": f"Failed to get result: {str(e)}"}), 500
 
 
+@app.route('/api/analyzer/jobs', methods=['GET'])
+def list_analysis_jobs():
+    """List recent jobs from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/jobs",
+            headers=get_analyzer_headers(),
+            params={"status": "completed", "limit": 20},
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to list jobs: {str(e)}"}), 500
+
+
 # Main Page
 
 @app.route('/')
@@ -2357,10 +2373,14 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         <!-- Library View -->
         <div id="library-view" class="view-content">
+            <div style="margin-bottom: 1rem; text-align: right;">
+                <button class="btn btn-sm" onclick="loadRecentJobs()">Load Recent Jobs</button>
+            </div>
             <div class="library-empty" id="library-empty">
                 <div class="library-empty-icon">&#128218;</div>
                 <div class="library-empty-text">Your library is empty</div>
                 <div class="library-empty-hint">Analyzed documents and generated visualizations will appear here</div>
+                <button class="btn" style="margin-top: 1rem;" onclick="loadRecentJobs()">Load from Server</button>
             </div>
             <div id="library-grid" class="library-grid"></div>
         </div>
@@ -3663,6 +3683,63 @@ HTML_PAGE = '''<!DOCTYPE html>
                 } catch (e) {
                     libraryItems = [];
                 }
+            }
+        }
+
+        async function loadRecentJobs() {
+            console.log('Loading recent jobs from server...');
+            try {
+                const res = await fetch('/api/analyzer/jobs');
+                const data = await res.json();
+                console.log('Found jobs:', data.jobs?.length || 0);
+
+                if (!data.jobs || data.jobs.length === 0) {
+                    alert('No completed jobs found on server');
+                    return;
+                }
+
+                // Fetch results for each completed job
+                for (const job of data.jobs.slice(0, 10)) {
+                    console.log('Fetching result for job:', job.job_id);
+                    try {
+                        const resultRes = await fetch('/api/analyzer/jobs/' + job.job_id + '/result');
+                        const result = await resultRes.json();
+
+                        if (result.outputs) {
+                            for (var key in result.outputs) {
+                                var output = result.outputs[key];
+                                var resultData = {
+                                    key: key,
+                                    title: key.replace(/_/g, ' '),
+                                    output: output,
+                                    metadata: result.metadata || {},
+                                    isImage: !!output.image_url,
+                                    imageUrl: output.image_url || null,
+                                    content: output.content || '',
+                                    data: output.data || null,
+                                    addedAt: job.completed_at || new Date().toISOString()
+                                };
+
+                                // Check if already in library
+                                var exists = libraryItems.some(function(it) {
+                                    return it.key === key && it.addedAt === resultData.addedAt;
+                                });
+
+                                if (!exists) {
+                                    libraryItems.push(resultData);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch result for job', job.job_id, e);
+                    }
+                }
+
+                renderLibrary();
+                console.log('Library now has', libraryItems.length, 'items');
+            } catch (e) {
+                console.error('Failed to load recent jobs:', e);
+                alert('Failed to load jobs: ' + e.message);
             }
         }
 

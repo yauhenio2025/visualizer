@@ -1955,7 +1955,18 @@ HTML_PAGE = '''<!DOCTYPE html>
         .markdown-body h2:last-of-type ~ p {
             font-family: 'Inter', sans-serif;
             font-size: 0.85rem;
-            line-height: 1.6;
+            line-height: 1.8;
+        }
+
+        /* Each footnote on its own line */
+        .markdown-body h2:last-of-type + p sup,
+        .markdown-body h2:last-of-type ~ p sup {
+            display: block;
+            margin-top: 0.5rem;
+        }
+        .markdown-body h2:last-of-type + p sup:first-child,
+        .markdown-body h2:last-of-type ~ p sup:first-child {
+            margin-top: 0;
         }
 
         /* Modal adjustments for markdown */
@@ -2969,6 +2980,27 @@ HTML_PAGE = '''<!DOCTYPE html>
             return /^#+ /m.test(text) || /\[.+\]\(.+\)/.test(text) || /\*\*.+\*\*/.test(text);
         }
 
+        function formatSourcesFootnotes(container) {
+            // Find the Sources heading and format footnotes in the following paragraph
+            var headings = container.querySelectorAll('h2');
+            headings.forEach(function(h2) {
+                if (h2.textContent.toLowerCase().includes('source')) {
+                    // Get the next sibling paragraph(s)
+                    var sibling = h2.nextElementSibling;
+                    while (sibling && sibling.tagName === 'P') {
+                        // Split on footnote markers (¹²³⁴⁵⁶⁷⁸⁹⁰) and reformat
+                        var html = sibling.innerHTML;
+                        // Add line break before each footnote number (except first)
+                        html = html.replace(/([^\s])\s*([¹²³⁴⁵⁶⁷⁸⁹⁰]+)\s+/g, '$1<br><br>$2 ');
+                        // Remove leading br if present
+                        html = html.replace(/^<br><br>/, '');
+                        sibling.innerHTML = html;
+                        sibling = sibling.nextElementSibling;
+                    }
+                }
+            });
+        }
+
         function openResultModal(index) {
             var data = allResults[index];
             if (!data) return;
@@ -3015,6 +3047,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var mdContainer = document.createElement('div');
                 mdContainer.className = 'markdown-body';
                 mdContainer.innerHTML = marked.parse(data.content);
+
+                // Format footnotes in Sources section - each on its own line
+                formatSourcesFootnotes(mdContainer);
+
                 body.appendChild(mdContainer);
             } else if (data.content) {
                 var pre = document.createElement('pre');

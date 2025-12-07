@@ -1638,6 +1638,32 @@ HTML_PAGE = '''<!DOCTYPE html>
             max-height: 100%;
             font-family: 'SF Mono', Monaco, monospace;
         }
+        .gallery-card-preview .html-preview {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            transform: scale(0.4);
+            transform-origin: top left;
+            width: 250%;
+            height: 250%;
+            padding: 0.5rem;
+            pointer-events: none;
+        }
+        .gallery-card-preview .html-preview table {
+            font-size: 0.65rem;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .gallery-card-preview .html-preview th,
+        .gallery-card-preview .html-preview td {
+            border: 1px solid var(--border);
+            padding: 0.25rem 0.4rem;
+            text-align: left;
+        }
+        .gallery-card-preview .html-preview th {
+            background: var(--bg-input);
+            font-weight: 600;
+        }
         .gallery-card-preview .icon-preview { font-size: 2.5rem; opacity: 0.4; }
 
         .gallery-card-info { padding: 1rem; }
@@ -2910,6 +2936,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     preview.appendChild(icon);
                 };
                 preview.appendChild(img);
+            } else if (data.content && isHtmlContent(data.content)) {
+                // HTML content - render scaled preview
+                var htmlPre = document.createElement('div');
+                htmlPre.className = 'html-preview';
+                htmlPre.innerHTML = data.content;
+                preview.appendChild(htmlPre);
             } else if (data.content) {
                 var textPre = document.createElement('div');
                 textPre.className = 'text-preview';
@@ -2982,6 +3014,12 @@ HTML_PAGE = '''<!DOCTYPE html>
             return /^#+ /m.test(text) || /\[.+\]\(.+\)/.test(text) || /\*\*.+\*\*/.test(text);
         }
 
+        function isHtmlContent(text) {
+            // Check if text looks like HTML (tables, divs, etc)
+            if (!text) return false;
+            return /<(table|div|html|body|p|h[1-6]|ul|ol|span)[^>]*>/i.test(text);
+        }
+
         function formatSourcesFootnotes(container) {
             // Find the Sources heading and format footnotes in the following paragraph
             var headings = container.querySelectorAll('h2');
@@ -3041,6 +3079,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 img.alt = data.title;
                 body.appendChild(img);
+            } else if (data.content && isHtmlContent(data.content)) {
+                // Render as HTML (tables, etc)
+                isMarkdownContent = true;
+                content.classList.add('wide');
+                body.classList.add('markdown-view');
+                var htmlContainer = document.createElement('div');
+                htmlContainer.className = 'markdown-body';
+                htmlContainer.innerHTML = data.content;
+                body.appendChild(htmlContainer);
             } else if (data.content && isMarkdown(data.content)) {
                 // Render as formatted markdown
                 isMarkdownContent = true;
@@ -3265,6 +3312,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 img.alt = data.title;
                 preview.appendChild(img);
+            } else if (data.content && isHtmlContent(data.content)) {
+                // HTML content - render scaled preview
+                var htmlPre = document.createElement('div');
+                htmlPre.className = 'html-preview';
+                htmlPre.innerHTML = data.content;
+                preview.appendChild(htmlPre);
             } else if (data.content) {
                 var textPre = document.createElement('div');
                 textPre.className = 'text-preview';

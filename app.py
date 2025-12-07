@@ -871,6 +871,10 @@ def submit_analysis():
             "details": errors
         })
 
+    # Debug: log document info
+    for doc in documents:
+        print(f"[DEBUG] Document: {doc.get('title', 'unknown')}, content length: {len(doc.get('content', ''))}")
+
     # For individual mode, we'll return multiple job IDs
     if collection_mode == "individual":
         jobs = []
@@ -918,7 +922,7 @@ def submit_analysis():
                     "engine": engine,
                     "output_mode": output_mode
                 },
-                timeout=60.0,
+                timeout=300.0,  # 5 minutes for large document sets
             )
             response.raise_for_status()
             job_data = response.json()
@@ -931,7 +935,21 @@ def submit_analysis():
                 "warnings": errors if errors else None
             })
 
+        except httpx.HTTPStatusError as e:
+            # Get the response body for more details
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                pass
+            print(f"[DEBUG] API Error: {e}, Response: {error_detail}")
+            return jsonify({
+                "success": False,
+                "error": f"API error: {str(e)}",
+                "detail": error_detail
+            })
         except httpx.HTTPError as e:
+            print(f"[DEBUG] HTTP Error: {e}")
             return jsonify({
                 "success": False,
                 "error": f"API error: {str(e)}"
@@ -2309,6 +2327,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Get documents (either paths or inline content)
                 const docData = await getDocumentsForAnalysis();
 
+                // Track document count for progress display
+                currentDocCount = docData.type === 'paths'
+                    ? docData.file_paths.length
+                    : docData.documents.length;
+
                 $('analyze-btn').textContent = 'Submitting...';
 
                 let response;
@@ -2367,12 +2390,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
                 } else {
                     console.log('Analysis failed:', data.error, data);
-                    showAnalysisError(data.error || 'Failed to submit analysis');
+                    var errorMsg = data.error || 'Failed to submit analysis';
+                    if (data.detail) {
+                        console.log('Error detail:', data.detail);
+                        errorMsg += ' - ' + data.detail.substring(0, 200);
+                    }
+                    showAnalysisError(errorMsg);
                 }
             } catch (e) {
                 showAnalysisError('Error: ' + e.message);
             }
         }
+
+        // Track document count for progress display
+        let currentDocCount = 0;
 
         // Poll Job Status
         async function pollJobStatus(jobId) {
@@ -2380,6 +2411,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const res = await fetch('/api/analyzer/jobs/' + jobId);
                 const job = await res.json();
 
+                // Add doc count to job for display
+                job.doc_count = currentDocCount;
                 updateProgress(job);
 
                 if (job.status === 'completed') {
@@ -2436,18 +2469,48 @@ HTML_PAGE = '''<!DOCTYPE html>
         function updateProgress(job) {
             const percent = job.progress_percent || 0;
             $('progress-bar').style.width = percent + '%';
-            $('progress-text').textContent = (job.current_stage || job.status) + ' (' + percent + '%)';
 
+            // Build status text
+            let statusText = '';
+            const stage = job.current_stage ? job.current_stage.toLowerCase() : '';
+            const status = job.status || 'pending';
+            const docCount = currentDocCount > 0 ? currentDocCount : '';
+            const docSuffix = docCount ? ' (' + docCount + ' doc' + (docCount > 1 ? 's' : '') + ')' : '';
+
+            if (status === 'pending' || status === 'queued') {
+                statusText = 'Queued...' + docSuffix;
+            } else if (stage === 'extraction' || status === 'extracting') {
+                statusText = 'Extracting from ' + (docCount || '') + ' document' + (docCount > 1 ? 's' : '') + '... (' + percent + '%)';
+            } else if (stage === 'curation' || status === 'curating') {
+                statusText = 'Curating analysis... (' + percent + '%)';
+            } else if (stage === 'concretization' || status === 'concretizing') {
+                statusText = 'Refining labels... (' + percent + '%)';
+            } else if (stage === 'rendering' || status === 'rendering') {
+                statusText = 'Generating output... (' + percent + '%)';
+            } else if (status === 'completed') {
+                statusText = 'Complete!' + docSuffix;
+            } else if (status === 'failed') {
+                statusText = 'Failed';
+            } else if (stage || status) {
+                statusText = (stage || status) + ' (' + percent + '%)';
+            } else {
+                statusText = 'Processing...' + docSuffix + ' (' + percent + '%)';
+            }
+
+            $('progress-text').textContent = statusText;
+
+            // Update stage badges
             const stages = ['extraction', 'curation', 'concretization', 'rendering'];
-            const currentIdx = stages.indexOf((job.current_stage || '').toLowerCase());
+            const stagesCompleted = job.stages_completed || [];
+            const currentStage = stage || '';
 
-            stages.forEach(function(stage, i) {
-                const el = $('stage-' + stage);
+            stages.forEach(function(stageName, i) {
+                const el = $('stage-' + stageName);
                 if (!el) return;
 
-                if (i < currentIdx) {
+                if (stagesCompleted.includes(stageName)) {
                     el.className = 'stage-badge completed';
-                } else if (i === currentIdx) {
+                } else if (currentStage === stageName) {
                     el.className = 'stage-badge active';
                 } else {
                     el.className = 'stage-badge';

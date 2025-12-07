@@ -3669,23 +3669,25 @@ HTML_PAGE = '''<!DOCTYPE html>
         function addToLibrary(item) {
             item.addedAt = new Date().toISOString();
 
-            // Clone item for storage - don't store huge data URLs
-            var storageItem = Object.assign({}, item);
-            if (storageItem.imageUrl && storageItem.imageUrl.startsWith('data:') && storageItem.imageUrl.length > 100000) {
-                // Data URL too large for localStorage - store placeholder
-                storageItem.imageUrl = null;
-                storageItem.imageTooLarge = true;
-            }
-
-            libraryItems.unshift(storageItem);
+            // Add original item to in-memory array for display
+            libraryItems.unshift(item);
             if (libraryItems.length > 100) libraryItems = libraryItems.slice(0, 100);
 
+            // Clone for localStorage - don't store huge data URLs
+            var storageItems = libraryItems.map(function(it) {
+                if (it.imageUrl && it.imageUrl.startsWith('data:') && it.imageUrl.length > 100000) {
+                    var clone = Object.assign({}, it);
+                    clone.imageUrl = null;
+                    clone.imageTooLarge = true;
+                    return clone;
+                }
+                return it;
+            });
+
             try {
-                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+                localStorage.setItem('visualizer_library', JSON.stringify(storageItems));
             } catch (e) {
                 console.warn('Failed to save to library (storage full?):', e);
-                // Remove the item we just added if storage failed
-                libraryItems.shift();
             }
             renderLibrary();
         }

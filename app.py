@@ -1867,6 +1867,18 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--bg-card);
         }
 
+        .gallery-card-actions button.btn-delete {
+            background: transparent;
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .gallery-card-actions button.btn-delete:hover {
+            background: var(--error);
+            border-color: var(--error);
+            color: white;
+        }
+
         /* Modal */
         .result-modal {
             position: fixed;
@@ -3710,8 +3722,32 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
             info.appendChild(meta);
 
+            // Add action buttons
+            var actions = document.createElement('div');
+            actions.className = 'gallery-card-actions';
+
+            var viewBtn = document.createElement('button');
+            viewBtn.textContent = 'View';
+            viewBtn.onclick = function(e) {
+                e.stopPropagation();
+                allResults = [data];
+                openResultModal(0);
+            };
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'btn-delete';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation();
+                deleteFromLibrary(index);
+            };
+
+            actions.appendChild(viewBtn);
+            actions.appendChild(deleteBtn);
+
             card.appendChild(preview);
             card.appendChild(info);
+            card.appendChild(actions);
 
             card.onclick = function() {
                 allResults = [data];
@@ -3719,6 +3755,14 @@ HTML_PAGE = '''<!DOCTYPE html>
             };
 
             return card;
+        }
+
+        function deleteFromLibrary(index) {
+            if (confirm('Delete this item from library?')) {
+                libraryItems.splice(index, 1);
+                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+                renderLibrary();
+            }
         }
     </script>
 </body>

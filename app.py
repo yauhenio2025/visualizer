@@ -2652,25 +2652,11 @@ Example prompts:
             }
         }
 
-        // Simple markdown to HTML converter
-        function markdownToHtml(md) {
-            if (!md) return '';
-            let html = md;
-            // Headers
-            html = html.replace(/^### (.+)$/gm, '<h3>$1<\u002Fh3>');
-            html = html.replace(/^## (.+)$/gm, '<h2>$1<\u002Fh2>');
-            html = html.replace(/^# (.+)$/gm, '<h1>$1<\u002Fh1>');
-            // Bold and italic
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1<\u002Fstrong>');
-            html = html.replace(/\*(.+?)\*/g, '<em>$1<\u002Fem>');
-            // Lists
-            html = html.replace(/^\- (.+)$/gm, '<li>$1<\u002Fli>');
-            // Tables - simplified
-            html = html.replace(/\|([^|]+)\|([^|]+)\|/g, '<tr><td>$1<\u002Ftd><td>$2<\u002Ftd><\u002Ftr>');
-            // Line breaks
-            html = html.replace(/\n\n/g, '<br><br>');
-            html = html.replace(/\n/g, '<br>');
-            return html;
+        // Escape HTML for safe display
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Display Result
@@ -2694,7 +2680,7 @@ Example prompts:
                     contentHtml = output.html_content;
                     rawContent = output.html_content;
                 } else if (output.content) {
-                    contentHtml = '<div class="markdown-content">' + markdownToHtml(output.content) + '<\/div>';
+                    contentHtml = '<pre>' + escapeHtml(output.content) + '<'+'/pre>';
                     rawContent = output.content;
                 } else if (output.data) {
                     rawContent = JSON.stringify(output.data, null, 2);

@@ -2663,6 +2663,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Poll Job Status
+        let pollCount = 0;
         async function pollJobStatus(jobId) {
             try {
                 const res = await fetch('/api/analyzer/jobs/' + jobId);
@@ -2670,16 +2671,26 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Add doc count to job for display
                 job.doc_count = currentDocCount;
+                pollCount++;
+
+                // Warn if stuck in queued for too long (>10 polls = 20+ seconds)
+                if ((job.status === 'pending' || job.status === 'queued') && pollCount > 10) {
+                    job.stuckWarning = true;
+                }
+
                 updateProgress(job);
 
                 if (job.status === 'completed') {
+                    pollCount = 0;
                     await fetchAndDisplayResult(jobId);
                 } else if (job.status === 'failed') {
+                    pollCount = 0;
                     showAnalysisError(job.error_message || 'Analysis failed');
                 } else {
                     setTimeout(function() { pollJobStatus(jobId); }, 2000);
                 }
             } catch (e) {
+                pollCount = 0;
                 showAnalysisError('Error polling status: ' + e.message);
             }
         }
@@ -2762,9 +2773,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
             }
 
+            // Reset text color
+            $('progress-text').style.color = '';
+
             // Match status or stage (API may return either) and set status text
             if (status === 'pending' || status === 'queued') {
-                statusText = 'Queued... waiting to start';
+                if (job.stuckWarning) {
+                    statusText = 'Still queued - is the analyzer worker running?';
+                    $('progress-text').style.color = 'var(--error)';
+                } else {
+                    statusText = 'Queued... waiting to start';
+                }
             } else if (stage.includes('extract') || status.includes('extract')) {
                 statusText = 'Stage 1/4: Extracting content (' + percent + '%)';
             } else if (stage.includes('curat') || status.includes('curat')) {

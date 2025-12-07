@@ -2297,7 +2297,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         const { content, encoding } = await readFileContent(doc.file);
                         documents.push({
                             id: 'doc_' + (i + 1),
-                            title: doc.name.replace(/\.[^/.]+$/, ''),
+                            title: doc.name,  // Keep full filename with extension for citations
                             content: content,
                             encoding: encoding
                         });

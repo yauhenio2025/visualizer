@@ -1,0 +1,23 @@
+# Render.com deployment configuration for Visualizer
+# See https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: visualizer
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      # Analyzer API connection
+      - key: ANALYZER_API_URL
+        sync: false  # Set in Render dashboard - URL of deployed analyzer-api
+      - key: ANALYZER_API_KEY
+        sync: false  # Set in Render dashboard - API key for analyzer

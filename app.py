@@ -44,10 +44,10 @@ except ImportError:
 # Load environment variables from .env file
 load_dotenv()
 
-# Configuration
-API_KEY = os.environ.get("GEMINI_API_KEY")
+# Configuration - API keys are optional (users can provide their own via UI)
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found. Create a .env file with GEMINI_API_KEY=your_key")
+    print("Note: GEMINI_API_KEY not set. Users must provide their own via the KEYS button.")
 
 # Model Definitions
 MODELS = {
@@ -715,13 +715,32 @@ def scan_folder():
         return jsonify({"success": False, "error": f"Invalid path: {input_path}"})
 
 
+def get_analyzer_headers() -> Dict[str, str]:
+    """
+    Build headers for analyzer API requests.
+    Includes the API key and any forwarded LLM keys from the frontend.
+    """
+    headers = {"X-API-Key": ANALYZER_API_KEY}
+
+    # Forward LLM keys from frontend if provided
+    anthropic_key = request.headers.get('X-Anthropic-Api-Key')
+    gemini_key = request.headers.get('X-Gemini-Api-Key')
+
+    if anthropic_key:
+        headers['X-Anthropic-Api-Key'] = anthropic_key
+    if gemini_key:
+        headers['X-Gemini-Api-Key'] = gemini_key
+
+    return headers
+
+
 @app.route('/api/analyzer/engines', methods=['GET'])
 def list_analyzer_engines():
     """Fetch available engines from Analyzer API."""
     try:
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/engines",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             timeout=30.0,
         )
         response.raise_for_status()
@@ -738,7 +757,7 @@ def list_analyzer_bundles():
     try:
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/bundles",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             timeout=30.0,
         )
         response.raise_for_status()
@@ -755,7 +774,7 @@ def list_analyzer_output_modes():
     try:
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/output-modes",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             timeout=30.0,
         )
         response.raise_for_status()
@@ -882,7 +901,7 @@ def submit_analysis():
             try:
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
-                    headers={"X-API-Key": ANALYZER_API_KEY},
+                    headers=get_analyzer_headers(),
                     json={
                         "documents": [doc],
                         "engine": engine,
@@ -916,7 +935,7 @@ def submit_analysis():
         try:
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
-                headers={"X-API-Key": ANALYZER_API_KEY},
+                headers=get_analyzer_headers(),
                 json={
                     "documents": documents,
                     "engine": engine,
@@ -1023,7 +1042,7 @@ def submit_bundle_analysis():
     try:
         response = httpx.post(
             f"{ANALYZER_API_URL}/v1/analyze/bundle",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             json={
                 "documents": documents,
                 "bundle": bundle,
@@ -1055,7 +1074,7 @@ def get_analysis_job(job_id):
     try:
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/jobs/{job_id}",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             timeout=30.0,
         )
         response.raise_for_status()
@@ -1070,7 +1089,7 @@ def get_analysis_result(job_id):
     try:
         response = httpx.get(
             f"{ANALYZER_API_URL}/v1/jobs/{job_id}/result",
-            headers={"X-API-Key": ANALYZER_API_KEY},
+            headers=get_analyzer_headers(),
             timeout=30.0,
         )
         response.raise_for_status()
@@ -1156,6 +1175,147 @@ HTML_PAGE = '''<!DOCTYPE html>
             text-transform: uppercase;
             letter-spacing: 0.15em;
             color: var(--text-muted);
+        }
+
+        /* KEYS Button */
+        .btn-keys {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-keys:hover {
+            background: var(--bg-card);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-keys.has-keys {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .keys-icon {
+            font-size: 1rem;
+        }
+
+        /* Keys Modal */
+        .keys-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .keys-modal-overlay.active {
+            display: flex;
+        }
+
+        .keys-modal {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .keys-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .keys-modal-header h3 {
+            font-family: 'Libre Baskerville', Georgia, serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        .keys-modal-body {
+            padding: 1.5rem;
+        }
+
+        .key-field {
+            margin-bottom: 1.25rem;
+        }
+
+        .key-field label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .key-field input {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+
+        .key-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .key-field .hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+        }
+
+        .keys-modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        .keys-status {
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-radius: var(--radius);
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .keys-status.configured {
+            border-left: 3px solid var(--success);
+            color: var(--success);
+        }
+
+        .keys-status.missing {
+            border-left: 3px solid var(--warning);
+            color: var(--warning);
         }
 
         /* Navigation */
@@ -2025,8 +2185,15 @@ HTML_PAGE = '''<!DOCTYPE html>
 <body>
     <div class="app">
         <header>
-            <h1>The Visualizer</h1>
-            <p class="tagline">Document Intelligence & Visual Analysis</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>The Visualizer</h1>
+                    <p class="tagline">Document Intelligence & Visual Analysis</p>
+                </div>
+                <button class="btn btn-keys" onclick="openKeysModal()">
+                    <span class="keys-icon">&#128273;</span> KEYS
+                </button>
+            </div>
         </header>
 
         <!-- Navigation -->
@@ -2122,12 +2289,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <div class="output-select">
                             <span class="section-label">Output Format</span>
                             <select id="output-mode">
-                                <option value="structured_text_report">Text Report</option>
-                                <option value="executive_memo">Executive Memo</option>
-                                <option value="research_report">Research Report</option>
                                 <option value="gemini_image">Visual Diagram (Gemini)</option>
-                                <option value="mermaid">Mermaid Diagram</option>
-                                <option value="d3_interactive">Interactive D3</option>
+                                <option value="executive_memo">Executive Memo</option>
+                                <option value="research_report">Research Study</option>
                                 <option value="comparative_matrix_table">Comparison Table</option>
                             </select>
                         </div>
@@ -2180,6 +2344,35 @@ HTML_PAGE = '''<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- KEYS Modal -->
+    <div id="keys-modal-overlay" class="keys-modal-overlay" onclick="closeKeysModal(event)">
+        <div class="keys-modal" onclick="event.stopPropagation()">
+            <div class="keys-modal-header">
+                <h3>API Keys Configuration</h3>
+                <button class="btn btn-ghost" onclick="closeKeysModal()">&times;</button>
+            </div>
+            <div class="keys-modal-body">
+                <div id="keys-status" class="keys-status missing">
+                    Keys are stored locally in your browser. They are never sent to our servers.
+                </div>
+                <div class="key-field">
+                    <label for="anthropic-key">Anthropic API Key</label>
+                    <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off">
+                    <div class="hint">Required for document analysis (Claude models)</div>
+                </div>
+                <div class="key-field">
+                    <label for="gemini-key">Google Gemini API Key</label>
+                    <input type="password" id="gemini-key" placeholder="AIzaSy..." autocomplete="off">
+                    <div class="hint">Required for visual diagram generation</div>
+                </div>
+            </div>
+            <div class="keys-modal-footer">
+                <button class="btn btn-ghost" onclick="clearKeys()">Clear All</button>
+                <button class="btn btn-primary" onclick="saveKeys()">Save Keys</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         let scannedDocs = [];
@@ -2201,11 +2394,105 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function $(id) { return document.getElementById(id); }
 
+        // ==================== API KEYS MANAGEMENT ====================
+        const KEYS_STORAGE_KEY = 'visualizer_api_keys';
+
+        function getStoredKeys() {
+            try {
+                const stored = localStorage.getItem(KEYS_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : { anthropic: '', gemini: '' };
+            } catch (e) {
+                return { anthropic: '', gemini: '' };
+            }
+        }
+
+        function saveStoredKeys(keys) {
+            localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(keys));
+        }
+
+        function openKeysModal() {
+            const keys = getStoredKeys();
+            $('anthropic-key').value = keys.anthropic || '';
+            $('gemini-key').value = keys.gemini || '';
+            updateKeysStatus();
+            $('keys-modal-overlay').classList.add('active');
+        }
+
+        function closeKeysModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            $('keys-modal-overlay').classList.remove('active');
+        }
+
+        function saveKeys() {
+            const keys = {
+                anthropic: $('anthropic-key').value.trim(),
+                gemini: $('gemini-key').value.trim()
+            };
+            saveStoredKeys(keys);
+            updateKeysButtonState();
+            updateKeysStatus();
+            closeKeysModal();
+        }
+
+        function clearKeys() {
+            if (confirm('Remove all stored API keys?')) {
+                saveStoredKeys({ anthropic: '', gemini: '' });
+                $('anthropic-key').value = '';
+                $('gemini-key').value = '';
+                updateKeysButtonState();
+                updateKeysStatus();
+            }
+        }
+
+        function updateKeysButtonState() {
+            const keys = getStoredKeys();
+            const hasKeys = keys.anthropic || keys.gemini;
+            const btn = document.querySelector('.btn-keys');
+            if (btn) {
+                btn.classList.toggle('has-keys', hasKeys);
+            }
+        }
+
+        function updateKeysStatus() {
+            const keys = getStoredKeys();
+            const statusEl = $('keys-status');
+            if (!statusEl) return;
+
+            const hasAnthropic = !!keys.anthropic;
+            const hasGemini = !!keys.gemini;
+
+            if (hasAnthropic && hasGemini) {
+                statusEl.className = 'keys-status configured';
+                statusEl.textContent = 'Both API keys configured. Ready for analysis.';
+            } else if (hasAnthropic || hasGemini) {
+                statusEl.className = 'keys-status configured';
+                const missing = !hasAnthropic ? 'Anthropic' : 'Gemini';
+                statusEl.textContent = 'Partial configuration. ' + missing + ' key not set.';
+            } else {
+                statusEl.className = 'keys-status missing';
+                statusEl.textContent = 'No API keys configured. Enter your keys to enable analysis.';
+            }
+        }
+
+        function getApiHeaders() {
+            const keys = getStoredKeys();
+            const headers = { 'Content-Type': 'application/json' };
+            if (keys.anthropic) {
+                headers['X-Anthropic-Api-Key'] = keys.anthropic;
+            }
+            if (keys.gemini) {
+                headers['X-Gemini-Api-Key'] = keys.gemini;
+            }
+            return headers;
+        }
+        // ==================== END KEYS MANAGEMENT ====================
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalyzerData();
             loadLibrary();
             setupDragDrop();
+            updateKeysButtonState();
         });
 
         // View switching
@@ -2610,7 +2897,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     response = await fetch('/api/analyzer/analyze', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: getApiHeaders(),
                         body: JSON.stringify(payload)
                     });
                 } else {
@@ -2633,7 +2920,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     response = await fetch('/api/analyzer/analyze/bundle', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: getApiHeaders(),
                         body: JSON.stringify(payload)
                     });
                 }
@@ -2666,7 +2953,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let pollCount = 0;
         async function pollJobStatus(jobId) {
             try {
-                const res = await fetch('/api/analyzer/jobs/' + jobId);
+                const res = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });
                 const job = await res.json();
 
                 // Add doc count to job for display
@@ -2705,12 +2992,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (!job.job_id) continue;
 
                 try {
-                    const res = await fetch('/api/analyzer/jobs/' + job.job_id);
+                    const res = await fetch('/api/analyzer/jobs/' + job.job_id, { headers: getApiHeaders() });
                     const status = await res.json();
 
                     if (status.status === 'completed') {
                         job.status = 'completed';
-                        const resultRes = await fetch('/api/analyzer/jobs/' + job.job_id + '/result');
+                        const resultRes = await fetch('/api/analyzer/jobs/' + job.job_id + '/result', { headers: getApiHeaders() });
                         const result = await resultRes.json();
                         displayResult(result, job.title);
                     } else if (status.status === 'failed') {
@@ -2877,7 +3164,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Fetch and Display Result
         async function fetchAndDisplayResult(jobId) {
             try {
-                const res = await fetch('/api/analyzer/jobs/' + jobId + '/result');
+                const res = await fetch('/api/analyzer/jobs/' + jobId + '/result', { headers: getApiHeaders() });
                 const result = await res.json();
                 displayResult(result);
                 finishAnalysis();
@@ -3435,52 +3722,63 @@ HTML_PAGE = '''<!DOCTYPE html>
 # Application Entry Point
 
 if __name__ == '__main__':
+    # Production-ready configuration from environment
+    PORT = int(os.environ.get('PORT', 5847))
+    DEBUG = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')
+    ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+
     # Print startup banner
     print()
     print("=" * 65)
-    print("  NANO BANANA 4K VISUALIZER")
+    print("  THE VISUALIZER")
     print("=" * 65)
     print()
+    print(f"  Environment      : {ENVIRONMENT}")
     print(f"  Download folder  : {DOWNLOAD_FOLDER}")
-    print(f"  API Key          : {'Environment variable' if os.environ.get('GEMINI_API_KEY') else 'Embedded'}")
-    print(f"  Available models : {', '.join(m['name'] for m in MODELS.values())}")
+    print(f"  Analyzer URL     : {ANALYZER_API_URL}")
+    print(f"  Gemini API Key   : {'Set' if os.environ.get('GEMINI_API_KEY') else 'Not set (users provide their own)'}")
     print()
     print("=" * 65)
-    print("  Starting server at: http://localhost:5010")
+    print(f"  Starting server at: http://localhost:{PORT}")
+    print(f"  Debug mode       : {'ON' if DEBUG else 'OFF'}")
     print("  Press Ctrl+C to stop")
     print("=" * 65)
     print()
 
-    # Initialize client before starting server
-    if initialize_client():
-        print("  Gemini client initialized successfully")
+    # Initialize client before starting server (optional in production)
+    if os.environ.get('GEMINI_API_KEY'):
+        if initialize_client():
+            print("  Gemini client initialized successfully")
+        else:
+            print("  Client initialization deferred to first request")
     else:
-        print("  Client initialization deferred to first request")
+        print("  No server-side Gemini key - users will provide their own")
 
     print()
 
-    # Collect files to watch for auto-reload
+    # Development mode: watch files for auto-reload
     extra_files = []
-    templates_dir = Path(__file__).parent / 'templates'
-    if templates_dir.exists():
-        for template_file in templates_dir.rglob('*.html'):
-            extra_files.append(str(template_file))
+    if DEBUG:
+        templates_dir = Path(__file__).parent / 'templates'
+        if templates_dir.exists():
+            for template_file in templates_dir.rglob('*.html'):
+                extra_files.append(str(template_file))
 
-    static_dir = Path(__file__).parent / 'static'
-    if static_dir.exists():
-        for static_file in static_dir.rglob('*'):
-            if static_file.is_file():
-                extra_files.append(str(static_file))
+        static_dir = Path(__file__).parent / 'static'
+        if static_dir.exists():
+            for static_file in static_dir.rglob('*'):
+                if static_file.is_file():
+                    extra_files.append(str(static_file))
 
-    if extra_files:
-        print(f"  Watching {len(extra_files)} template and static files for changes")
+        if extra_files:
+            print(f"  Watching {len(extra_files)} template and static files for changes")
 
-    # Run the Flask server with auto-reload enabled
+    # Run the Flask server
     app.run(
         host='0.0.0.0',
-        port=5847,
-        debug=True,
-        use_reloader=True,
+        port=PORT,
+        debug=DEBUG,
+        use_reloader=DEBUG,
         extra_files=extra_files if extra_files else None,
         threaded=True
     )

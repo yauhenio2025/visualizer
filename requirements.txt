@@ -1,0 +1,18 @@
+# Web Framework
+flask>=3.0.0
+gunicorn>=21.0.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# Image handling
+pillow>=10.2.0
+
+# PDF support
+pymupdf>=1.23.0
+
+# Gemini API (for image generation)
+google-genai>=1.0.0
+
+# Environment
+python-dotenv>=1.0.0

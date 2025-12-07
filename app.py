@@ -76,7 +76,7 @@ IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff'}
 TEXT_EXTENSIONS = {'.txt', '.md', '.json', '.csv', '.xml', '.py', '.js', '.html', '.css', '.yaml', '.yml'}
 
 # Analyzer API Configuration
-ANALYZER_API_URL = os.environ.get("ANALYZER_API_URL", "http://localhost:8000")
+ANALYZER_API_URL = os.environ.get("ANALYZER_API_URL", "http://localhost:8847")
 ANALYZER_API_KEY = os.environ.get("ANALYZER_API_KEY", "dev-key-12345")
 
 # Document extensions for analysis
@@ -2706,7 +2706,7 @@ if __name__ == '__main__':
     # Run the Flask server with auto-reload enabled
     app.run(
         host='0.0.0.0',
-        port=5010,
+        port=5847,
         debug=True,
         use_reloader=True,
         extra_files=extra_files if extra_files else None,

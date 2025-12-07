@@ -2695,15 +2695,35 @@ Example prompts:
                     metaHtml = '<div class="result-meta">⏱️ ' + time + ' | 💰 ' + cost + '<\/div>';
                 }
 
-                card.innerHTML =
-                    '<div class="header">' +
-                        '<span>' + (title ? title + ' - ' : '') + key.replace(/_/g, ' ') + '<\/span>' +
-                        '<div class="result-actions">' +
-                            '<button onclick="downloadResult(\'' + cardId + '\', \'' + key + '\')">📥 Download<\/button>' +
-                            '<span class="badge">' + (output.mode || output.renderer_type || '') + '<\/span>' +
-                        '<\/div>' +
-                    '<\/div>' +
-                    '<div class="content" id="' + cardId + '">' + contentHtml + metaHtml + '<\/div>';
+                var header = document.createElement('div');
+                header.className = 'header';
+
+                var titleSpan = document.createElement('span');
+                titleSpan.textContent = (title ? title + ' - ' : '') + key.replace(/_/g, ' ');
+
+                var actions = document.createElement('div');
+                actions.className = 'result-actions';
+
+                var dlBtn = document.createElement('button');
+                dlBtn.textContent = '📥 Download';
+                dlBtn.onclick = function() { downloadResult(cardId, key); };
+
+                var badge = document.createElement('span');
+                badge.className = 'badge';
+                badge.textContent = output.mode || output.renderer_type || '';
+
+                actions.appendChild(dlBtn);
+                actions.appendChild(badge);
+                header.appendChild(titleSpan);
+                header.appendChild(actions);
+
+                var content = document.createElement('div');
+                content.className = 'content';
+                content.id = cardId;
+                content.innerHTML = contentHtml + metaHtml;
+
+                card.appendChild(header);
+                card.appendChild(content);
 
                 // Store raw content for download
                 card.dataset.rawContent = rawContent;
@@ -2714,19 +2734,45 @@ Example prompts:
 
             // If no outputs but has canonical data, show that
             if (Object.keys(outputs).length === 0 && result.canonical_data) {
-                const card = document.createElement('div');
-                card.className = 'result-card fade-in';
-                const rawJson = JSON.stringify(result.canonical_data, null, 2);
-                card.innerHTML =
-                    '<div class="header">' +
-                        '<span>Canonical Data<\/span>' +
-                        '<div class="result-actions">' +
-                            '<button onclick="downloadJson(this, \'canonical_data.json\')">📥 Download JSON<\/button>' +
-                        '<\/div>' +
-                    '<\/div>' +
-                    '<div class="content"><pre>' + rawJson + '<\/pre><\/div>';
-                card.dataset.rawContent = rawJson;
-                container.appendChild(card);
+                var card2 = document.createElement('div');
+                card2.className = 'result-card fade-in';
+                var rawJson = JSON.stringify(result.canonical_data, null, 2);
+
+                var header2 = document.createElement('div');
+                header2.className = 'header';
+
+                var titleSpan2 = document.createElement('span');
+                titleSpan2.textContent = 'Canonical Data';
+
+                var actions2 = document.createElement('div');
+                actions2.className = 'result-actions';
+
+                var dlBtn2 = document.createElement('button');
+                dlBtn2.textContent = '📥 Download JSON';
+                dlBtn2.onclick = function() {
+                    var blob = new Blob([rawJson], { type: 'application/json' });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'canonical_data.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+
+                actions2.appendChild(dlBtn2);
+                header2.appendChild(titleSpan2);
+                header2.appendChild(actions2);
+
+                var content2 = document.createElement('div');
+                content2.className = 'content';
+                var pre = document.createElement('pre');
+                pre.textContent = rawJson;
+                content2.appendChild(pre);
+
+                card2.appendChild(header2);
+                card2.appendChild(content2);
+                card2.dataset.rawContent = rawJson;
+                container.appendChild(card2);
             }
         }
 
@@ -2760,12 +2806,22 @@ Example prompts:
         }
 
         function displayError(title, message) {
-            const container = $('results-container');
-            const card = document.createElement('div');
+            var container = $('results-container');
+            var card = document.createElement('div');
             card.className = 'result-card fade-in';
-            card.innerHTML =
-                '<div class="header" style="background:rgba(248,113,113,0.2);">' + title + '<\/div>' +
-                '<div class="content" style="color:var(--error);">' + (message || 'Analysis failed') + '<\/div>';
+
+            var header = document.createElement('div');
+            header.className = 'header';
+            header.style.background = 'rgba(248,113,113,0.2)';
+            header.textContent = title;
+
+            var content = document.createElement('div');
+            content.className = 'content';
+            content.style.color = 'var(--error)';
+            content.textContent = message || 'Analysis failed';
+
+            card.appendChild(header);
+            card.appendChild(content);
             container.appendChild(card);
         }
 

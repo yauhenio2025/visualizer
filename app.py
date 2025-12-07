@@ -1530,6 +1530,29 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--text-secondary);
         }
 
+        .progress-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-counter {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .progress-doc-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            max-width: 60%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: right;
+        }
+
         .progress-stages {
             display: flex;
             gap: 0.5rem;
@@ -2073,6 +2096,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                     <!-- Progress Section -->
                     <div id="progress-section" class="progress-section">
                         <div class="progress-header">Processing</div>
+                        <div class="progress-details">
+                            <div id="progress-counter" class="progress-counter"></div>
+                            <div id="progress-doc-name" class="progress-doc-name"></div>
+                        </div>
                         <div class="progress-bar-outer">
                             <div id="progress-bar" class="progress-bar-inner"></div>
                         </div>
@@ -2121,6 +2148,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         let currentJobId = null;
         let allResults = [];
         let libraryItems = [];
+
+        // Progress tracking
+        let currentDocCount = 0;
+        let currentDocNames = [];  // Array of document names being processed
+        let currentDocIndex = 0;   // Index of document currently being processed
 
         function $(id) { return document.getElementById(id); }
 
@@ -2495,15 +2527,25 @@ HTML_PAGE = '''<!DOCTYPE html>
             allResults = [];
 
             resetStages();
+            resetProgressDetails();
 
             try {
                 // Get documents (either paths or inline content)
                 const docData = await getDocumentsForAnalysis();
 
-                // Track document count for progress display
-                currentDocCount = docData.type === 'paths'
-                    ? docData.file_paths.length
-                    : docData.documents.length;
+                // Track document count and names for progress display
+                if (docData.type === 'paths') {
+                    currentDocCount = docData.file_paths.length;
+                    // Extract filenames from paths
+                    currentDocNames = docData.file_paths.map(p => p.split('/').pop());
+                } else {
+                    currentDocCount = docData.documents.length;
+                    currentDocNames = docData.documents.map(d => d.title);
+                }
+                currentDocIndex = 0;
+
+                // Show initial document info
+                updateProgressDetails(0, currentDocCount, currentDocNames[0] || '');
 
                 $('analyze-btn').textContent = 'Submitting...';
 
@@ -2575,9 +2617,6 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
-        // Track document count for progress display
-        let currentDocCount = 0;
-
         // Poll Job Status
         async function pollJobStatus(jobId) {
             try {
@@ -2604,6 +2643,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         async function pollMultipleJobs(jobs) {
             const pending = jobs.filter(function(j) { return j.status === 'submitted'; });
             let allDone = true;
+            let currentProcessingJob = null;
 
             for (const job of pending) {
                 if (!job.job_id) continue;
@@ -2622,6 +2662,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                         displayError(job.title, status.error_message);
                     } else {
                         allDone = false;
+                        // Track which job is currently being processed
+                        if (!currentProcessingJob) {
+                            currentProcessingJob = job;
+                        }
                     }
                 } catch (e) {
                     job.status = 'failed';
@@ -2629,7 +2673,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             const completed = jobs.filter(function(j) { return j.status === 'completed' || j.status === 'failed'; }).length;
-            updateProgressMulti(completed, jobs.length);
+            updateProgressMulti(completed, jobs.length, currentProcessingJob);
 
             if (!allDone) {
                 setTimeout(function() { pollMultipleJobs(jobs); }, 2000);
@@ -2656,29 +2700,42 @@ HTML_PAGE = '''<!DOCTYPE html>
             const stage = job.current_stage ? String(job.current_stage).toLowerCase() : '';
             const status = job.status ? String(job.status).toLowerCase() : 'pending';
             const docCount = currentDocCount > 0 ? currentDocCount : '';
-            const docSuffix = docCount ? ' (' + docCount + ' doc' + (docCount > 1 ? 's' : '') + ')' : '';
 
-            // Match status or stage (API may return either)
+            // Update progress counter (document count)
+            if (docCount) {
+                $('progress-counter').textContent = docCount + ' document' + (docCount > 1 ? 's' : '');
+            }
+
+            // Match status or stage (API may return either) and set status text
             if (status === 'pending' || status === 'queued') {
-                statusText = 'Queued...' + docSuffix;
+                statusText = 'Queued...';
+                $('progress-doc-name').textContent = 'Waiting to start';
             } else if (stage.includes('extract') || status.includes('extract')) {
-                statusText = 'Extracting from ' + (docCount || '') + ' document' + (docCount > 1 ? 's' : '') + '... (' + percent + '%)';
+                statusText = 'Stage 1/4: Extraction (' + percent + '%)';
+                $('progress-doc-name').textContent = 'Reading and extracting content';
             } else if (stage.includes('curat') || status.includes('curat')) {
-                statusText = 'Curating insights... (' + percent + '%)';
+                statusText = 'Stage 2/4: Curation (' + percent + '%)';
+                $('progress-doc-name').textContent = 'Curating insights';
             } else if (stage.includes('concret') || status.includes('concret')) {
-                statusText = 'Refining labels... (' + percent + '%)';
+                statusText = 'Stage 3/4: Concretization (' + percent + '%)';
+                $('progress-doc-name').textContent = 'Refining labels';
             } else if (stage.includes('render') || status.includes('render')) {
-                statusText = 'Generating output... (' + percent + '%)';
+                statusText = 'Stage 4/4: Rendering (' + percent + '%)';
+                $('progress-doc-name').textContent = 'Generating output';
             } else if (status === 'completed') {
-                statusText = 'Complete!' + docSuffix;
+                statusText = 'Complete!';
+                $('progress-doc-name').textContent = 'All done';
             } else if (status === 'failed') {
                 statusText = 'Failed';
+                $('progress-doc-name').textContent = '';
             } else if (stage || status) {
                 // Capitalize first letter for display
                 const displayStage = stage || status;
                 statusText = displayStage.charAt(0).toUpperCase() + displayStage.slice(1) + '... (' + percent + '%)';
+                $('progress-doc-name').textContent = '';
             } else {
-                statusText = 'Processing...' + docSuffix + ' (' + percent + '%)';
+                statusText = 'Processing... (' + percent + '%)';
+                $('progress-doc-name').textContent = '';
             }
 
             $('progress-text').textContent = statusText;
@@ -2708,10 +2765,16 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
         }
 
-        function updateProgressMulti(completed, total) {
+        function updateProgressMulti(completed, total, currentJob) {
             const percent = Math.round((completed / total) * 100);
             $('progress-bar').style.width = percent + '%';
             $('progress-text').textContent = completed + ' of ' + total + ' documents processed';
+
+            // Update document details
+            $('progress-counter').textContent = 'Document ' + (completed + 1) + ' of ' + total;
+            if (currentJob && currentJob.title) {
+                $('progress-doc-name').textContent = currentJob.title;
+            }
         }
 
         function resetStages() {
@@ -2719,6 +2782,30 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const el = $('stage-' + s);
                 if (el) el.className = 'stage-badge';
             });
+        }
+
+        function resetProgressDetails() {
+            $('progress-counter').textContent = '';
+            $('progress-doc-name').textContent = '';
+            currentDocNames = [];
+            currentDocIndex = 0;
+        }
+
+        function updateProgressDetails(current, total, docName) {
+            if (total > 0) {
+                // For single collection mode, show overall count
+                // For individual mode, show current/total
+                if (collectionMode === 'single' && current === 0) {
+                    $('progress-counter').textContent = total + ' document' + (total > 1 ? 's' : '');
+                } else if (total > 1) {
+                    $('progress-counter').textContent = 'Document ' + (current + 1) + ' of ' + total;
+                } else {
+                    $('progress-counter').textContent = '1 document';
+                }
+            }
+            if (docName) {
+                $('progress-doc-name').textContent = docName;
+            }
         }
 
         // Fetch and Display Result

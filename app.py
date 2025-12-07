@@ -1095,12 +1095,12 @@ HTML_PAGE = '''<!DOCTYPE html>
         /* Main Layout */
         .main-layout {
             display: grid;
-            grid-template-columns: 380px 1fr;
-            gap: 3rem;
+            grid-template-columns: 340px 1fr;
+            gap: 2.5rem;
             align-items: start;
         }
 
-        @media (max-width: 1000px) {
+        @media (max-width: 1100px) {
             .main-layout { grid-template-columns: 1fr; }
         }
 
@@ -1259,40 +1259,69 @@ HTML_PAGE = '''<!DOCTYPE html>
         .mode-btn .title { font-weight: 600; font-size: 0.85rem; }
         .mode-btn .desc { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
 
-        /* Engine grid */
+        /* Engine grid - expansive, inviting layout */
         .engine-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 0.5rem;
-            margin: 1rem 0;
-            max-height: 220px;
-            overflow-y: auto;
-            padding: 0.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+            padding: 0;
         }
 
         .engine-card {
-            padding: 0.75rem;
-            background: var(--bg-input);
+            padding: 1.25rem;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             cursor: pointer;
             transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .engine-card:hover { border-color: var(--accent-muted); }
-        .engine-card.selected { border-color: var(--accent); background: var(--bg-card); box-shadow: var(--shadow); }
-        .engine-card .name { font-weight: 500; font-size: 0.8rem; }
+        .engine-card:hover {
+            border-color: var(--accent-muted);
+            box-shadow: var(--shadow);
+            transform: translateY(-1px);
+        }
+
+        .engine-card.selected {
+            border-color: var(--accent);
+            background: var(--bg-card);
+            box-shadow: var(--shadow-lg);
+            border-width: 2px;
+        }
+
+        .engine-card .name {
+            font-family: 'Libre Baskerville', Georgia, serif;
+            font-weight: 400;
+            font-size: 1rem;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .engine-card .desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            flex: 1;
+        }
+
         .engine-card .priority {
             display: inline-block;
-            padding: 0.125rem 0.375rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 3px;
             font-size: 0.65rem;
-            margin-top: 0.25rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            align-self: flex-start;
         }
 
-        .priority-1 { background: rgba(45,125,70,0.15); color: var(--success); }
-        .priority-2 { background: rgba(198,126,0,0.15); color: var(--warning); }
-        .priority-3 { background: rgba(102,102,102,0.15); color: var(--text-secondary); }
+        .priority-1 { background: rgba(45,125,70,0.12); color: var(--success); }
+        .priority-2 { background: rgba(198,126,0,0.12); color: var(--warning); }
+        .priority-3 { background: rgba(102,102,102,0.12); color: var(--text-secondary); }
 
         /* Bundles */
         .bundle-card {
@@ -1953,32 +1982,48 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
+        // Format engine name - convert snake_case to Title Case
+        function formatEngineName(key) {
+            return key.split('_').map(function(word) {
+                return word.charAt(0).toUpperCase() + word.slice(1);
+            }).join(' ');
+        }
+
+        // Truncate description to ~80 chars
+        function truncateDesc(desc, maxLen) {
+            if (!desc) return '';
+            if (desc.length <= maxLen) return desc;
+            return desc.substring(0, maxLen).replace(/\\s+\\S*$/, '') + '...';
+        }
+
         // Render Engines
         function renderEngines() {
-            const grid = $('engine-grid');
+            var grid = $('engine-grid');
             $('engine-count').textContent = '(' + engines.length + ' available)';
 
             grid.innerHTML = engines.map(function(e) {
+                var displayName = e.name || formatEngineName(e.engine_key);
+                var shortDesc = truncateDesc(e.description || '', 100);
                 return '<div class="engine-card ' + (selectedEngine === e.engine_key ? 'selected' : '') + '" ' +
-                'onclick="selectEngine(\\'' + e.engine_key + '\\')" ' +
-                'title="' + (e.description || '') + '">' +
-                '<div class="name">' + (e.name || e.engine_key) + '</div>' +
-                '<span class="priority priority-' + (e.priority || 2) + '">P' + (e.priority || 2) + '</span>' +
+                'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
+                '<div class="name">' + displayName + '</div>' +
+                '<div class="desc">' + shortDesc + '</div>' +
                 '</div>';
             }).join('');
         }
 
         // Render Bundles
         function renderBundles() {
-            const list = $('bundle-list');
+            var list = $('bundle-list');
 
             list.innerHTML = bundles.map(function(b) {
+                var displayName = b.name || formatEngineName(b.bundle_key);
+                var engineList = (b.member_engines || []).map(formatEngineName).slice(0, 3).join(', ');
+                var moreCount = (b.member_engines || []).length > 3 ? ' +' + ((b.member_engines || []).length - 3) + ' more' : '';
                 return '<div class="bundle-card ' + (selectedBundle === b.bundle_key ? 'selected' : '') + '" ' +
                 'onclick="selectBundle(\\'' + b.bundle_key + '\\')">' +
-                '<div class="name">' + (b.name || b.bundle_key) + '</div>' +
-                '<div class="engines">' + (b.member_engines || []).length + ' engines: ' +
-                (b.member_engines || []).slice(0, 3).join(', ') +
-                ((b.member_engines || []).length > 3 ? '...' : '') + '</div>' +
+                '<div class="name">' + displayName + '</div>' +
+                '<div class="engines">' + (b.member_engines || []).length + ' engines: ' + engineList + moreCount + '</div>' +
                 '</div>';
             }).join('');
         }

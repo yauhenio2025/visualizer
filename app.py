@@ -1632,11 +1632,19 @@ HTML_PAGE = '''<!DOCTYPE html>
         .gallery-card-preview .text-preview {
             padding: 1rem;
             font-size: 0.75rem;
-            line-height: 1.5;
+            line-height: 1.6;
             color: var(--text-secondary);
             overflow: hidden;
             max-height: 100%;
+            font-family: 'Inter', -apple-system, sans-serif;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .gallery-card-preview .text-preview.json-preview {
             font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.7rem;
+            line-height: 1.5;
+            color: var(--text-muted);
         }
         .gallery-card-preview .html-preview {
             width: 100%;
@@ -2945,13 +2953,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             } else if (data.content) {
                 var textPre = document.createElement('div');
                 textPre.className = 'text-preview';
-                textPre.textContent = data.content.substring(0, 500) + (data.content.length > 500 ? '...' : '');
+                var cleanText = cleanTextForPreview(data.content);
+                textPre.textContent = cleanText.substring(0, 400) + (cleanText.length > 400 ? '...' : '');
                 preview.appendChild(textPre);
             } else if (data.data) {
                 var jsonPre = document.createElement('div');
-                jsonPre.className = 'text-preview';
-                var jsonStr = JSON.stringify(data.data, null, 2);
-                jsonPre.textContent = jsonStr.substring(0, 500) + (jsonStr.length > 500 ? '...' : '');
+                jsonPre.className = 'text-preview json-preview';
+                jsonPre.textContent = formatJsonPreview(data.data);
                 preview.appendChild(jsonPre);
             } else {
                 var icon = document.createElement('div');
@@ -3018,6 +3026,52 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Check if text looks like HTML (tables, divs, etc)
             if (!text) return false;
             return /<(table|div|html|body|p|h[1-6]|ul|ol|span)[^>]*>/i.test(text);
+        }
+
+        function cleanTextForPreview(text) {
+            if (!text) return '';
+            // Remove markdown headers
+            var clean = text.replace(/^#{1,6}\s+/gm, '');
+            // Remove bold/italic markers
+            clean = clean.replace(/\*\*([^*]+)\*\*/g, '$1');
+            clean = clean.replace(/\*([^*]+)\*/g, '$1');
+            clean = clean.replace(/__([^_]+)__/g, '$1');
+            clean = clean.replace(/_([^_]+)_/g, '$1');
+            // Remove markdown links, keep text
+            clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+            // Remove horizontal rules
+            clean = clean.replace(/^-{3,}$/gm, '');
+            // Remove excessive newlines
+            clean = clean.replace(/\n{3,}/g, '\n\n');
+            // Trim and limit
+            return clean.trim();
+        }
+
+        function formatJsonPreview(data) {
+            // Create a cleaner summary of JSON data
+            if (!data) return '';
+            if (Array.isArray(data)) {
+                var count = data.length;
+                var sample = data.slice(0, 2).map(function(item) {
+                    if (typeof item === 'object' && item !== null) {
+                        var keys = Object.keys(item).slice(0, 3);
+                        return keys.join(', ');
+                    }
+                    return String(item).substring(0, 30);
+                });
+                return count + ' items: ' + sample.join(' | ') + (count > 2 ? '...' : '');
+            }
+            if (typeof data === 'object') {
+                var keys = Object.keys(data).slice(0, 5);
+                return keys.map(function(k) {
+                    var v = data[k];
+                    if (typeof v === 'string') return k + ': ' + v.substring(0, 40);
+                    if (typeof v === 'number') return k + ': ' + v;
+                    if (Array.isArray(v)) return k + ': [' + v.length + ' items]';
+                    return k + ': {...}';
+                }).join('\n');
+            }
+            return String(data);
         }
 
         function formatSourcesFootnotes(container) {
@@ -3321,8 +3375,14 @@ HTML_PAGE = '''<!DOCTYPE html>
             } else if (data.content) {
                 var textPre = document.createElement('div');
                 textPre.className = 'text-preview';
-                textPre.textContent = data.content.substring(0, 300) + '...';
+                var cleanText = cleanTextForPreview(data.content);
+                textPre.textContent = cleanText.substring(0, 300) + (cleanText.length > 300 ? '...' : '');
                 preview.appendChild(textPre);
+            } else if (data.data) {
+                var jsonPre = document.createElement('div');
+                jsonPre.className = 'text-preview json-preview';
+                jsonPre.textContent = formatJsonPreview(data.data);
+                preview.appendChild(jsonPre);
             } else {
                 var icon = document.createElement('div');
                 icon.className = 'icon-preview';

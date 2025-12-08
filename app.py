@@ -1361,6 +1361,94 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--warning);
         }
 
+        /* Profile Management */
+        .profile-section {
+            margin-bottom: 1.25rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .profile-section label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-selector {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .profile-selector select {
+            flex: 1;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .profile-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn-icon {
+            padding: 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-icon.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border-color: var(--error);
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .profile-actions input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .profile-actions input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .profile-actions .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+
         /* Navigation */
         .nav-bar {
             display: flex;
@@ -2413,6 +2501,24 @@ HTML_PAGE = '''<!DOCTYPE html>
                 <div id="keys-status" class="keys-status missing">
                     Keys are stored locally in your browser. They are never sent to our servers.
                 </div>
+
+                <!-- Profile Section -->
+                <div class="profile-section">
+                    <label>Key Profile</label>
+                    <div class="profile-selector">
+                        <select id="profile-select" onchange="onProfileSelect()">
+                            <option value="">-- Select Profile --</option>
+                        </select>
+                        <button class="btn-icon danger" onclick="deleteCurrentProfile()" title="Delete Profile" id="delete-profile-btn" style="display: none;">
+                            &#128465;
+                        </button>
+                    </div>
+                    <div class="profile-actions">
+                        <input type="text" id="new-profile-name" placeholder="New profile name...">
+                        <button class="btn btn-sm" onclick="saveAsNewProfile()">Save as Profile</button>
+                    </div>
+                </div>
+
                 <div class="key-field">
                     <label for="anthropic-key">Anthropic API Key</label>
                     <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off">
@@ -2426,7 +2532,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             </div>
             <div class="keys-modal-footer">
                 <button class="btn btn-ghost" onclick="clearKeys()">Clear All</button>
-                <button class="btn btn-primary" onclick="saveKeys()">Save Keys</button>
+                <button class="btn btn-primary" onclick="saveKeys()">Update Active Keys</button>
             </div>
         </div>
     </div>
@@ -2454,6 +2560,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // ==================== API KEYS MANAGEMENT ====================
         const KEYS_STORAGE_KEY = 'visualizer_api_keys';
+        const PROFILES_STORAGE_KEY = 'visualizer_key_profiles';
+        const ACTIVE_PROFILE_KEY = 'visualizer_active_profile';
 
         function getStoredKeys() {
             try {
@@ -2468,10 +2576,144 @@ HTML_PAGE = '''<!DOCTYPE html>
             localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(keys));
         }
 
+        function getProfiles() {
+            try {
+                const stored = localStorage.getItem(PROFILES_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveProfiles(profiles) {
+            localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profiles));
+        }
+
+        function getActiveProfileName() {
+            return localStorage.getItem(ACTIVE_PROFILE_KEY) || '';
+        }
+
+        function setActiveProfileName(name) {
+            if (name) {
+                localStorage.setItem(ACTIVE_PROFILE_KEY, name);
+            } else {
+                localStorage.removeItem(ACTIVE_PROFILE_KEY);
+            }
+        }
+
+        function renderProfileSelector() {
+            const select = $('profile-select');
+            const profiles = getProfiles();
+            const activeProfile = getActiveProfileName();
+
+            select.innerHTML = '<option value="">-- Select Profile --</option>';
+            profiles.forEach(function(profile) {
+                const opt = document.createElement('option');
+                opt.value = profile.name;
+                opt.textContent = profile.name;
+                if (profile.name === activeProfile) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+
+            // Show/hide delete button based on selection
+            const deleteBtn = $('delete-profile-btn');
+            deleteBtn.style.display = activeProfile ? 'flex' : 'none';
+        }
+
+        function onProfileSelect() {
+            const select = $('profile-select');
+            const profileName = select.value;
+            const profiles = getProfiles();
+
+            if (profileName) {
+                const profile = profiles.find(function(p) { return p.name === profileName; });
+                if (profile) {
+                    $('anthropic-key').value = profile.anthropic || '';
+                    $('gemini-key').value = profile.gemini || '';
+                    setActiveProfileName(profileName);
+
+                    // Also save as current active keys
+                    saveStoredKeys({ anthropic: profile.anthropic, gemini: profile.gemini });
+                    updateKeysButtonState();
+                    updateKeysStatus();
+                }
+            } else {
+                setActiveProfileName('');
+            }
+
+            // Show/hide delete button
+            const deleteBtn = $('delete-profile-btn');
+            deleteBtn.style.display = profileName ? 'flex' : 'none';
+        }
+
+        function saveAsNewProfile() {
+            const nameInput = $('new-profile-name');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                alert('Please enter a profile name');
+                return;
+            }
+
+            const profiles = getProfiles();
+            const existingIndex = profiles.findIndex(function(p) { return p.name === name; });
+
+            const profile = {
+                name: name,
+                anthropic: $('anthropic-key').value.trim(),
+                gemini: $('gemini-key').value.trim()
+            };
+
+            if (existingIndex >= 0) {
+                if (!confirm('Profile "' + name + '" already exists. Overwrite?')) {
+                    return;
+                }
+                profiles[existingIndex] = profile;
+            } else {
+                profiles.push(profile);
+            }
+
+            saveProfiles(profiles);
+            setActiveProfileName(name);
+
+            // Also save as current active keys
+            saveStoredKeys({ anthropic: profile.anthropic, gemini: profile.gemini });
+
+            nameInput.value = '';
+            renderProfileSelector();
+            updateKeysButtonState();
+            updateKeysStatus();
+
+            console.log('Saved profile:', name);
+        }
+
+        function deleteCurrentProfile() {
+            const activeProfile = getActiveProfileName();
+            if (!activeProfile) return;
+
+            if (!confirm('Delete profile "' + activeProfile + '"?')) {
+                return;
+            }
+
+            const profiles = getProfiles();
+            const newProfiles = profiles.filter(function(p) { return p.name !== activeProfile; });
+            saveProfiles(newProfiles);
+            setActiveProfileName('');
+
+            $('profile-select').value = '';
+            renderProfileSelector();
+
+            console.log('Deleted profile:', activeProfile);
+        }
+
         function openKeysModal() {
             const keys = getStoredKeys();
             $('anthropic-key').value = keys.anthropic || '';
             $('gemini-key').value = keys.gemini || '';
+            $('new-profile-name').value = '';
+            renderProfileSelector();
             updateKeysStatus();
             $('keys-modal-overlay').classList.add('active');
         }
@@ -2487,16 +2729,32 @@ HTML_PAGE = '''<!DOCTYPE html>
                 gemini: $('gemini-key').value.trim()
             };
             saveStoredKeys(keys);
+
+            // If a profile is selected, also update it
+            const activeProfile = getActiveProfileName();
+            if (activeProfile) {
+                const profiles = getProfiles();
+                const profileIndex = profiles.findIndex(function(p) { return p.name === activeProfile; });
+                if (profileIndex >= 0) {
+                    profiles[profileIndex].anthropic = keys.anthropic;
+                    profiles[profileIndex].gemini = keys.gemini;
+                    saveProfiles(profiles);
+                }
+            }
+
             updateKeysButtonState();
             updateKeysStatus();
             closeKeysModal();
         }
 
         function clearKeys() {
-            if (confirm('Remove all stored API keys?')) {
+            if (confirm('Remove all stored API keys? (Profiles will be preserved)')) {
                 saveStoredKeys({ anthropic: '', gemini: '' });
+                setActiveProfileName('');
                 $('anthropic-key').value = '';
                 $('gemini-key').value = '';
+                $('profile-select').value = '';
+                renderProfileSelector();
                 updateKeysButtonState();
                 updateKeysStatus();
             }
@@ -2518,14 +2776,17 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             const hasAnthropic = !!keys.anthropic;
             const hasGemini = !!keys.gemini;
+            const activeProfile = getActiveProfileName();
+
+            let profileInfo = activeProfile ? ' [Profile: ' + activeProfile + ']' : '';
 
             if (hasAnthropic && hasGemini) {
                 statusEl.className = 'keys-status configured';
-                statusEl.textContent = 'Both API keys configured. Ready for analysis.';
+                statusEl.textContent = 'Both API keys configured. Ready for analysis.' + profileInfo;
             } else if (hasAnthropic || hasGemini) {
                 statusEl.className = 'keys-status configured';
                 const missing = !hasAnthropic ? 'Anthropic' : 'Gemini';
-                statusEl.textContent = 'Partial configuration. ' + missing + ' key not set.';
+                statusEl.textContent = 'Partial configuration. ' + missing + ' key not set.' + profileInfo;
             } else {
                 statusEl.className = 'keys-status missing';
                 statusEl.textContent = 'No API keys configured. Enter your keys to enable analysis.';

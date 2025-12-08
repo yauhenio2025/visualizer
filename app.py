@@ -1108,6 +1108,23 @@ def get_analysis_result(job_id):
         return jsonify({"error": f"Failed to get result: {str(e)}"}), 500
 
 
+@app.route('/api/analyzer/jobs/<job_id>', methods=['DELETE'])
+def delete_analysis_job(job_id):
+    """Delete a job from the Analyzer API."""
+    try:
+        response = httpx.delete(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        print(f"Deleted job {job_id} from server")
+        return jsonify({"success": True, "job_id": job_id})
+    except httpx.HTTPError as e:
+        print(f"HTTPError deleting job {job_id}: {e}")
+        return jsonify({"error": f"Failed to delete job: {str(e)}"}), 500
+
+
 @app.route('/api/analyzer/jobs', methods=['GET'])
 def list_analysis_jobs():
     """List recent jobs from Analyzer API."""
@@ -2379,8 +2396,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             <div class="library-empty" id="library-empty">
                 <div class="library-empty-icon">&#128218;</div>
                 <div class="library-empty-text">Your library is empty</div>
-                <div class="library-empty-hint">Analyzed documents and generated visualizations will appear here</div>
-                <button class="btn" style="margin-top: 1rem;" onclick="loadRecentJobs()">Load from Server</button>
+                <div class="library-empty-hint">Analyzed documents and generated visualizations will appear here.<br>Click "Load Recent Jobs" above to fetch from server.</div>
             </div>
             <div id="library-grid" class="library-grid"></div>
         </div>
@@ -3711,6 +3727,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 var resultData = {
                                     key: key,
                                     title: key.replace(/_/g, ' '),
+                                    job_id: job.job_id,
                                     output: output,
                                     metadata: result.metadata || {},
                                     isImage: !!output.image_url,
@@ -3890,8 +3907,27 @@ HTML_PAGE = '''<!DOCTYPE html>
             return card;
         }
 
-        function deleteFromLibrary(index) {
+        async function deleteFromLibrary(index) {
             if (confirm('Delete this item from library?')) {
+                var item = libraryItems[index];
+
+                // If item has a job_id, also delete from server
+                if (item && item.job_id) {
+                    try {
+                        const res = await fetch('/api/analyzer/jobs/' + item.job_id, {
+                            method: 'DELETE'
+                        });
+                        if (res.ok) {
+                            console.log('Deleted job from server:', item.job_id);
+                        } else {
+                            console.warn('Failed to delete from server:', await res.text());
+                        }
+                    } catch (e) {
+                        console.warn('Error deleting from server:', e);
+                    }
+                }
+
+                // Remove from local library
                 libraryItems.splice(index, 1);
                 localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
                 renderLibrary();

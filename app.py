@@ -3972,8 +3972,36 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
-        async function loadRecentJobs() {
+        // Cache for recent jobs - avoid re-fetching too often
+        let recentJobsCache = { jobs: [], lastFetch: 0 };
+        const CACHE_TTL_MS = 60000; // 1 minute cache
+
+        async function loadRecentJobs(forceRefresh = false) {
             console.log('Loading recent jobs from server...');
+
+            // Check cache first (unless force refresh)
+            const now = Date.now();
+            if (!forceRefresh && recentJobsCache.jobs.length > 0 && (now - recentJobsCache.lastFetch) < CACHE_TTL_MS) {
+                console.log('Using cached jobs (' + recentJobsCache.jobs.length + ' items, ' + Math.round((now - recentJobsCache.lastFetch)/1000) + 's old)');
+                // Just merge cached items into library
+                recentJobsCache.jobs.forEach(function(item) {
+                    var exists = libraryItems.some(function(it) {
+                        return it.job_id === item.job_id && it.key === item.key;
+                    });
+                    if (!exists) libraryItems.push(item);
+                });
+                renderLibrary();
+                return;
+            }
+
+            // Show loading state
+            const btn = document.querySelector('button[onclick*="loadRecentJobs"]');
+            const originalText = btn ? btn.textContent : '';
+            if (btn) {
+                btn.textContent = 'Loading...';
+                btn.disabled = true;
+            }
+
             try {
                 const res = await fetch('/api/analyzer/jobs');
                 const data = await res.json();
@@ -3984,8 +4012,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     return;
                 }
 
+                // Clear cache for fresh fetch
+                recentJobsCache.jobs = [];
+
                 // Fetch results for each completed job
+                let loaded = 0;
                 for (const job of data.jobs.slice(0, 10)) {
+                    if (btn) btn.textContent = 'Loading ' + (++loaded) + '/10...';
                     console.log('Fetching result for job:', job.job_id);
                     try {
                         const resultRes = await fetch('/api/analyzer/jobs/' + job.job_id + '/result');
@@ -4007,9 +4040,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                                     addedAt: job.completed_at || new Date().toISOString()
                                 };
 
+                                // Add to cache
+                                recentJobsCache.jobs.push(resultData);
+
                                 // Check if already in library
                                 var exists = libraryItems.some(function(it) {
-                                    return it.key === key && it.addedAt === resultData.addedAt;
+                                    return it.job_id === resultData.job_id && it.key === key;
                                 });
 
                                 if (!exists) {
@@ -4022,11 +4058,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
                 }
 
+                // Update cache timestamp
+                recentJobsCache.lastFetch = Date.now();
+
                 renderLibrary();
-                console.log('Library now has', libraryItems.length, 'items');
+                console.log('Library now has', libraryItems.length, 'items (cached ' + recentJobsCache.jobs.length + ')');
             } catch (e) {
                 console.error('Failed to load recent jobs:', e);
                 alert('Failed to load jobs: ' + e.message);
+            } finally {
+                // Restore button
+                if (btn) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
             }
         }
 

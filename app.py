@@ -833,6 +833,7 @@ def submit_analysis():
     engine = data.get('engine')
     output_mode = data.get('output_mode', 'structured_text_report')
     collection_mode = data.get('collection_mode', 'single')
+    llm_keys = data.get('llm_keys')  # Forward user-provided API keys
 
     if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
@@ -899,14 +900,17 @@ def submit_analysis():
         jobs = []
         for doc in documents:
             try:
+                payload = {
+                    "documents": [doc],
+                    "engine": engine,
+                    "output_mode": output_mode
+                }
+                if llm_keys:
+                    payload["llm_keys"] = llm_keys
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
                     headers=get_analyzer_headers(),
-                    json={
-                        "documents": [doc],
-                        "engine": engine,
-                        "output_mode": output_mode
-                    },
+                    json=payload,
                     timeout=60.0,
                 )
                 response.raise_for_status()
@@ -933,14 +937,17 @@ def submit_analysis():
     else:
         # Single collection mode - all documents together
         try:
+            payload = {
+                "documents": documents,
+                "engine": engine,
+                "output_mode": output_mode
+            }
+            if llm_keys:
+                payload["llm_keys"] = llm_keys
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
                 headers=get_analyzer_headers(),
-                json={
-                    "documents": documents,
-                    "engine": engine,
-                    "output_mode": output_mode
-                },
+                json=payload,
                 timeout=300.0,  # 5 minutes for large document sets
             )
             response.raise_for_status()

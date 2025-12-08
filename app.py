@@ -715,21 +715,31 @@ def scan_folder():
         return jsonify({"success": False, "error": f"Invalid path: {input_path}"})
 
 
-def get_analyzer_headers() -> Dict[str, str]:
+def get_analyzer_headers(llm_keys: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """
     Build headers for analyzer API requests.
     Includes the API key and any forwarded LLM keys from the frontend.
+
+    Args:
+        llm_keys: Optional dict with 'anthropic_api_key' and/or 'gemini_api_key' from request body
     """
     headers = {"X-API-Key": ANALYZER_API_KEY}
 
-    # Forward LLM keys from frontend if provided
-    anthropic_key = request.headers.get('X-Anthropic-Api-Key')
-    gemini_key = request.headers.get('X-Gemini-Api-Key')
+    # First check llm_keys from request body (preferred - from JSON payload)
+    if llm_keys:
+        if llm_keys.get('anthropic_api_key'):
+            headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
+        if llm_keys.get('gemini_api_key'):
+            headers['X-Gemini-Api-Key'] = llm_keys['gemini_api_key']
+    else:
+        # Fallback: check request headers (legacy support)
+        anthropic_key = request.headers.get('X-Anthropic-Api-Key')
+        gemini_key = request.headers.get('X-Gemini-Api-Key')
 
-    if anthropic_key:
-        headers['X-Anthropic-Api-Key'] = anthropic_key
-    if gemini_key:
-        headers['X-Gemini-Api-Key'] = gemini_key
+        if anthropic_key:
+            headers['X-Anthropic-Api-Key'] = anthropic_key
+        if gemini_key:
+            headers['X-Gemini-Api-Key'] = gemini_key
 
     return headers
 
@@ -905,11 +915,9 @@ def submit_analysis():
                     "engine": engine,
                     "output_mode": output_mode
                 }
-                if llm_keys:
-                    payload["llm_keys"] = llm_keys
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
-                    headers=get_analyzer_headers(),
+                    headers=get_analyzer_headers(llm_keys),
                     json=payload,
                     timeout=60.0,
                 )
@@ -942,11 +950,9 @@ def submit_analysis():
                 "engine": engine,
                 "output_mode": output_mode
             }
-            if llm_keys:
-                payload["llm_keys"] = llm_keys
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
-                headers=get_analyzer_headers(),
+                headers=get_analyzer_headers(llm_keys),
                 json=payload,
                 timeout=300.0,  # 5 minutes for large document sets
             )
@@ -990,6 +996,7 @@ def submit_bundle_analysis():
     inline_documents = data.get('documents', [])
     bundle = data.get('bundle')
     output_modes = data.get('output_modes', {})
+    llm_keys = data.get('llm_keys')  # Forward user-provided API keys
 
     if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
@@ -1049,7 +1056,7 @@ def submit_bundle_analysis():
     try:
         response = httpx.post(
             f"{ANALYZER_API_URL}/v1/analyze/bundle",
-            headers=get_analyzer_headers(),
+            headers=get_analyzer_headers(llm_keys),
             json={
                 "documents": documents,
                 "bundle": bundle,

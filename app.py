@@ -2606,6 +2606,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             const profiles = getProfiles();
             const activeProfile = getActiveProfileName();
 
+            console.log('Rendering profiles:', profiles.length, 'profiles, active:', activeProfile);
+
             select.innerHTML = '<option value="">-- Select Profile --</option>';
             profiles.forEach(function(profile) {
                 const opt = document.createElement('option');
@@ -2683,9 +2685,16 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             nameInput.value = '';
             renderProfileSelector();
+
+            // Select the newly saved profile in dropdown
+            $('profile-select').value = name;
+            $('delete-profile-btn').style.display = 'flex';
+
             updateKeysButtonState();
             updateKeysStatus();
 
+            // Visual feedback
+            alert('Profile "' + name + '" saved!');
             console.log('Saved profile:', name);
         }
 

@@ -3629,8 +3629,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                     metadata: metadata,
                     isImage: !!output.image_url,
                     imageUrl: output.image_url || null,
-                    content: output.content || '',
-                    data: output.data || null
+                    content: output.content || output.html_content || '',
+                    data: output.data || null,
+                    isInteractive: !!output.html_content
                 };
                 allResults.push(resultData);
 
@@ -3694,6 +3695,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                     preview.appendChild(icon);
                 };
                 preview.appendChild(img);
+            } else if (data.isInteractive && data.content) {
+                // Interactive content (D3, Mermaid) - show icon preview
+                var icon = document.createElement('div');
+                icon.className = 'icon-preview';
+                icon.innerHTML = '&#128202;';  // Chart emoji
+                icon.title = 'Interactive visualization - click to view';
+                preview.appendChild(icon);
+                var interLabel = document.createElement('div');
+                interLabel.style.cssText = 'font-size: 0.7rem; color: var(--accent); margin-top: 0.5rem;';
+                interLabel.textContent = 'Interactive';
+                preview.appendChild(interLabel);
             } else if (data.content && isHtmlContent(data.content)) {
                 // HTML content - render scaled preview
                 var htmlPre = document.createElement('div');
@@ -3874,6 +3886,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 img.alt = data.title;
                 body.appendChild(img);
+            } else if (data.isInteractive && data.content) {
+                // Interactive content (D3, Mermaid) - use iframe for script execution
+                content.classList.add('wide');
+                content.classList.add('interactive-view');
+                var iframe = document.createElement('iframe');
+                iframe.className = 'interactive-iframe';
+                iframe.style.cssText = 'width: 100%; height: 70vh; border: none; background: white; border-radius: 8px;';
+                iframe.srcdoc = data.content;
+                body.appendChild(iframe);
             } else if (data.content && isHtmlContent(data.content)) {
                 // Render as HTML (tables, etc)
                 isMarkdownContent = true;
@@ -4134,9 +4155,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                                     metadata: result.metadata || {},
                                     isImage: !!output.image_url,
                                     imageUrl: output.image_url || null,
-                                    content: output.content || '',
+                                    content: output.content || output.html_content || '',
                                     data: output.data || null,
-                                    addedAt: job.completed_at || new Date().toISOString()
+                                    addedAt: job.completed_at || new Date().toISOString(),
+                                    isInteractive: !!output.html_content
                                 };
 
                                 // Add to cache
@@ -4246,6 +4268,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                 label.style.cssText = 'font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;';
                 label.textContent = '(Image not cached)';
                 preview.appendChild(label);
+            } else if (data.isInteractive && data.content) {
+                // Interactive content (D3, Mermaid) - show icon preview
+                var icon = document.createElement('div');
+                icon.className = 'icon-preview';
+                icon.innerHTML = '&#128202;';  // Chart emoji
+                icon.title = 'Interactive visualization - click to view';
+                preview.appendChild(icon);
+                var interLabel = document.createElement('div');
+                interLabel.style.cssText = 'font-size: 0.7rem; color: var(--accent); margin-top: 0.5rem;';
+                interLabel.textContent = 'Interactive';
+                preview.appendChild(interLabel);
             } else if (data.content && isHtmlContent(data.content)) {
                 // HTML content - render scaled preview
                 var htmlPre = document.createElement('div');
@@ -4280,7 +4313,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var meta = document.createElement('div');
             meta.className = 'gallery-card-meta';
-            meta.innerHTML = '<span>' + (data.isImage ? 'Image' : 'Text') + '</span>';
+            var typeLabel = data.isImage ? 'Image' : (data.isInteractive ? 'Interactive' : 'Text');
+            meta.innerHTML = '<span>' + typeLabel + '</span>';
             if (data.addedAt) {
                 meta.innerHTML += '<span>' + new Date(data.addedAt).toLocaleDateString() + '</span>';
             }

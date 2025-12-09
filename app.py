@@ -2444,12 +2444,9 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                         <!-- Output Mode -->
                         <div class="output-select">
-                            <span class="section-label">Output Format</span>
+                            <span class="section-label">Output Format <span id="output-mode-count" style="color: #666; font-size: 11px;"></span></span>
                             <select id="output-mode">
-                                <option value="gemini_image">Visual Diagram (Gemini)</option>
-                                <option value="executive_memo">Executive Memo</option>
-                                <option value="research_report">Research Study</option>
-                                <option value="comparative_matrix_table">Comparison Table</option>
+                                <option value="">Loading output modes...</option>
                             </select>
                         </div>
 
@@ -2557,6 +2554,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let selectedDocs = new Set();
         let engines = [];
         let bundles = [];
+        let outputModes = [];
         let selectedEngine = null;
         let selectedBundle = null;
         let collectionMode = 'single';
@@ -2955,6 +2953,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     bundles = await bundlesRes.json();
                     renderBundles();
                 }
+
+                const outputModesRes = await fetch('/api/analyzer/output-modes');
+                if (outputModesRes.ok) {
+                    outputModes = await outputModesRes.json();
+                    renderOutputModes();
+                }
             } catch (e) {
                 console.error('Failed to load analyzer data:', e);
             }
@@ -3004,6 +3008,87 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<div class="engines">' + (b.member_engines || []).length + ' engines: ' + engineList + moreCount + '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // Render Output Modes dropdown
+        function renderOutputModes() {
+            var select = $('output-mode');
+            var countSpan = $('output-mode-count');
+
+            if (!outputModes || outputModes.length === 0) {
+                select.innerHTML = '<option value="">No output modes available</option>';
+                return;
+            }
+
+            // Group by renderer type for better organization
+            var groups = {
+                'visual': [],
+                'document': [],
+                'structured': [],
+                'other': []
+            };
+
+            outputModes.forEach(function(mode) {
+                var type = mode.renderer_type || 'other';
+                // Visual outputs: gemini images, mermaid diagrams, d3 interactive
+                if (type === 'gemini_image' || type === 'mermaid' || type === 'd3_interactive') {
+                    groups.visual.push(mode);
+                // Document outputs: text-based reports and memos
+                } else if (type === 'text' || type === 'document') {
+                    groups.document.push(mode);
+                // Structured outputs: tables, matrices
+                } else if (type === 'table' || type === 'structured') {
+                    groups.structured.push(mode);
+                } else {
+                    groups.other.push(mode);
+                }
+            });
+
+            var html = '';
+
+            // Visual outputs first (most common)
+            if (groups.visual.length > 0) {
+                html += '<optgroup label="Visual Outputs">';
+                groups.visual.forEach(function(mode) {
+                    var label = mode.mode_name || formatEngineName(mode.mode_key);
+                    var requiresVisual = mode.requires_visual_llm ? ' (requires API key)' : '';
+                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + requiresVisual + '</option>';
+                });
+                html += '</optgroup>';
+            }
+
+            // Document outputs
+            if (groups.document.length > 0) {
+                html += '<optgroup label="Document Outputs">';
+                groups.document.forEach(function(mode) {
+                    var label = mode.mode_name || formatEngineName(mode.mode_key);
+                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                });
+                html += '</optgroup>';
+            }
+
+            // Structured outputs
+            if (groups.structured.length > 0) {
+                html += '<optgroup label="Structured Outputs">';
+                groups.structured.forEach(function(mode) {
+                    var label = mode.mode_name || formatEngineName(mode.mode_key);
+                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                });
+                html += '</optgroup>';
+            }
+
+            // Other outputs
+            if (groups.other.length > 0) {
+                html += '<optgroup label="Other">';
+                groups.other.forEach(function(mode) {
+                    var label = mode.mode_name || formatEngineName(mode.mode_key);
+                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                });
+                html += '</optgroup>';
+            }
+
+            select.innerHTML = html;
+            countSpan.textContent = '(' + outputModes.length + ' available)';
         }
 
         // Select Engine

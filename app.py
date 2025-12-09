@@ -3989,10 +3989,26 @@ HTML_PAGE = '''<!DOCTYPE html>
                 actions.appendChild(copyBtn);
             }
 
+            // Open in New Tab button for interactive content
+            if (data.isInteractive && data.content) {
+                var newTabBtn = document.createElement('button');
+                newTabBtn.className = 'btn';
+                newTabBtn.style.width = 'auto';
+                newTabBtn.style.background = '#4fc3f7';
+                newTabBtn.style.color = '#1a1a2e';
+                newTabBtn.textContent = '↗ Open Full Screen';
+                newTabBtn.onclick = function() {
+                    var newWindow = window.open('', '_blank');
+                    newWindow.document.write(data.content);
+                    newWindow.document.close();
+                };
+                actions.appendChild(newTabBtn);
+            }
+
             var dlBtn = document.createElement('button');
             dlBtn.className = 'btn btn-primary';
             dlBtn.style.width = 'auto';
-            dlBtn.textContent = 'Download';
+            dlBtn.textContent = 'DOWNLOAD';
             dlBtn.onclick = function() { downloadGalleryResult(index); };
             actions.appendChild(dlBtn);
 
@@ -4036,7 +4052,12 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             var content, filename, mimeType;
-            if (data.content) {
+            if (data.isInteractive && data.content) {
+                // Interactive HTML content
+                content = data.content;
+                filename = data.key.replace(/_/g, '-') + '.html';
+                mimeType = 'text/html';
+            } else if (data.content) {
                 content = data.content;
                 filename = data.key.replace(/_/g, '-') + '.md';
                 mimeType = 'text/markdown';

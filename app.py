@@ -3010,6 +3010,16 @@ HTML_PAGE = '''<!DOCTYPE html>
             }).join('');
         }
 
+        // Check if output mode is compatible with selected engine
+        function isOutputModeCompatible(mode) {
+            // If no engine selected, all modes are available
+            if (!selectedEngine) return true;
+            // If compatible_engines is empty, mode works with all engines
+            if (!mode.compatible_engines || mode.compatible_engines.length === 0) return true;
+            // Check if selected engine is in compatible list
+            return mode.compatible_engines.includes(selectedEngine);
+        }
+
         // Render Output Modes dropdown
         function renderOutputModes() {
             var select = $('output-mode');
@@ -3028,7 +3038,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 'other': []
             };
 
+            var compatibleCount = 0;
+
             outputModes.forEach(function(mode) {
+                // Add compatibility info to mode
+                mode._isCompatible = isOutputModeCompatible(mode);
+                if (mode._isCompatible) compatibleCount++;
+
                 var type = mode.renderer_type || 'other';
                 // Visual outputs: gemini images, mermaid diagrams, d3 interactive
                 if (type === 'gemini_image' || type === 'mermaid' || type === 'd3_interactive') {
@@ -3046,13 +3062,20 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var html = '';
 
+            // Helper to render option with compatibility check
+            function renderOption(mode) {
+                var label = mode.mode_name || formatEngineName(mode.mode_key);
+                var requiresVisual = mode.requires_visual_llm ? ' (requires API key)' : '';
+                var disabled = !mode._isCompatible ? ' disabled' : '';
+                var incompatNote = !mode._isCompatible ? ' [incompatible]' : '';
+                return '<option value="' + mode.mode_key + '"' + disabled + ' title="' + (mode.description || '') + '">' + label + requiresVisual + incompatNote + '</option>';
+            }
+
             // Visual outputs first (most common)
             if (groups.visual.length > 0) {
                 html += '<optgroup label="Visual Outputs">';
                 groups.visual.forEach(function(mode) {
-                    var label = mode.mode_name || formatEngineName(mode.mode_key);
-                    var requiresVisual = mode.requires_visual_llm ? ' (requires API key)' : '';
-                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + requiresVisual + '</option>';
+                    html += renderOption(mode);
                 });
                 html += '</optgroup>';
             }
@@ -3061,8 +3084,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (groups.document.length > 0) {
                 html += '<optgroup label="Document Outputs">';
                 groups.document.forEach(function(mode) {
-                    var label = mode.mode_name || formatEngineName(mode.mode_key);
-                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                    html += renderOption(mode);
                 });
                 html += '</optgroup>';
             }
@@ -3071,8 +3093,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (groups.structured.length > 0) {
                 html += '<optgroup label="Structured Outputs">';
                 groups.structured.forEach(function(mode) {
-                    var label = mode.mode_name || formatEngineName(mode.mode_key);
-                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                    html += renderOption(mode);
                 });
                 html += '</optgroup>';
             }
@@ -3081,14 +3102,30 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (groups.other.length > 0) {
                 html += '<optgroup label="Other">';
                 groups.other.forEach(function(mode) {
-                    var label = mode.mode_name || formatEngineName(mode.mode_key);
-                    html += '<option value="' + mode.mode_key + '" title="' + (mode.description || '') + '">' + label + '</option>';
+                    html += renderOption(mode);
                 });
                 html += '</optgroup>';
             }
 
             select.innerHTML = html;
-            countSpan.textContent = '(' + outputModes.length + ' available)';
+
+            // Show count - highlight if some are incompatible
+            if (selectedEngine && compatibleCount < outputModes.length) {
+                countSpan.textContent = '(' + compatibleCount + '/' + outputModes.length + ' compatible)';
+            } else {
+                countSpan.textContent = '(' + outputModes.length + ' available)';
+            }
+
+            // Auto-select first compatible option if current selection is incompatible
+            var currentValue = select.value;
+            var currentMode = outputModes.find(function(m) { return m.mode_key === currentValue; });
+            if (currentMode && !currentMode._isCompatible) {
+                // Find first compatible mode
+                var firstCompatible = outputModes.find(function(m) { return m._isCompatible; });
+                if (firstCompatible) {
+                    select.value = firstCompatible.mode_key;
+                }
+            }
         }
 
         // Select Engine
@@ -3096,6 +3133,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             selectedEngine = key;
             selectedBundle = null;
             renderEngines();
+            renderOutputModes();  // Update output modes based on engine compatibility
             updateAnalyzeButton();
         }
 
@@ -3104,6 +3142,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             selectedBundle = key;
             selectedEngine = null;
             renderBundles();
+            renderOutputModes();  // Reset output modes (all available for bundles)
             updateAnalyzeButton();
         }
 

@@ -795,6 +795,61 @@ def list_analyzer_output_modes():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/categories', methods=['GET'])
+def list_analyzer_categories():
+    """Fetch engine categories from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/categories",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch categories: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/curator/recommend', methods=['POST'])
+def curator_recommend():
+    """Get engine recommendations from the Curator AI."""
+    try:
+        data = request.get_json()
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/recommend",
+            headers=get_analyzer_headers(),
+            json=data,
+            timeout=120.0,  # Longer timeout for AI processing
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Curator request failed: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/curator/quick-suggest', methods=['GET'])
+def curator_quick_suggest():
+    """Get quick heuristic-based engine suggestions."""
+    try:
+        text = request.args.get('text', '')
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/curator/quick-suggest",
+            headers=get_analyzer_headers(),
+            params={'text': text},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Quick suggest failed: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 def extract_pdf_from_base64(base64_content: str) -> str:
     """Extract text from base64-encoded PDF."""
     import base64
@@ -1741,6 +1796,100 @@ HTML_PAGE = '''<!DOCTYPE html>
         .bundle-card .name { font-weight: 600; font-size: 0.9rem; }
         .bundle-card .engines { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
 
+        /* Category Tabs */
+        .category-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .category-tab {
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+        }
+
+        .category-tab:hover {
+            border-color: var(--accent-muted);
+            background: var(--bg-card);
+        }
+
+        .category-tab.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .category-tab .cat-icon { font-size: 1em; }
+        .category-tab .cat-count { opacity: 0.7; }
+
+        /* Curator Section */
+        .curator-section {
+            background: linear-gradient(135deg, rgba(45,125,70,0.05) 0%, rgba(45,125,70,0.02) 100%);
+            border: 1px solid rgba(45,125,70,0.2);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .curator-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .curator-result {
+            margin-top: 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .curator-result.loading {
+            color: var(--accent);
+            font-style: italic;
+        }
+
+        .curator-result .doc-type {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .curator-result .strategy {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Recommended Engine Badge */
+        .engine-card.recommended {
+            border-color: var(--success);
+            background: linear-gradient(135deg, rgba(45,125,70,0.05) 0%, transparent 100%);
+        }
+
+        .rec-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--success);
+            background: rgba(45,125,70,0.1);
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            margin-bottom: 0.5rem;
+            align-self: flex-start;
+        }
+
         /* Buttons */
         .btn {
             display: inline-flex;
@@ -2430,6 +2579,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                             </div>
                         </div>
 
+                        <!-- Smart Curator -->
+                        <div id="curator-section" class="curator-section">
+                            <div class="curator-header">
+                                <span class="section-label">Smart Curator</span>
+                                <button class="btn btn-sm" onclick="getCuratorRecommendations()" id="curator-btn" disabled title="Upload documents first">
+                                    Get AI Recommendations
+                                </button>
+                            </div>
+                            <div id="curator-result" class="curator-result"></div>
+                        </div>
+
+                        <!-- Category Filter Tabs -->
+                        <div id="category-tabs" class="category-tabs"></div>
+
                         <!-- Single Engine Selection -->
                         <div id="engine-selection">
                             <span class="section-label">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
@@ -2554,9 +2717,12 @@ HTML_PAGE = '''<!DOCTYPE html>
         let selectedDocs = new Set();
         let engines = [];
         let bundles = [];
+        let categories = [];
         let outputModes = [];
         let selectedEngine = null;
         let selectedBundle = null;
+        let selectedCategory = null;  // Filter engines by category
+        let curatorRecommendations = null;  // AI recommendations
         let collectionMode = 'single';
         let engineMode = 'engine';
         let currentJobId = null;
@@ -2936,12 +3102,19 @@ HTML_PAGE = '''<!DOCTYPE html>
             return false;
         }
 
-        // Load Engines and Bundles
+        // Load Engines, Bundles, and Categories
         async function loadAnalyzerData() {
             const connected = await checkAnalyzerStatus();
             if (!connected) return;
 
             try {
+                // Load categories first for filtering
+                const categoriesRes = await fetch('/api/analyzer/categories');
+                if (categoriesRes.ok) {
+                    categories = await categoriesRes.json();
+                    renderCategoryTabs();
+                }
+
                 const enginesRes = await fetch('/api/analyzer/engines');
                 if (enginesRes.ok) {
                     engines = await enginesRes.json();
@@ -2978,17 +3151,96 @@ HTML_PAGE = '''<!DOCTYPE html>
             return desc.substring(0, maxLen).replace(/\\s+\\S*$/, '') + '...';
         }
 
-        // Render Engines
+        // Category icons mapping
+        var categoryIcons = {
+            'argument': '&#128218;',    // Books
+            'concepts': '&#128161;',    // Lightbulb
+            'temporal': '&#128336;',    // Clock
+            'power': '&#9889;',         // Lightning bolt
+            'evidence': '&#128200;',    // Chart
+            'rhetoric': '&#128172;',    // Speech bubble
+            'epistemology': '&#129504;', // Brain
+            'scholarly': '&#127891;',   // Graduation cap
+            'market': '&#128176;'       // Money bag
+        };
+
+        // Render category filter tabs
+        function renderCategoryTabs() {
+            var container = $('category-tabs');
+            if (!container) return;
+
+            var html = '<button class="category-tab ' + (!selectedCategory ? 'active' : '') + '" ' +
+                       'onclick="filterByCategory(null)">All Engines</button>';
+
+            categories.forEach(function(cat) {
+                var icon = categoryIcons[cat.category_key] || '';
+                var active = selectedCategory === cat.category_key ? 'active' : '';
+                html += '<button class="category-tab ' + active + '" ' +
+                        'onclick="filterByCategory(\\'' + cat.category_key + '\\')" ' +
+                        'title="' + (cat.description || '') + '">' +
+                        '<span class="cat-icon">' + icon + '</span>' +
+                        '<span class="cat-name">' + cat.name + '</span>' +
+                        '<span class="cat-count">(' + cat.engine_count + ')</span>' +
+                        '</button>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Filter engines by category
+        function filterByCategory(categoryKey) {
+            selectedCategory = categoryKey;
+            selectedEngine = null;  // Reset selection when filtering
+            curatorRecommendations = null;  // Clear recommendations
+            renderCategoryTabs();
+            renderEngines();
+            updateAnalyzeButton();
+        }
+
+        // Render Engines (with category filtering and recommendations)
         function renderEngines() {
             var grid = $('engine-grid');
-            $('engine-count').textContent = '(' + engines.length + ' available)';
 
-            grid.innerHTML = engines.map(function(e) {
-                var displayName = e.name || formatEngineName(e.engine_key);
+            // Filter engines by selected category
+            var filteredEngines = engines;
+            if (selectedCategory) {
+                filteredEngines = engines.filter(function(e) {
+                    return e.category === selectedCategory;
+                });
+            }
+
+            // If we have curator recommendations, highlight them
+            var recommendedKeys = new Set();
+            if (curatorRecommendations && curatorRecommendations.primary_recommendations) {
+                curatorRecommendations.primary_recommendations.forEach(function(r) {
+                    recommendedKeys.add(r.engine_key);
+                });
+            }
+
+            $('engine-count').textContent = '(' + filteredEngines.length + (selectedCategory ? ' in category' : ' available') + ')';
+
+            // Sort: recommended engines first, then alphabetically
+            filteredEngines = filteredEngines.slice().sort(function(a, b) {
+                var aRec = recommendedKeys.has(a.engine_key) ? 0 : 1;
+                var bRec = recommendedKeys.has(b.engine_key) ? 0 : 1;
+                if (aRec !== bRec) return aRec - bRec;
+                return a.engine_name.localeCompare(b.engine_name);
+            });
+
+            grid.innerHTML = filteredEngines.map(function(e) {
+                var displayName = e.engine_name || formatEngineName(e.engine_key);
                 var shortDesc = truncateDesc(e.description || '', 100);
-                return '<div class="engine-card ' + (selectedEngine === e.engine_key ? 'selected' : '') + '" ' +
+                var isRecommended = recommendedKeys.has(e.engine_key);
+                var recInfo = '';
+                if (isRecommended) {
+                    var rec = curatorRecommendations.primary_recommendations.find(function(r) { return r.engine_key === e.engine_key; });
+                    recInfo = rec ? '<div class="rec-badge" title="' + (rec.rationale || '') + '">AI Recommended (' + Math.round(rec.confidence * 100) + '%)</div>' : '';
+                }
+                var catIcon = categoryIcons[e.category] || '';
+                return '<div class="engine-card ' + (selectedEngine === e.engine_key ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
                 'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
-                '<div class="name">' + displayName + '</div>' +
+                recInfo +
+                '<div class="name">' + catIcon + ' ' + displayName + '</div>' +
                 '<div class="desc">' + shortDesc + '</div>' +
                 '</div>';
             }).join('');
@@ -3008,6 +3260,97 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<div class="engines">' + (b.member_engines || []).length + ' engines: ' + engineList + moreCount + '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // Get sample text from documents for curator
+        function getSampleTextForCurator() {
+            // Get text from selected documents
+            var sampleParts = [];
+            var docCount = 0;
+            var maxDocs = 3;  // Sample from up to 3 docs
+            var maxCharsPerDoc = 2000;
+
+            scannedDocs.forEach(function(doc) {
+                if (!selectedDocs.has(doc.id) || docCount >= maxDocs) return;
+                var content = doc.content || '';
+                if (content.length > maxCharsPerDoc) {
+                    content = content.substring(0, maxCharsPerDoc) + '...';
+                }
+                sampleParts.push(content);
+                docCount++;
+            });
+
+            return sampleParts.join('\n\n---\n\n');
+        }
+
+        // Update curator button state based on document selection
+        function updateCuratorButton() {
+            var btn = $('curator-btn');
+            if (!btn) return;
+            var hasSelectedDocs = selectedDocs.size > 0;
+            btn.disabled = !hasSelectedDocs;
+            btn.title = hasSelectedDocs ? 'Get AI-powered engine recommendations' : 'Upload documents first';
+        }
+
+        // Get curator recommendations
+        async function getCuratorRecommendations() {
+            var resultDiv = $('curator-result');
+            var btn = $('curator-btn');
+
+            var sampleText = getSampleTextForCurator();
+            if (!sampleText || sampleText.length < 100) {
+                resultDiv.innerHTML = '<span style="color:var(--warning);">Need more document content for analysis.</span>';
+                return;
+            }
+
+            // Show loading state
+            resultDiv.innerHTML = '<span class="loading">Analyzing documents to suggest best engines...</span>';
+            btn.disabled = true;
+
+            try {
+                var response = await fetch('/api/analyzer/curator/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sample_text: sampleText,
+                        max_recommendations: 6
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Curator request failed');
+                }
+
+                curatorRecommendations = await response.json();
+
+                // Display results
+                var chars = curatorRecommendations.document_characteristics || {};
+                var html = '<div class="doc-type">Document type: ' + (chars.type || 'Unknown') + '</div>';
+                html += '<div>Style: ' + (chars.style || 'N/A') + ' | Focus: ' + (chars.focus || 'N/A') + '</div>';
+
+                if (curatorRecommendations.primary_recommendations && curatorRecommendations.primary_recommendations.length > 0) {
+                    html += '<div style="margin-top:0.5rem;"><strong>Top recommendations:</strong> ';
+                    html += curatorRecommendations.primary_recommendations.slice(0, 4).map(function(r) {
+                        return r.engine_name + ' (' + Math.round(r.confidence * 100) + '%)';
+                    }).join(', ');
+                    html += '</div>';
+                }
+
+                if (curatorRecommendations.analysis_strategy) {
+                    html += '<div class="strategy">' + curatorRecommendations.analysis_strategy + '</div>';
+                }
+
+                resultDiv.innerHTML = html;
+
+                // Re-render engines to show recommendations
+                renderEngines();
+
+            } catch (e) {
+                console.error('Curator error:', e);
+                resultDiv.innerHTML = '<span style="color:var(--error);">Recommendation failed. Try selecting specific category manually.</span>';
+            }
+
+            btn.disabled = false;
         }
 
         // Check if output mode is compatible with selected engine
@@ -3249,6 +3592,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             } else {
                 btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
             }
+
+            // Also update curator button state
+            updateCuratorButton();
         }
 
         // Read file as text or base64 for PDFs

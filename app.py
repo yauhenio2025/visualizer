@@ -778,6 +778,40 @@ def list_analyzer_bundles():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/pipelines', methods=['GET'])
+def list_analyzer_pipelines():
+    """Fetch available meta-engine pipelines from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/pipelines",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch pipelines: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/pipeline-tiers', methods=['GET'])
+def list_analyzer_pipeline_tiers():
+    """Fetch pipeline tier groupings from Analyzer API."""
+    try:
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/pipeline-tiers",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch pipeline tiers: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analyzer/output-modes', methods=['GET'])
 def list_analyzer_output_modes():
     """Fetch available output modes from Analyzer API."""
@@ -1126,6 +1160,108 @@ def submit_bundle_analysis():
             "success": True,
             "job_id": job_data.get("job_id"),
             "bundle": bundle,
+            "document_count": len(documents),
+            "warnings": errors if errors else None
+        })
+
+    except httpx.HTTPError as e:
+        return jsonify({
+            "success": False,
+            "error": f"API error: {str(e)}"
+        })
+
+
+@app.route('/api/analyzer/analyze/pipeline', methods=['POST'])
+def submit_pipeline_analysis():
+    """Submit documents for pipeline analysis (chained engines)."""
+    data = request.json or {}
+    file_paths = data.get('file_paths', [])
+    inline_documents = data.get('documents', [])
+    pipeline = data.get('pipeline')
+    output_mode = data.get('output_mode', 'executive_memo')
+    include_intermediate = data.get('include_intermediate_outputs', True)
+    llm_keys = data.get('llm_keys')
+
+    if not file_paths and not inline_documents:
+        return jsonify({"success": False, "error": "No files provided"})
+
+    if not pipeline:
+        return jsonify({"success": False, "error": "No pipeline selected"})
+
+    documents = []
+    errors = []
+
+    # Handle inline documents (from browser upload)
+    if inline_documents:
+        for i, doc in enumerate(inline_documents):
+            doc_id = doc.get('id', f'doc_{i+1}')
+            title = doc.get('title', f'Document {i+1}')
+            content = doc.get('content', '')
+            encoding = doc.get('encoding', 'text')
+
+            if encoding == 'base64':
+                content = extract_pdf_from_base64(content)
+
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": doc_id,
+                    "title": title,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to extract content from {title}")
+
+    # Handle file paths (from server folder scan)
+    else:
+        for i, path in enumerate(file_paths):
+            content = extract_text_from_file(path)
+            filename = os.path.basename(path)
+
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": f"doc_{i+1}",
+                    "title": filename,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to read {filename}: {content}")
+
+    if not documents:
+        return jsonify({
+            "success": False,
+            "error": "No valid documents could be processed",
+            "details": errors
+        })
+
+    # Build headers for analyzer API
+    headers = get_analyzer_headers()
+
+    # Forward user-provided LLM API keys if present
+    if llm_keys:
+        if llm_keys.get('anthropic_api_key'):
+            headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
+        if llm_keys.get('gemini_api_key'):
+            headers['X-Gemini-Api-Key'] = llm_keys['gemini_api_key']
+
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/analyze/pipeline",
+            json={
+                "documents": documents,
+                "pipeline": pipeline,
+                "output_mode": output_mode,
+                "include_intermediate_outputs": include_intermediate,
+            },
+            headers=headers,
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        job_data = response.json()
+
+        return jsonify({
+            "success": True,
+            "job_id": job_data.get("job_id"),
+            "pipeline": pipeline,
             "document_count": len(documents),
             "warnings": errors if errors else None
         })
@@ -1795,6 +1931,70 @@ HTML_PAGE = '''<!DOCTYPE html>
         .bundle-card.selected { border-color: var(--accent); background: var(--bg-card); }
         .bundle-card .name { font-weight: 600; font-size: 0.9rem; }
         .bundle-card .engines { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Pipeline Cards (Meta-Engines) */
+        .pipeline-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .pipeline-card {
+            padding: 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .pipeline-card:hover { border-color: var(--accent-muted); box-shadow: var(--shadow-sm); }
+        .pipeline-card.selected { border-color: var(--accent); background: var(--bg-card); border-width: 2px; }
+        .pipeline-card .name { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+        .pipeline-card .desc { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.35rem; line-height: 1.4; }
+        .pipeline-card .synergy { font-size: 0.75rem; color: var(--accent); margin-top: 0.5rem; font-style: italic; }
+        .pipeline-card .stages { margin-top: 0.75rem; display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+        .pipeline-card .stage-chip {
+            padding: 0.2rem 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-family: var(--mono);
+        }
+        .pipeline-card .stage-arrow { color: var(--text-muted); font-size: 0.8rem; }
+        .pipeline-card .tier-badge {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.4rem;
+            background: var(--accent);
+            color: white;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        /* Tier Filter Tabs */
+        .tier-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tier-tab {
+            padding: 0.4rem 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.15s;
+        }
+
+        .tier-tab:hover { border-color: var(--accent-muted); }
+        .tier-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .tier-tab .count { opacity: 0.7; margin-left: 0.25rem; }
 
         /* Category Tabs */
         .category-tabs {
@@ -2567,7 +2767,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     <div class="card">
                         <h2 class="card-header">Analysis Engine</h2>
 
-                        <!-- Engine vs Bundle Toggle -->
+                        <!-- Engine vs Bundle vs Pipeline Toggle -->
                         <div class="mode-toggle">
                             <div class="mode-btn active" onclick="setEngineMode('engine')" id="engine-mode-single">
                                 <div class="title">Single Engine</div>
@@ -2576,6 +2776,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <div class="mode-btn" onclick="setEngineMode('bundle')" id="engine-mode-bundle">
                                 <div class="title">Bundle</div>
                                 <div class="desc">Multiple engines</div>
+                            </div>
+                            <div class="mode-btn" onclick="setEngineMode('pipeline')" id="engine-mode-pipeline">
+                                <div class="title">Pipeline</div>
+                                <div class="desc">Chained engines</div>
                             </div>
                         </div>
 
@@ -2603,6 +2807,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <div id="bundle-selection" style="display:none;">
                             <span class="section-label">Select Bundle</span>
                             <div id="bundle-list"></div>
+                        </div>
+
+                        <!-- Pipeline Selection (Meta-Engines) -->
+                        <div id="pipeline-selection" style="display:none;">
+                            <div id="pipeline-tier-tabs" class="tier-tabs"></div>
+                            <span class="section-label">Select Pipeline <span id="pipeline-count" style="color:var(--text-secondary);"></span></span>
+                            <div id="pipeline-list" class="pipeline-list"></div>
                         </div>
 
                         <!-- Output Mode -->
@@ -2717,14 +2928,18 @@ HTML_PAGE = '''<!DOCTYPE html>
         let selectedDocs = new Set();
         let engines = [];
         let bundles = [];
+        let pipelines = [];  // Meta-engines
+        let pipelineTiers = [];  // Tier groupings
         let categories = [];
         let outputModes = [];
         let selectedEngine = null;
         let selectedBundle = null;
+        let selectedPipeline = null;  // Meta-engine selection
+        let selectedTier = null;  // Filter pipelines by tier
         let selectedCategory = null;  // Filter engines by category
         let curatorRecommendations = null;  // AI recommendations
         let collectionMode = 'single';
-        let engineMode = 'engine';
+        let engineMode = 'engine';  // 'engine', 'bundle', or 'pipeline'
         let currentJobId = null;
         let allResults = [];
         let libraryItems = [];
@@ -3127,6 +3342,21 @@ HTML_PAGE = '''<!DOCTYPE html>
                     renderBundles();
                 }
 
+                // Load pipelines (meta-engines)
+                const pipelinesRes = await fetch('/api/analyzer/pipelines');
+                if (pipelinesRes.ok) {
+                    pipelines = await pipelinesRes.json();
+                    renderPipelineTierTabs();
+                    renderPipelines();
+                }
+
+                // Load pipeline tiers for display info
+                const tiersRes = await fetch('/api/analyzer/pipeline-tiers');
+                if (tiersRes.ok) {
+                    pipelineTiers = await tiersRes.json();
+                    renderPipelineTierTabs();  // Re-render with full tier info
+                }
+
                 const outputModesRes = await fetch('/api/analyzer/output-modes');
                 if (outputModesRes.ok) {
                     outputModes = await outputModesRes.json();
@@ -3260,6 +3490,94 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<div class="engines">' + (b.member_engines || []).length + ' engines: ' + engineList + moreCount + '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // Tier names for display
+        var tierNames = {
+            1: 'Foundation \\u2192 Enhancement',
+            2: 'Extraction \\u2192 Relational',
+            3: 'Critique \\u2192 Generation',
+            4: 'Multi-Stage Deep'
+        };
+
+        // Render pipeline tier filter tabs
+        function renderPipelineTierTabs() {
+            var tabs = $('pipeline-tier-tabs');
+            if (!tabs) return;
+
+            // Count pipelines per tier
+            var tierCounts = {};
+            pipelines.forEach(function(p) {
+                tierCounts[p.tier] = (tierCounts[p.tier] || 0) + 1;
+            });
+
+            var html = '<div class="tier-tab ' + (selectedTier === null ? 'active' : '') + '" onclick="filterByTier(null)">' +
+                'All <span class="count">(' + pipelines.length + ')</span></div>';
+
+            for (var tier = 1; tier <= 4; tier++) {
+                if (tierCounts[tier]) {
+                    html += '<div class="tier-tab ' + (selectedTier === tier ? 'active' : '') + '" onclick="filterByTier(' + tier + ')">' +
+                        tierNames[tier] + ' <span class="count">(' + tierCounts[tier] + ')</span></div>';
+                }
+            }
+
+            tabs.innerHTML = html;
+        }
+
+        // Filter pipelines by tier
+        function filterByTier(tier) {
+            selectedTier = tier;
+            selectedPipeline = null;
+            renderPipelineTierTabs();
+            renderPipelines();
+            updateAnalyzeButton();
+        }
+
+        // Render pipeline cards
+        function renderPipelines() {
+            var list = $('pipeline-list');
+            var countSpan = $('pipeline-count');
+            if (!list) return;
+
+            // Filter by tier if selected
+            var filtered = selectedTier !== null
+                ? pipelines.filter(function(p) { return p.tier === selectedTier; })
+                : pipelines;
+
+            if (countSpan) {
+                countSpan.textContent = '(' + filtered.length + ' available)';
+            }
+
+            list.innerHTML = filtered.map(function(p) {
+                // Build stage chips with arrows
+                var stagesHtml = (p.engine_sequence || []).map(function(engineKey, idx) {
+                    var arrow = idx < p.engine_sequence.length - 1
+                        ? '<span class="stage-arrow">\\u2192</span>'
+                        : '';
+                    return '<span class="stage-chip">' + formatEngineName(engineKey) + '</span>' + arrow;
+                }).join('');
+
+                return '<div class="pipeline-card ' + (selectedPipeline === p.pipeline_key ? 'selected' : '') + '" ' +
+                    'onclick="selectPipeline(\\'' + p.pipeline_key + '\\')">' +
+                    '<div class="name">' +
+                        '<span class="tier-badge">Tier ' + p.tier + '</span> ' +
+                        p.pipeline_name +
+                    '</div>' +
+                    '<div class="desc">' + truncateDesc(p.description, 120) + '</div>' +
+                    (p.synergy_rationale ? '<div class="synergy">"' + truncateDesc(p.synergy_rationale, 100) + '"</div>' : '') +
+                    '<div class="stages">' + stagesHtml + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Select a pipeline
+        function selectPipeline(pipelineKey) {
+            selectedPipeline = pipelineKey;
+            selectedEngine = null;
+            selectedBundle = null;
+            renderPipelines();
+            renderOutputModes();
+            updateAnalyzeButton();
         }
 
         // Get sample text from documents for curator (async - reads file contents)
@@ -3603,14 +3921,28 @@ HTML_PAGE = '''<!DOCTYPE html>
             engineMode = mode;
             $('engine-mode-single').classList.toggle('active', mode === 'engine');
             $('engine-mode-bundle').classList.toggle('active', mode === 'bundle');
+            $('engine-mode-pipeline').classList.toggle('active', mode === 'pipeline');
             $('engine-selection').style.display = mode === 'engine' ? 'block' : 'none';
             $('bundle-selection').style.display = mode === 'bundle' ? 'block' : 'none';
+            $('pipeline-selection').style.display = mode === 'pipeline' ? 'block' : 'none';
+            // Show/hide category tabs (only for single engine mode)
+            $('category-tabs').style.display = mode === 'engine' ? 'flex' : 'none';
+            // Show/hide curator (only for single engine mode)
+            $('curator-section').style.display = mode === 'engine' ? 'block' : 'none';
+            updateAnalyzeButton();
         }
 
         // Update Analyze Button
         function updateAnalyzeButton() {
             const btn = $('analyze-btn');
-            const hasSelection = engineMode === 'engine' ? selectedEngine : selectedBundle;
+            let hasSelection;
+            if (engineMode === 'engine') {
+                hasSelection = selectedEngine;
+            } else if (engineMode === 'bundle') {
+                hasSelection = selectedBundle;
+            } else {
+                hasSelection = selectedPipeline;
+            }
             const hasDocs = selectedDocs.size > 0;
 
             btn.disabled = !hasSelection || !hasDocs;
@@ -3618,7 +3950,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (!hasDocs) {
                 btn.textContent = 'Select Documents First';
             } else if (!hasSelection) {
-                btn.textContent = 'Select ' + (engineMode === 'engine' ? 'Engine' : 'Bundle') + ' to Analyze';
+                var modeLabel = engineMode === 'engine' ? 'Engine' : (engineMode === 'bundle' ? 'Bundle' : 'Pipeline');
+                btn.textContent = 'Select ' + modeLabel + ' to Analyze';
             } else {
                 btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
             }
@@ -3742,7 +4075,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         headers: getApiHeaders(),
                         body: JSON.stringify(payload)
                     });
-                } else {
+                } else if (engineMode === 'bundle') {
                     var outputModes = {};
                     var bundle = bundles.find(function(b) { return b.bundle_key === selectedBundle; });
                     if (bundle) {
@@ -3761,6 +4094,25 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
 
                     response = await fetch('/api/analyzer/analyze/bundle', {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // Pipeline mode
+                    const payload = {
+                        pipeline: selectedPipeline,
+                        output_mode: outputMode,
+                        include_intermediate_outputs: true
+                    };
+
+                    if (docData.type === 'paths') {
+                        payload.file_paths = docData.file_paths;
+                    } else {
+                        payload.documents = docData.documents;
+                    }
+
+                    response = await fetch('/api/analyzer/analyze/pipeline', {
                         method: 'POST',
                         headers: getApiHeaders(),
                         body: JSON.stringify(payload)

@@ -3262,23 +3262,49 @@ HTML_PAGE = '''<!DOCTYPE html>
             }).join('');
         }
 
-        // Get sample text from documents for curator
-        function getSampleTextForCurator() {
-            // Get text from selected documents
+        // Get sample text from documents for curator (async - reads file contents)
+        async function getSampleTextForCurator() {
             var sampleParts = [];
-            var docCount = 0;
             var maxDocs = 3;  // Sample from up to 3 docs
             var maxCharsPerDoc = 2000;
 
-            scannedDocs.forEach(function(doc) {
-                if (!selectedDocs.has(doc.path) || docCount >= maxDocs) return;
-                var content = doc.content || '';
+            var selectedDocObjects = scannedDocs.filter(function(doc) {
+                return selectedDocs.has(doc.path);
+            }).slice(0, maxDocs);
+
+            for (var i = 0; i < selectedDocObjects.length; i++) {
+                var doc = selectedDocObjects[i];
+                var content = '';
+
+                // If doc has a File object, read it
+                if (doc.file && doc.file instanceof File) {
+                    try {
+                        var fileData = await readFileContent(doc.file);
+                        if (fileData.encoding === 'base64') {
+                            // For PDFs, we can't easily extract text in browser
+                            // Just note it's a PDF and let the backend handle it
+                            content = '[PDF: ' + doc.name + '] - Content will be extracted by analyzer';
+                        } else {
+                            content = fileData.content || '';
+                        }
+                    } catch (e) {
+                        content = '[Error reading: ' + doc.name + ']';
+                    }
+                } else if (doc.content) {
+                    // Server-scanned doc with content
+                    content = doc.content;
+                } else {
+                    // Server-scanned doc without content - just use metadata
+                    content = '[Document: ' + doc.name + ' at ' + doc.path + ']';
+                }
+
                 if (content.length > maxCharsPerDoc) {
                     content = content.substring(0, maxCharsPerDoc) + '...';
                 }
-                sampleParts.push(content);
-                docCount++;
-            });
+                if (content) {
+                    sampleParts.push(content);
+                }
+            }
 
             return sampleParts.join('\\n\\n---\\n\\n');
         }
@@ -3297,15 +3323,19 @@ HTML_PAGE = '''<!DOCTYPE html>
             var resultDiv = $('curator-result');
             var btn = $('curator-btn');
 
-            var sampleText = getSampleTextForCurator();
+            // Show loading state while reading files
+            resultDiv.innerHTML = '<span class="loading">Reading documents...</span>';
+            btn.disabled = true;
+
+            var sampleText = await getSampleTextForCurator();
             if (!sampleText || sampleText.length < 100) {
                 resultDiv.innerHTML = '<span style="color:var(--warning);">Need more document content for analysis.</span>';
+                btn.disabled = false;
                 return;
             }
 
-            // Show loading state
+            // Show loading state for AI analysis
             resultDiv.innerHTML = '<span class="loading">Analyzing documents to suggest best engines...</span>';
-            btn.disabled = true;
 
             try {
                 var response = await fetch('/api/analyzer/curator/recommend', {

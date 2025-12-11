@@ -4229,7 +4229,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                 status: job.status,
                 stage: job.current_stage,
                 percent: percent,
-                stages_completed: job.stages_completed
+                stages_completed: job.stages_completed,
+                pipeline_stages_completed: job.pipeline_stages_completed,
+                total_pipeline_stages: job.total_pipeline_stages
             });
 
             // Build status text - normalize to lowercase for comparison
@@ -4238,13 +4240,23 @@ HTML_PAGE = '''<!DOCTYPE html>
             const status = job.status ? String(job.status).toLowerCase() : 'pending';
             const docCount = currentDocCount > 0 ? currentDocCount : '';
 
+            // Check if this is a pipeline job
+            const isPipeline = engineMode === 'pipeline' || job.total_pipeline_stages > 0;
+            const pipelineStagesCompleted = job.pipeline_stages_completed || 0;
+            const totalPipelineStages = job.total_pipeline_stages || 0;
+
             // Update progress counter (document count)
             if (docCount) {
                 $('progress-counter').textContent = docCount + ' document' + (docCount > 1 ? 's' : '');
             }
 
-            // Show document names on the right
-            if (currentDocNames.length > 0) {
+            // Show document names on the right (or pipeline info for pipeline mode)
+            if (isPipeline && selectedPipeline) {
+                var pipeline = pipelines.find(function(p) { return p.pipeline_key === selectedPipeline; });
+                if (pipeline) {
+                    $('progress-doc-name').textContent = pipeline.pipeline_name;
+                }
+            } else if (currentDocNames.length > 0) {
                 if (currentDocNames.length === 1) {
                     $('progress-doc-name').textContent = currentDocNames[0];
                 } else if (currentDocNames.length <= 3) {
@@ -4264,6 +4276,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                     $('progress-text').style.color = 'var(--error)';
                 } else {
                     statusText = 'Queued... waiting to start';
+                }
+            } else if (isPipeline && totalPipelineStages > 0) {
+                // Pipeline-specific progress display
+                var pipelineStageNum = pipelineStagesCompleted + 1;
+                if (stage.includes('extract') || status.includes('extract')) {
+                    statusText = 'Pipeline ' + pipelineStageNum + '/' + totalPipelineStages + ': Extracting (' + percent + '%)';
+                } else if (stage.includes('curat') || status.includes('curat')) {
+                    statusText = 'Pipeline ' + pipelineStageNum + '/' + totalPipelineStages + ': Curating (' + percent + '%)';
+                } else if (stage.includes('concret') || status.includes('concret')) {
+                    statusText = 'Finalizing: Refining labels (' + percent + '%)';
+                } else if (stage.includes('render') || status.includes('render')) {
+                    statusText = 'Finalizing: Generating outputs (' + percent + '%)';
+                } else {
+                    statusText = 'Pipeline stage ' + pipelineStageNum + '/' + totalPipelineStages + ' (' + percent + '%)';
                 }
             } else if (stage.includes('extract') || status.includes('extract')) {
                 statusText = 'Stage 1/4: Extracting content (' + percent + '%)';

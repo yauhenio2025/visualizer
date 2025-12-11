@@ -3148,7 +3148,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         function truncateDesc(desc, maxLen) {
             if (!desc) return '';
             if (desc.length <= maxLen) return desc;
-            return desc.substring(0, maxLen).replace(/\\s+\\S*$/, '') + '...';
+            return desc.substring(0, maxLen).replace(/\s+\S*$/, '') + '...';
         }
 
         // Category icons mapping
@@ -3176,7 +3176,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var icon = categoryIcons[cat.category_key] || '';
                 var active = selectedCategory === cat.category_key ? 'active' : '';
                 html += '<button class="category-tab ' + active + '" ' +
-                        'onclick="filterByCategory(\\'' + cat.category_key + '\\')" ' +
+                        "onclick=\"filterByCategory('" + cat.category_key + "')\" " +
                         'title="' + (cat.description || '') + '">' +
                         '<span class="cat-icon">' + icon + '</span>' +
                         '<span class="cat-name">' + cat.name + '</span>' +
@@ -3238,7 +3238,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 var catIcon = categoryIcons[e.category] || '';
                 return '<div class="engine-card ' + (selectedEngine === e.engine_key ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
-                'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
+                "onclick=\"selectEngine('" + e.engine_key + "')\">" +
                 recInfo +
                 '<div class="name">' + catIcon + ' ' + displayName + '</div>' +
                 '<div class="desc">' + shortDesc + '</div>' +
@@ -3255,7 +3255,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var engineList = (b.member_engines || []).map(formatEngineName).slice(0, 3).join(', ');
                 var moreCount = (b.member_engines || []).length > 3 ? ' +' + ((b.member_engines || []).length - 3) + ' more' : '';
                 return '<div class="bundle-card ' + (selectedBundle === b.bundle_key ? 'selected' : '') + '" ' +
-                'onclick="selectBundle(\\'' + b.bundle_key + '\\')">' +
+                "onclick=\"selectBundle('" + b.bundle_key + "')\">" +
                 '<div class="name">' + displayName + '</div>' +
                 '<div class="engines">' + (b.member_engines || []).length + ' engines: ' + engineList + moreCount + '</div>' +
                 '</div>';
@@ -3525,9 +3525,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             const icons = { pdf: '&#128196;', md: '&#128221;', txt: '&#128195;', json: '&#128196;', xml: '&#128196;' };
 
             list.innerHTML = scannedDocs.map(function(d) {
-                var escapedPath = d.path.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
+                var escapedPath = d.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 return '<div class="doc-item">' +
-                '<input type="checkbox" ' + (selectedDocs.has(d.path) ? 'checked' : '') + ' onchange="toggleDoc(\\'' + escapedPath + '\\')">' +
+                '<input type="checkbox" ' + (selectedDocs.has(d.path) ? 'checked' : '') + " onchange=\"toggleDoc('" + escapedPath + "')\">" +
                 '<span class="icon">' + (icons[d.type] || '&#128196;') + '</span>' +
                 '<div class="info">' +
                 '<div class="name">' + d.name + '</div>' +
@@ -4207,7 +4207,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     if (typeof v === 'number') return k + ': ' + v;
                     if (Array.isArray(v)) return k + ': [' + v.length + ' items]';
                     return k + ': {...}';
-                }).join('\\n');
+                }).join('\n');
             }
             return String(data);
         }

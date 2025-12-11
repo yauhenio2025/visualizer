@@ -3271,7 +3271,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             var maxCharsPerDoc = 2000;
 
             scannedDocs.forEach(function(doc) {
-                if (!selectedDocs.has(doc.id) || docCount >= maxDocs) return;
+                if (!selectedDocs.has(doc.path) || docCount >= maxDocs) return;
                 var content = doc.content || '';
                 if (content.length > maxCharsPerDoc) {
                     content = content.substring(0, maxCharsPerDoc) + '...';

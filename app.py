@@ -3280,7 +3280,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 docCount++;
             });
 
-            return sampleParts.join('\n\n---\n\n');
+            return sampleParts.join('\\n\\n---\\n\\n');
         }
 
         // Update curator button state based on document selection
@@ -3525,7 +3525,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             const icons = { pdf: '&#128196;', md: '&#128221;', txt: '&#128195;', json: '&#128196;', xml: '&#128196;' };
 
             list.innerHTML = scannedDocs.map(function(d) {
-                var escapedPath = d.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                var escapedPath = d.path.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
                 return '<div class="doc-item">' +
                 '<input type="checkbox" ' + (selectedDocs.has(d.path) ? 'checked' : '') + ' onchange="toggleDoc(\\'' + escapedPath + '\\')">' +
                 '<span class="icon">' + (icons[d.type] || '&#128196;') + '</span>' +
@@ -4166,7 +4166,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Check if text looks like markdown
             if (!text) return false;
             // Has headers, or starts with # title, or has markdown links/emphasis
-            return /^#+ /m.test(text) || /\[.+\]\(.+\)/.test(text) || /\*\*.+\*\*/.test(text);
+            return /^#+ /m.test(text) || /\\[.+\\]\\(.+\\)/.test(text) || /\\*\\*.+\\*\\*/.test(text);
         }
 
         function isHtmlContent(text) {
@@ -4207,7 +4207,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     if (typeof v === 'number') return k + ': ' + v;
                     if (Array.isArray(v)) return k + ': [' + v.length + ' items]';
                     return k + ': {...}';
-                }).join('\n');
+                }).join('\\n');
             }
             return String(data);
         }
@@ -4223,7 +4223,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         // Split on footnote markers (¹²³⁴⁵⁶⁷⁸⁹⁰) and reformat
                         var html = sibling.innerHTML;
                         // Add line break before each footnote number (except first)
-                        html = html.replace(/([^\s])\s*([¹²³⁴⁵⁶⁷⁸⁹⁰]+)\s+/g, '$1<br><br>$2 ');
+                        html = html.replace(/([^\\s])\\s*([¹²³⁴⁵⁶⁷⁸⁹⁰]+)\\s+/g, '$1<br><br>$2 ');
                         // Remove leading br if present
                         html = html.replace(/^<br><br>/, '');
                         sibling.innerHTML = html;

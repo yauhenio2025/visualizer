@@ -3498,13 +3498,22 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Switch to analyze view
                 switchView('analyze');
 
-                // Show progress section (hide curator and engine selector)
+                // Hide document/engine selection panels, show only progress
+                var leftPanel = document.querySelector('.left-panel');
+                var rightPanel = document.querySelector('.right-panel');
                 var progressSection = document.getElementById('progress-section');
-                var curatorSection = document.getElementById('curator-section');
                 var engineSelector = document.querySelector('.engine-selector');
-                if (progressSection) progressSection.classList.add('show');
-                if (curatorSection) curatorSection.style.display = 'none';
+                var curatorSection = document.getElementById('curator-section');
+
+                // Hide the left panel (Documents)
+                if (leftPanel) leftPanel.style.display = 'none';
+
+                // Hide engine selector and curator, keep progress visible
                 if (engineSelector) engineSelector.style.display = 'none';
+                if (curatorSection) curatorSection.style.display = 'none';
+
+                // Show progress section
+                if (progressSection) progressSection.classList.add('show');
 
                 // First check job status
                 const statusRes = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });

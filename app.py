@@ -805,11 +805,13 @@ def websaver_get_collection(collection_id: int):
         for article in data.get("articles", []):
             # Create document entry
             documents.append({
+                "id": article.get("id"),
                 "title": article.get("title", "Untitled"),
                 "content": article.get("content", ""),
                 "source_name": article.get("source_name"),
                 "url": article.get("url"),
                 "date_published": article.get("date_published"),
+                "word_count": article.get("word_count", 0),
             })
 
             # Create file-like entry for UI display
@@ -3084,6 +3086,204 @@ HTML_PAGE = '''<!DOCTYPE html>
         .btn-copied {
             background: var(--success) !important;
             color: white !important;
+        }
+
+        /* ========================================
+           Web-Saver Integration Styles
+           ======================================== */
+
+        .btn-websaver {
+            background: linear-gradient(135deg, #4a90a4 0%, #357a8a 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-websaver:hover {
+            background: linear-gradient(135deg, #357a8a 0%, #2a6570 100%);
+            transform: translateY(-1px);
+        }
+
+        .btn-websaver:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .websaver-status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 0.5rem;
+        }
+
+        .websaver-status.connected {
+            color: var(--success);
+        }
+
+        .websaver-status.error {
+            color: var(--danger);
+        }
+
+        /* Web-Saver Modal */
+        .ws-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+
+        .ws-modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+        }
+
+        .ws-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ws-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+
+        .ws-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+            line-height: 1;
+        }
+
+        .ws-modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .ws-modal-body {
+            padding: 1rem 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .ws-search-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .ws-search-row input {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .ws-search-row input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .ws-collections-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .ws-collection-item {
+            padding: 0.75rem 1rem;
+            background: var(--bg-hover);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ws-collection-item:hover {
+            background: var(--bg-input);
+            border-color: var(--border-color);
+        }
+
+        .ws-collection-item.selected {
+            background: rgba(74, 144, 164, 0.15);
+            border-color: #4a90a4;
+        }
+
+        .ws-collection-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .ws-collection-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .ws-loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .ws-error {
+            text-align: center;
+            padding: 2rem;
+            color: var(--danger);
+        }
+
+        .ws-empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .ws-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            gap: 0.5rem;
+        }
+
+        .ws-modal-footer span {
+            flex: 1;
+            font-size: 0.85rem;
+            color: var(--text-muted);
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -5905,6 +6105,291 @@ HTML_PAGE = '''<!DOCTYPE html>
         function refreshDebug() {
             fetchDebugStatus();
         }
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // ========================================
+        // Web-Saver Integration
+        // ========================================
+
+        let wsCollections = [];
+        let wsSelectedCollection = null;
+
+        // Check Web-Saver availability on page load
+        function checkWebSaverAvailability() {
+            fetch('/api/websaver/health')
+                .then(response => response.json())
+                .then(data => {
+                    const statusEl = document.getElementById('websaver-status');
+                    const btnEl = document.getElementById('websaver-import-btn');
+                    if (data.success && data.available) {
+                        statusEl.textContent = '✓ Connected';
+                        statusEl.className = 'websaver-status connected';
+                        btnEl.disabled = false;
+                    } else {
+                        statusEl.textContent = '✗ Offline';
+                        statusEl.className = 'websaver-status error';
+                        btnEl.disabled = true;
+                    }
+                })
+                .catch(() => {
+                    const statusEl = document.getElementById('websaver-status');
+                    const btnEl = document.getElementById('websaver-import-btn');
+                    statusEl.textContent = '✗ Unavailable';
+                    statusEl.className = 'websaver-status error';
+                    btnEl.disabled = true;
+                });
+        }
+
+        function openWebSaverModal() {
+            document.getElementById('websaver-modal').style.display = 'flex';
+            refreshWebSaverCollections();
+        }
+
+        function closeWebSaverModal() {
+            document.getElementById('websaver-modal').style.display = 'none';
+            wsSelectedCollection = null;
+            document.getElementById('ws-selected-info').textContent = '';
+            document.getElementById('ws-import-btn').disabled = true;
+        }
+
+        function refreshWebSaverCollections() {
+            const listEl = document.getElementById('ws-collections-list');
+            listEl.innerHTML = '<div class="ws-loading">Loading collections...</div>';
+
+            fetch('/api/websaver/collections?min_articles=1&limit=100')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        listEl.innerHTML = '<div class="ws-error">Failed to load collections: ' + (data.error || 'Unknown error') + '</div>';
+                        return;
+                    }
+
+                    wsCollections = data.collections || [];
+
+                    if (wsCollections.length === 0) {
+                        listEl.innerHTML = '<div class="ws-empty">No collections with articles found.</div>';
+                        return;
+                    }
+
+                    renderCollectionsList(wsCollections);
+                })
+                .catch(error => {
+                    listEl.innerHTML = '<div class="ws-error">Connection error: ' + error.message + '</div>';
+                });
+        }
+
+        function renderCollectionsList(collections) {
+            const listEl = document.getElementById('ws-collections-list');
+            listEl.innerHTML = collections.map(col => `
+                <div class="ws-collection-item ${wsSelectedCollection && wsSelectedCollection.id === col.id ? 'selected' : ''}"
+                     onclick="selectCollection(${col.id})" data-id="${col.id}">
+                    <div class="ws-collection-name">${escapeHtml(col.name)}</div>
+                    <div class="ws-collection-meta">
+                        <span>📄 ${col.article_count} articles</span>
+                        <span>📅 ${formatDate(col.updated_at)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterWebSaverCollections() {
+            const search = document.getElementById('ws-search').value.toLowerCase();
+            const filtered = wsCollections.filter(col =>
+                col.name.toLowerCase().includes(search) ||
+                (col.description && col.description.toLowerCase().includes(search))
+            );
+            renderCollectionsList(filtered);
+        }
+
+        function selectCollection(collectionId) {
+            wsSelectedCollection = wsCollections.find(c => c.id === collectionId);
+
+            // Update selection UI
+            document.querySelectorAll('.ws-collection-item').forEach(el => {
+                el.classList.remove('selected');
+                if (parseInt(el.dataset.id) === collectionId) {
+                    el.classList.add('selected');
+                }
+            });
+
+            // Update footer
+            if (wsSelectedCollection) {
+                document.getElementById('ws-selected-info').textContent =
+                    `Selected: ${wsSelectedCollection.name} (${wsSelectedCollection.article_count} articles)`;
+                document.getElementById('ws-import-btn').disabled = false;
+            } else {
+                document.getElementById('ws-selected-info').textContent = '';
+                document.getElementById('ws-import-btn').disabled = true;
+            }
+        }
+
+        function importSelectedCollection() {
+            if (!wsSelectedCollection) return;
+
+            const importBtn = document.getElementById('ws-import-btn');
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing...';
+
+            fetch('/api/websaver/collections/' + wsSelectedCollection.id)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('Failed to import: ' + (data.error || 'Unknown error'));
+                        importBtn.disabled = false;
+                        importBtn.textContent = 'Import';
+                        return;
+                    }
+
+                    // Add documents to the analysis panel
+                    const documents = data.documents || [];
+                    if (documents.length === 0) {
+                        alert('Collection has no documents with content.');
+                        importBtn.disabled = false;
+                        importBtn.textContent = 'Import';
+                        return;
+                    }
+
+                    // Clear existing files and add imported documents
+                    const filesList = document.getElementById('files-list');
+                    filesList.innerHTML = '';
+
+                    documents.forEach(doc => {
+                        // Create virtual file entry for each document
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'file-item';
+                        fileDiv.innerHTML = `
+                            <span class="file-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
+                            <span class="file-meta">${doc.word_count.toLocaleString()} words</span>
+                            <button class="file-remove" onclick="this.parentElement.remove(); updateFileCount();">✕</button>
+                        `;
+                        // Store content as data attribute (for later analysis)
+                        fileDiv.dataset.documentId = doc.id;
+                        fileDiv.dataset.title = doc.title;
+                        fileDiv.dataset.content = doc.content;
+                        fileDiv.dataset.source = doc.source_name || '';
+                        fileDiv.dataset.url = doc.url || '';
+
+                        filesList.appendChild(fileDiv);
+                    });
+
+                    // Update file count
+                    updateFileCount();
+
+                    // Update UI state
+                    document.getElementById('files-section').classList.add('has-files');
+
+                    // Close modal
+                    closeWebSaverModal();
+
+                    // Show success message
+                    showToast(`Imported ${documents.length} documents from "${wsSelectedCollection.name}"`);
+                })
+                .catch(error => {
+                    alert('Import failed: ' + error.message);
+                })
+                .finally(() => {
+                    importBtn.disabled = false;
+                    importBtn.textContent = 'Import';
+                });
+        }
+
+        function formatDate(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed; bottom: 2rem; right: 2rem;
+                background: var(--success); color: white;
+                padding: 1rem 1.5rem; border-radius: 8px;
+                z-index: 3000; animation: fadeIn 0.3s ease;
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Handle URL parameters for direct linking
+        function handleUrlParameters() {
+            const params = new URLSearchParams(window.location.search);
+            const source = params.get('source');
+            const collectionId = params.get('collection');
+
+            if (source === 'web-saver' && collectionId) {
+                // Auto-import from Web-Saver collection
+                setTimeout(() => {
+                    importFromUrlParam(collectionId);
+                }, 500); // Small delay to ensure page is loaded
+            }
+        }
+
+        function importFromUrlParam(collectionId) {
+            showToast('Loading collection from Web-Saver...');
+
+            fetch('/api/websaver/collections/' + collectionId)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        showToast('Failed to load collection: ' + (data.error || 'Not found'));
+                        return;
+                    }
+
+                    const documents = data.documents || [];
+                    if (documents.length === 0) {
+                        showToast('Collection has no documents.');
+                        return;
+                    }
+
+                    // Clear and add documents
+                    const filesList = document.getElementById('files-list');
+                    filesList.innerHTML = '';
+
+                    documents.forEach(doc => {
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'file-item';
+                        fileDiv.innerHTML = `
+                            <span class="file-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
+                            <span class="file-meta">${doc.word_count.toLocaleString()} words</span>
+                            <button class="file-remove" onclick="this.parentElement.remove(); updateFileCount();">✕</button>
+                        `;
+                        fileDiv.dataset.documentId = doc.id;
+                        fileDiv.dataset.title = doc.title;
+                        fileDiv.dataset.content = doc.content;
+                        fileDiv.dataset.source = doc.source_name || '';
+                        fileDiv.dataset.url = doc.url || '';
+                        filesList.appendChild(fileDiv);
+                    });
+
+                    updateFileCount();
+                    document.getElementById('files-section').classList.add('has-files');
+                    showToast(`Imported ${documents.length} documents from "${data.collection?.name || 'Collection'}"`);
+
+                    // Clean up URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                })
+                .catch(error => {
+                    showToast('Failed to import: ' + error.message);
+                });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkWebSaverAvailability();
+            handleUrlParameters();
+        });
     </script>
 
     <!-- Debug Toggle and Panel -->

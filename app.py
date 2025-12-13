@@ -3498,9 +3498,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Switch to analyze view
                 switchView('analyze');
 
-                // Show processing section
-                document.getElementById('processing-section').style.display = 'block';
-                document.getElementById('result-section').style.display = 'none';
+                // Show progress section (hide curator)
+                var progressSection = document.getElementById('progress-section');
+                var curatorSection = document.getElementById('curator-section');
+                if (progressSection) progressSection.style.display = 'block';
+                if (curatorSection) curatorSection.style.display = 'none';
 
                 // First check job status
                 const statusRes = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });
@@ -3511,6 +3513,9 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 const job = await statusRes.json();
                 currentJobId = jobId;
+
+                // Update URL to show job URL section
+                updateJobUrl(jobId);
 
                 if (job.status === 'completed') {
                     // Job already complete - fetch and display result

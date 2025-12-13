@@ -79,6 +79,10 @@ TEXT_EXTENSIONS = {'.txt', '.md', '.json', '.csv', '.xml', '.py', '.js', '.html'
 ANALYZER_API_URL = os.environ.get("ANALYZER_API_URL", "http://localhost:8847")
 ANALYZER_API_KEY = os.environ.get("ANALYZER_API_KEY", "dev-key-12345")
 
+# Web-Saver Export API Configuration
+WEBSAVER_API_URL = os.environ.get("WEBSAVER_API_URL", "http://localhost:5001/api/export")
+WEBSAVER_API_KEY = os.environ.get("WEBSAVER_API_KEY", "ws-export-key-12345")
+
 # Document extensions for analysis
 DOCUMENT_EXTENSIONS = {'.pdf', '.md', '.txt'}
 
@@ -713,6 +717,129 @@ def scan_folder():
 
     else:
         return jsonify({"success": False, "error": f"Invalid path: {input_path}"})
+
+
+# =============================================================================
+# Web-Saver Integration Endpoints
+# =============================================================================
+
+def get_websaver_headers() -> Dict[str, str]:
+    """Build headers for Web-Saver Export API requests."""
+    return {"X-API-Key": WEBSAVER_API_KEY}
+
+
+@app.route('/api/websaver/health', methods=['GET'])
+def websaver_health():
+    """Check if Web-Saver is reachable."""
+    try:
+        response = httpx.get(
+            f"{WEBSAVER_API_URL}/health",
+            timeout=5.0,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return jsonify({
+                "success": True,
+                "available": True,
+                "url": WEBSAVER_API_URL,
+                "article_count": data.get("article_count", 0),
+                "collection_count": data.get("collection_count", 0),
+            })
+        else:
+            return jsonify({"success": True, "available": False, "url": WEBSAVER_API_URL})
+    except Exception as e:
+        return jsonify({"success": True, "available": False, "url": WEBSAVER_API_URL, "error": str(e)})
+
+
+@app.route('/api/websaver/collections', methods=['GET'])
+def websaver_list_collections():
+    """List collections from Web-Saver."""
+    try:
+        min_articles = request.args.get('min_articles', 1, type=int)
+        search = request.args.get('search', '')
+
+        params = {"min_articles": min_articles}
+        if search:
+            params["search"] = search
+
+        response = httpx.get(
+            f"{WEBSAVER_API_URL}/collections",
+            headers=get_websaver_headers(),
+            params=params,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        return jsonify({
+            "success": True,
+            "collections": data.get("collections", []),
+            "total": data.get("total", 0),
+        })
+    except httpx.HTTPStatusError as e:
+        return jsonify({"success": False, "error": f"Web-Saver API error: {e.response.status_code}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route('/api/websaver/collections/<int:collection_id>', methods=['GET'])
+def websaver_get_collection(collection_id: int):
+    """
+    Fetch collection with articles from Web-Saver.
+
+    Returns documents in format ready for Analyzer.
+    """
+    try:
+        response = httpx.get(
+            f"{WEBSAVER_API_URL}/collections/{collection_id}",
+            headers=get_websaver_headers(),
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Transform to format compatible with scan-folder response
+        files = []
+        documents = []
+
+        for article in data.get("articles", []):
+            # Create document entry
+            documents.append({
+                "title": article.get("title", "Untitled"),
+                "content": article.get("content", ""),
+                "source_name": article.get("source_name"),
+                "url": article.get("url"),
+                "date_published": article.get("date_published"),
+            })
+
+            # Create file-like entry for UI display
+            word_count = article.get("word_count", 0)
+            files.append({
+                "name": article.get("title", "Untitled")[:60] + ("..." if len(article.get("title", "")) > 60 else ""),
+                "path": f"websaver://article/{article.get('id')}",
+                "type": "web-saver",
+                "size": f"{word_count:,} words",
+                "size_bytes": word_count * 5,  # Approximate bytes
+                "source": article.get("source_name", "Unknown"),
+                "article_id": article.get("id"),
+            })
+
+        return jsonify({
+            "success": True,
+            "collection": {
+                "id": data.get("id"),
+                "name": data.get("name"),
+                "description": data.get("description"),
+            },
+            "files": files,
+            "documents": documents,  # Ready for Analyzer API
+            "count": len(files),
+            "mode": "web-saver",
+        })
+    except httpx.HTTPStatusError as e:
+        return jsonify({"success": False, "error": f"Web-Saver API error: {e.response.status_code}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 
 def get_analyzer_headers(llm_keys: Optional[Dict[str, str]] = None) -> Dict[str, str]:
@@ -1394,6 +1521,21 @@ def requeue_pending_jobs():
         return jsonify(response.json())
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to requeue: {str(e)}"}), 500
+
+
+@app.route('/api/admin/force-requeue/<job_id>', methods=['POST'])
+def force_requeue_job(job_id):
+    """Force-requeue a specific job regardless of its current status."""
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/admin/force-requeue/{job_id}",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to force-requeue: {str(e)}"}), 500
 
 
 @app.route('/api/analyzer/jobs/<job_id>/resume', methods=['POST'])
@@ -2993,6 +3135,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <div class="path-input-row">
                             <input type="text" id="folder-path" placeholder="~/Documents/articles">
                             <button class="btn btn-sm" onclick="scanFolder()">Scan</button>
+                        </div>
+
+                        <!-- Import from Web-Saver -->
+                        <span class="section-label" style="margin-top: 1rem;">Or import from Web-Saver</span>
+                        <div class="path-input-row">
+                            <button class="btn btn-sm btn-websaver" onclick="openWebSaverModal()" id="websaver-import-btn">
+                                📚 Import Collection
+                            </button>
+                            <span id="websaver-status" class="websaver-status"></span>
                         </div>
 
                         <!-- Document List -->
@@ -5768,6 +5919,30 @@ HTML_PAGE = '''<!DOCTYPE html>
         </div>
         <div id="debug-content" class="debug-panel-content">
             <div class="debug-section">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Web-Saver Collection Picker Modal -->
+    <div id="websaver-modal" class="ws-modal" style="display:none;">
+        <div class="ws-modal-content">
+            <div class="ws-modal-header">
+                <h3>📚 Import from Web-Saver</h3>
+                <button class="ws-modal-close" onclick="closeWebSaverModal()">✕</button>
+            </div>
+            <div class="ws-modal-body">
+                <div class="ws-search-row">
+                    <input type="text" id="ws-search" placeholder="Search collections..." oninput="filterWebSaverCollections()">
+                    <button class="btn btn-sm" onclick="refreshWebSaverCollections()">↻</button>
+                </div>
+                <div id="ws-collections-list" class="ws-collections-list">
+                    <div class="ws-loading">Loading collections...</div>
+                </div>
+            </div>
+            <div class="ws-modal-footer">
+                <span id="ws-selected-info"></span>
+                <button class="btn btn-sm" onclick="closeWebSaverModal()">Cancel</button>
+                <button class="btn btn-sm btn-primary" onclick="importSelectedCollection()" id="ws-import-btn" disabled>Import</button>
+            </div>
         </div>
     </div>
 </body>

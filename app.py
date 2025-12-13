@@ -1381,6 +1381,36 @@ def get_debug_status():
         return jsonify({"error": f"Failed to get debug status: {str(e)}"}), 500
 
 
+@app.route('/api/admin/requeue-pending-jobs', methods=['POST'])
+def requeue_pending_jobs():
+    """Re-queue pending jobs that aren't in the Procrastinate queue."""
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/admin/requeue-pending-jobs",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to requeue: {str(e)}"}), 500
+
+
+@app.route('/api/analyzer/jobs/<job_id>/resume', methods=['POST'])
+def resume_job(job_id):
+    """Resume a failed job from its last completed stage."""
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}/resume",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to resume job: {str(e)}"}), 500
+
+
 # Main Page
 
 @app.route('/')
@@ -5590,6 +5620,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                 html += '</div>';
             }
 
+            // Stuck Pending Jobs
+            if (data.stuck_pending_jobs && data.stuck_pending_jobs > 0) {
+                html += '<div class="debug-section">';
+                html += '<div class="debug-section-title">⏳ Stuck Pending</div>';
+                html += '<div class="debug-item"><span class="debug-key">Not queued</span><span class="debug-value warning">' + data.stuck_pending_jobs + '</span></div>';
+                html += '<button onclick="requeuePendingJobs()" style="margin-top:0.5rem;padding:0.25rem 0.5rem;background:var(--warning);color:black;border:none;border-radius:3px;cursor:pointer;font-size:0.75rem;">Requeue Pending Jobs</button>';
+                html += '</div>';
+            }
+
             // Current Job Details
             if (data.job) {
                 html += '<div class="debug-section">';
@@ -5603,6 +5642,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 if (data.job.error_message) {
                     html += '<div class="debug-item"><span class="debug-key">Error</span><span class="debug-value error">' + data.job.error_message.substring(0,100) + '</span></div>';
+                }
+                // Resume button for failed jobs
+                if (data.job.status === 'failed' && data.job.id) {
+                    html += '<button onclick="resumeJob(\\'' + data.job.id + '\\')" style="margin-top:0.5rem;padding:0.25rem 0.5rem;background:#4CAF50;color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.75rem;">▶ Resume This Job</button>';
                 }
                 html += '</div>';
             }
@@ -5637,6 +5680,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 html += '</div>';
             }
 
+            // Quick Actions
+            html += '<div class="debug-section">';
+            html += '<div class="debug-section-title">🔧 Quick Actions</div>';
+            html += '<a href="https://dashboard.render.com/worker/srv-d4qqhs2li9vc73a2nqeg" target="_blank" style="color:#4CAF50;font-size:0.75rem;text-decoration:none;">📊 Worker Dashboard (Render)</a>';
+            html += '</div>';
+
             // Timestamp
             html += '<div class="debug-section" style="opacity:0.5;font-size:0.7rem;">';
             html += 'Last updated: ' + new Date().toLocaleTimeString();
@@ -5654,6 +5703,41 @@ HTML_PAGE = '''<!DOCTYPE html>
                 })
                 .catch(function(error) {
                     alert('Cleanup failed: ' + error.message);
+                });
+        }
+
+        function requeuePendingJobs() {
+            fetch('/api/admin/requeue-pending-jobs', { method: 'POST' })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    alert(data.message || 'Requeue complete: ' + (data.requeued_count || 0) + ' jobs requeued');
+                    fetchDebugStatus();
+                })
+                .catch(function(error) {
+                    alert('Requeue failed: ' + error.message);
+                });
+        }
+
+        function resumeJob(jobId) {
+            if (!confirm('Resume job ' + jobId.substring(0, 8) + '... from last completed stage?')) {
+                return;
+            }
+            fetch('/api/analyzer/jobs/' + jobId + '/resume', { method: 'POST' })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert('Resume failed: ' + data.error);
+                    } else {
+                        alert(data.message || 'Job resumed from ' + (data.resuming_from || 'start'));
+                        fetchDebugStatus();
+                        // Also trigger job progress polling if we're on that job
+                        if (currentJobId === jobId) {
+                            pollJobProgress();
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    alert('Resume failed: ' + error.message);
                 });
         }
 

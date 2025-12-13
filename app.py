@@ -1540,6 +1540,21 @@ def force_requeue_job(job_id):
         return jsonify({"error": f"Failed to force-requeue: {str(e)}"}), 500
 
 
+@app.route('/api/admin/cancel-all', methods=['POST'])
+def cancel_all_jobs():
+    """Nuclear option: Cancel ALL active jobs."""
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/admin/cancel-all",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to cancel all: {str(e)}"}), 500
+
+
 @app.route('/api/analyzer/jobs/<job_id>/resume', methods=['POST'])
 def resume_job(job_id):
     """Resume a failed job from its last completed stage."""

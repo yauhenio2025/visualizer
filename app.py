@@ -1354,6 +1354,13 @@ def index():
     return Response(HTML_PAGE, mimetype='text/html')
 
 
+@app.route('/job/<job_id>')
+def job_page(job_id):
+    """Serve a job-specific page with stable URL."""
+    # The HTML page will detect the job_id from URL and auto-load it
+    return Response(HTML_PAGE, mimetype='text/html')
+
+
 # Embedded HTML/CSS/JS
 
 HTML_PAGE = '''<!DOCTYPE html>
@@ -2228,6 +2235,48 @@ HTML_PAGE = '''<!DOCTYPE html>
         .stage-badge.active { background: rgba(26,26,26,0.1); color: var(--accent); }
         .stage-badge.completed { background: rgba(45,125,70,0.15); color: var(--success); }
 
+        /* Job URL Section */
+        .job-url-section {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .job-url-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .job-url-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+
+        .job-url-link:hover {
+            text-decoration: underline;
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .btn-small:hover {
+            background: var(--bg-hover);
+        }
+
         /* Results Gallery */
         .results-gallery {
             margin-top: 2rem;
@@ -2847,6 +2896,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <span class="stage-badge" id="stage-concretization">Concretization</span>
                             <span class="stage-badge" id="stage-rendering">Rendering</span>
                         </div>
+                        <div id="job-url-section" class="job-url-section" style="display:none;">
+                            <span class="job-url-label">Job URL:</span>
+                            <a id="job-url-link" href="#" class="job-url-link" target="_blank"></a>
+                            <button class="btn-small" onclick="copyJobUrl()" title="Copy URL">📋</button>
+                        </div>
                     </div>
 
                     <!-- Results Gallery -->
@@ -3214,7 +3268,91 @@ HTML_PAGE = '''<!DOCTYPE html>
             loadLibrary();
             setupDragDrop();
             updateKeysButtonState();
+
+            // Check if we're on a job page URL
+            checkForJobUrl();
         });
+
+        // Check if URL is /job/<job_id> and auto-load job
+        function checkForJobUrl() {
+            var match = window.location.pathname.match(/^\\/job\\/([a-f0-9-]+)$/i);
+            if (match) {
+                var jobId = match[1];
+                console.log('Loading job from URL:', jobId);
+                loadJobFromUrl(jobId);
+            }
+        }
+
+        // Load a job directly from URL
+        async function loadJobFromUrl(jobId) {
+            try {
+                // Switch to analyze view
+                switchView('analyze');
+
+                // Show processing section
+                document.getElementById('processing-section').style.display = 'block';
+                document.getElementById('result-section').style.display = 'none';
+
+                // First check job status
+                const statusRes = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });
+                if (!statusRes.ok) {
+                    showAnalysisError('Job not found: ' + jobId);
+                    return;
+                }
+
+                const job = await statusRes.json();
+                currentJobId = jobId;
+
+                if (job.status === 'completed') {
+                    // Job already complete - fetch and display result
+                    await fetchAndDisplayResult(jobId);
+                } else if (job.status === 'failed') {
+                    showAnalysisError(job.error_message || 'Job failed');
+                } else {
+                    // Job still running - start polling
+                    updateProgress(job);
+                    pollJobStatus(jobId);
+                }
+            } catch (e) {
+                showAnalysisError('Error loading job: ' + e.message);
+            }
+        }
+
+        // Update browser URL when job starts (without page reload)
+        function updateJobUrl(jobId) {
+            var newUrl = '/job/' + jobId;
+            window.history.pushState({ jobId: jobId }, '', newUrl);
+
+            // Show job URL section with link
+            var fullUrl = window.location.origin + newUrl;
+            var urlSection = document.getElementById('job-url-section');
+            var urlLink = document.getElementById('job-url-link');
+            if (urlSection && urlLink) {
+                urlLink.href = fullUrl;
+                urlLink.textContent = fullUrl;
+                urlSection.style.display = 'flex';
+            }
+        }
+
+        // Copy job URL to clipboard
+        function copyJobUrl() {
+            var urlLink = document.getElementById('job-url-link');
+            if (urlLink) {
+                navigator.clipboard.writeText(urlLink.href).then(function() {
+                    // Brief visual feedback
+                    var btn = event.target;
+                    var originalText = btn.textContent;
+                    btn.textContent = '✓';
+                    setTimeout(function() { btn.textContent = originalText; }, 1000);
+                });
+            }
+        }
+
+        // Hide job URL section when starting new analysis
+        function hideJobUrl() {
+            var urlSection = document.getElementById('job-url-section');
+            if (urlSection) urlSection.style.display = 'none';
+        }
 
         // View switching
         function switchView(viewId, evt) {
@@ -4035,6 +4173,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             resetStages();
             resetProgressDetails();
+            hideJobUrl();  // Hide previous job URL
 
             try {
                 // Get documents (either paths or inline content)
@@ -4127,6 +4266,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         pollMultipleJobs(data.jobs);
                     } else {
                         currentJobId = data.job_id;
+                        // Update browser URL to stable job URL
+                        updateJobUrl(data.job_id);
                         pollJobStatus(data.job_id);
                     }
                 } else {

@@ -3498,11 +3498,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Switch to analyze view
                 switchView('analyze');
 
-                // Show progress section (hide curator)
+                // Show progress section (hide curator and engine selector)
                 var progressSection = document.getElementById('progress-section');
                 var curatorSection = document.getElementById('curator-section');
-                if (progressSection) progressSection.style.display = 'block';
+                var engineSelector = document.querySelector('.engine-selector');
+                if (progressSection) progressSection.classList.add('show');
                 if (curatorSection) curatorSection.style.display = 'none';
+                if (engineSelector) engineSelector.style.display = 'none';
 
                 // First check job status
                 const statusRes = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });

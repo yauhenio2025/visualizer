@@ -3471,26 +3471,33 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
         // ==================== END KEYS MANAGEMENT ====================
 
+        // Check if we're on a job URL
+        var isJobUrl = window.location.pathname.match(/^\\/job\\/([a-f0-9-]+)$/i);
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            loadAnalyzerData();
-            loadLibrary();
             setupDragDrop();
             updateKeysButtonState();
 
-            // Check if we're on a job page URL
-            checkForJobUrl();
-        });
+            if (isJobUrl) {
+                // Loading job from URL - hide panels immediately before any async loading
+                var leftPanel = document.querySelector('.left-panel');
+                var engineSelector = document.querySelector('.engine-selector');
+                var curatorSection = document.getElementById('curator-section');
+                if (leftPanel) leftPanel.style.display = 'none';
+                if (engineSelector) engineSelector.style.display = 'none';
+                if (curatorSection) curatorSection.style.display = 'none';
 
-        // Check if URL is /job/<job_id> and auto-load job
-        function checkForJobUrl() {
-            var match = window.location.pathname.match(/^\\/job\\/([a-f0-9-]+)$/i);
-            if (match) {
-                var jobId = match[1];
+                // Then load job
+                var jobId = isJobUrl[1];
                 console.log('Loading job from URL:', jobId);
                 loadJobFromUrl(jobId);
+            } else {
+                // Normal page load
+                loadAnalyzerData();
             }
-        }
+            loadLibrary();
+        });
 
         // Load a job directly from URL
         async function loadJobFromUrl(jobId) {
@@ -3498,21 +3505,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Switch to analyze view
                 switchView('analyze');
 
-                // Hide document/engine selection panels, show only progress
-                var leftPanel = document.querySelector('.left-panel');
-                var rightPanel = document.querySelector('.right-panel');
-                var progressSection = document.getElementById('progress-section');
-                var engineSelector = document.querySelector('.engine-selector');
-                var curatorSection = document.getElementById('curator-section');
-
-                // Hide the left panel (Documents)
-                if (leftPanel) leftPanel.style.display = 'none';
-
-                // Hide engine selector and curator, keep progress visible
-                if (engineSelector) engineSelector.style.display = 'none';
-                if (curatorSection) curatorSection.style.display = 'none';
-
                 // Show progress section
+                var progressSection = document.getElementById('progress-section');
                 if (progressSection) progressSection.classList.add('show');
 
                 // First check job status

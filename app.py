@@ -1346,6 +1346,21 @@ def list_analysis_jobs():
         return jsonify({"error": f"Failed to list jobs: {str(e)}"}), 500
 
 
+@app.route('/api/admin/cleanup-orphaned-jobs', methods=['POST'])
+def cleanup_orphaned_jobs():
+    """Cleanup orphaned Procrastinate jobs stuck in 'doing' status."""
+    try:
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/admin/cleanup-orphaned-jobs",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to cleanup: {str(e)}"}), 500
+
+
 # Main Page
 
 @app.route('/')

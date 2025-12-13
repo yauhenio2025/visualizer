@@ -1361,6 +1361,26 @@ def cleanup_orphaned_jobs():
         return jsonify({"error": f"Failed to cleanup: {str(e)}"}), 500
 
 
+@app.route('/api/admin/debug-status', methods=['GET'])
+def get_debug_status():
+    """Get detailed debug status from analyzer for troubleshooting."""
+    job_id = request.args.get('job_id')
+    try:
+        params = {}
+        if job_id:
+            params['job_id'] = job_id
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/admin/debug-status",
+            headers=get_analyzer_headers(),
+            params=params,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to get debug status: {str(e)}"}), 500
+
+
 # Main Page
 
 @app.route('/')
@@ -2291,6 +2311,150 @@ HTML_PAGE = '''<!DOCTYPE html>
         .btn-small:hover {
             background: var(--bg-hover);
         }
+
+        /* Debug Panel */
+        .debug-toggle {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .debug-toggle:hover {
+            background: var(--bg-hover);
+        }
+
+        .debug-toggle.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .debug-panel {
+            display: none;
+            position: fixed;
+            bottom: 4rem;
+            right: 1rem;
+            width: 450px;
+            max-height: 60vh;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 999;
+            overflow: hidden;
+        }
+
+        .debug-panel.show {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .debug-panel-header {
+            padding: 0.75rem 1rem;
+            background: var(--accent);
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .debug-panel-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .debug-panel-actions button {
+            padding: 0.25rem 0.5rem;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .debug-panel-actions button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .debug-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .debug-section {
+            margin-bottom: 1rem;
+        }
+
+        .debug-section-title {
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .debug-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .debug-item:last-child {
+            border-bottom: none;
+        }
+
+        .debug-key {
+            color: var(--text-muted);
+        }
+
+        .debug-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .debug-value.success { color: var(--success); }
+        .debug-value.warning { color: #b8860b; }
+        .debug-value.error { color: var(--error); }
+
+        .debug-log {
+            background: var(--bg-input);
+            padding: 0.5rem;
+            border-radius: 3px;
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .debug-status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .debug-status-indicator.green { background: var(--success); }
+        .debug-status-indicator.yellow { background: #b8860b; }
+        .debug-status-indicator.red { background: var(--error); }
 
         /* Results Gallery */
         .results-gallery {
@@ -5351,7 +5515,167 @@ HTML_PAGE = '''<!DOCTYPE html>
                 renderLibrary();
             }
         }
+
+        // ===== DEBUG PANEL =====
+        var debugEnabled = false;
+        var debugInterval = null;
+
+        function toggleDebugPanel() {
+            debugEnabled = !debugEnabled;
+            var toggle = document.getElementById('debug-toggle');
+            var panel = document.getElementById('debug-panel');
+
+            if (debugEnabled) {
+                toggle.classList.add('active');
+                toggle.innerHTML = '🔧 Debug ON';
+                panel.classList.add('show');
+                fetchDebugStatus();
+                debugInterval = setInterval(fetchDebugStatus, 3000);
+            } else {
+                toggle.classList.remove('active');
+                toggle.innerHTML = '🔧 Debug';
+                panel.classList.remove('show');
+                if (debugInterval) {
+                    clearInterval(debugInterval);
+                    debugInterval = null;
+                }
+            }
+        }
+
+        function fetchDebugStatus() {
+            var jobId = currentJobId || null;
+            var url = '/api/admin/debug-status';
+            if (jobId) {
+                url += '?job_id=' + jobId;
+            }
+
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    renderDebugPanel(data);
+                })
+                .catch(function(error) {
+                    console.error('Debug fetch error:', error);
+                    document.getElementById('debug-content').innerHTML =
+                        '<div class="debug-section"><div class="debug-value error">Error fetching debug status: ' + error.message + '</div></div>';
+                });
+        }
+
+        function renderDebugPanel(data) {
+            var content = document.getElementById('debug-content');
+            var html = '';
+
+            // Queue Status
+            html += '<div class="debug-section">';
+            html += '<div class="debug-section-title">📊 Job Queue</div>';
+            if (data.queue) {
+                var queueKeys = ['todo', 'doing', 'succeeded', 'failed'];
+                queueKeys.forEach(function(key) {
+                    var count = data.queue[key] || 0;
+                    var valueClass = '';
+                    if (key === 'doing' && count > 0) valueClass = 'warning';
+                    if (key === 'failed' && count > 0) valueClass = 'error';
+                    if (key === 'succeeded') valueClass = 'success';
+                    html += '<div class="debug-item"><span class="debug-key">' + key + '</span><span class="debug-value ' + valueClass + '">' + count + '</span></div>';
+                });
+            }
+            html += '</div>';
+
+            // Orphaned Jobs Warning
+            if (data.orphaned_jobs && data.orphaned_jobs > 0) {
+                html += '<div class="debug-section">';
+                html += '<div class="debug-section-title">⚠️ Orphaned Jobs</div>';
+                html += '<div class="debug-item"><span class="debug-key">Stuck in "doing"</span><span class="debug-value error">' + data.orphaned_jobs + '</span></div>';
+                html += '<button onclick="cleanupOrphanedJobs()" style="margin-top:0.5rem;padding:0.25rem 0.5rem;background:var(--error);color:white;border:none;border-radius:3px;cursor:pointer;font-size:0.75rem;">Clean Up Orphaned Jobs</button>';
+                html += '</div>';
+            }
+
+            // Current Job Details
+            if (data.job) {
+                html += '<div class="debug-section">';
+                html += '<div class="debug-section-title">🎯 Current Job</div>';
+                html += '<div class="debug-item"><span class="debug-key">ID</span><span class="debug-value">' + (data.job.id || 'N/A').substring(0,8) + '...</span></div>';
+                html += '<div class="debug-item"><span class="debug-key">Status</span><span class="debug-value">' + (data.job.status || 'N/A') + '</span></div>';
+                html += '<div class="debug-item"><span class="debug-key">Stage</span><span class="debug-value">' + (data.job.current_stage || 'N/A') + '</span></div>';
+                html += '<div class="debug-item"><span class="debug-key">Progress</span><span class="debug-value">' + (data.job.progress_percent || 0) + '%</span></div>';
+                if (data.job.stages_completed !== null && data.job.total_stages) {
+                    html += '<div class="debug-item"><span class="debug-key">Pipeline</span><span class="debug-value">' + data.job.stages_completed + '/' + data.job.total_stages + '</span></div>';
+                }
+                if (data.job.error_message) {
+                    html += '<div class="debug-item"><span class="debug-key">Error</span><span class="debug-value error">' + data.job.error_message.substring(0,100) + '</span></div>';
+                }
+                html += '</div>';
+            }
+
+            // Recent Procrastinate Jobs
+            if (data.recent_procrastinate_jobs && data.recent_procrastinate_jobs.length > 0) {
+                html += '<div class="debug-section">';
+                html += '<div class="debug-section-title">📋 Recent Queue Jobs</div>';
+                data.recent_procrastinate_jobs.slice(0, 5).forEach(function(job) {
+                    var statusClass = '';
+                    if (job.status === 'succeeded') statusClass = 'success';
+                    if (job.status === 'failed') statusClass = 'error';
+                    if (job.status === 'doing') statusClass = 'warning';
+                    html += '<div class="debug-item">';
+                    html += '<span class="debug-key">#' + job.procrastinate_id + ' ' + job.task.replace('process_', '').replace('_job', '') + '</span>';
+                    html += '<span class="debug-value ' + statusClass + '">' + job.status + '</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Analysis Jobs 24h Summary
+            if (data.analysis_jobs_24h) {
+                html += '<div class="debug-section">';
+                html += '<div class="debug-section-title">📈 Last 24h</div>';
+                Object.keys(data.analysis_jobs_24h).forEach(function(status) {
+                    var valueClass = '';
+                    if (status === 'completed') valueClass = 'success';
+                    if (status === 'failed') valueClass = 'error';
+                    html += '<div class="debug-item"><span class="debug-key">' + status + '</span><span class="debug-value ' + valueClass + '">' + data.analysis_jobs_24h[status] + '</span></div>';
+                });
+                html += '</div>';
+            }
+
+            // Timestamp
+            html += '<div class="debug-section" style="opacity:0.5;font-size:0.7rem;">';
+            html += 'Last updated: ' + new Date().toLocaleTimeString();
+            html += '</div>';
+
+            content.innerHTML = html;
+        }
+
+        function cleanupOrphanedJobs() {
+            fetch('/api/admin/cleanup-orphaned-jobs', { method: 'POST' })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    alert(data.message || 'Cleanup complete');
+                    fetchDebugStatus();
+                })
+                .catch(function(error) {
+                    alert('Cleanup failed: ' + error.message);
+                });
+        }
+
+        function refreshDebug() {
+            fetchDebugStatus();
+        }
     </script>
+
+    <!-- Debug Toggle and Panel -->
+    <div id="debug-toggle" class="debug-toggle" onclick="toggleDebugPanel()">🔧 Debug</div>
+    <div id="debug-panel" class="debug-panel">
+        <div class="debug-panel-header">
+            <span>System Status</span>
+            <div class="debug-panel-actions">
+                <button onclick="refreshDebug()">↻ Refresh</button>
+                <button onclick="toggleDebugPanel()">✕</button>
+            </div>
+        </div>
+        <div id="debug-content" class="debug-panel-content">
+            <div class="debug-section">Loading...</div>
+        </div>
+    </div>
 </body>
 </html>
 '''

@@ -2686,6 +2686,118 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 2rem;
         }
 
+        /* Job Info Header */
+        .job-info-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .job-info-pipeline {
+            margin-bottom: 1rem;
+        }
+        .job-info-pipeline-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+        .job-info-pipeline-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .job-info-stages {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+        .job-info-stage {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .job-info-stage-arrow {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        .job-info-docs {
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+        .job-info-docs-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .job-info-docs-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .job-info-doc {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .job-info-more {
+            color: var(--accent);
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        /* Job Process Details */
+        .job-process-details {
+            margin-top: 2rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .job-process-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+        .job-process-timings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .job-timing {
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+        .job-timing-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .job-timing-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .job-process-cost {
+            text-align: center;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
         .results-gallery-header {
             display: flex;
             justify-content: space-between;
@@ -3661,11 +3773,20 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     <!-- Results Gallery -->
                     <div id="results-gallery" class="results-gallery" style="display:none;">
+                        <!-- Job Info Header -->
+                        <div id="job-info-header" class="job-info-header" style="display:none;">
+                            <div class="job-info-pipeline"></div>
+                            <div class="job-info-docs"></div>
+                        </div>
+
                         <div class="results-gallery-header">
                             <h3>Analysis Results</h3>
                             <span id="results-count" class="results-count"></span>
                         </div>
                         <div id="results-grid" class="results-grid"></div>
+
+                        <!-- Job Process Details -->
+                        <div id="job-process-details" class="job-process-details" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -5350,7 +5471,14 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var outputs = result.outputs || {};
             var metadata = result.metadata || {};
+            var extInfo = result.extended_info || {};
             var count = 0;
+
+            // Display job info header if we have extended info
+            displayJobInfoHeader(extInfo);
+
+            // Display process details at bottom
+            displayProcessDetails(metadata, extInfo);
 
             console.log('Outputs:', Object.keys(outputs));
 
@@ -5404,6 +5532,103 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             countEl.textContent = count + ' result' + (count !== 1 ? 's' : '');
+        }
+
+        // Display job info header (pipeline, documents)
+        function displayJobInfoHeader(extInfo) {
+            var header = $('job-info-header');
+            if (!header) return;
+
+            var pipelineDiv = header.querySelector('.job-info-pipeline');
+            var docsDiv = header.querySelector('.job-info-docs');
+
+            var hasContent = false;
+
+            // Pipeline/Engine info
+            if (extInfo.pipeline || extInfo.engine) {
+                hasContent = true;
+                var name = extInfo.pipeline || extInfo.engine;
+                var desc = extInfo.pipeline_description || '';
+                var stages = extInfo.engine_sequence || [];
+
+                var html = '<div class="job-info-pipeline-name">' + name.replace(/_/g, ' ') + '</div>';
+                if (desc) {
+                    html += '<div class="job-info-pipeline-desc">' + desc + '</div>';
+                }
+                if (stages.length > 0) {
+                    html += '<div class="job-info-stages">';
+                    stages.forEach(function(stage, idx) {
+                        if (idx > 0) html += '<span class="job-info-stage-arrow">→</span>';
+                        html += '<span class="job-info-stage">' + stage.replace(/_/g, ' ') + '</span>';
+                    });
+                    html += '</div>';
+                }
+                pipelineDiv.innerHTML = html;
+            }
+
+            // Documents info
+            var docs = extInfo.documents || [];
+            var total = extInfo.documents_total || docs.length;
+            var collectionName = extInfo.collection_name;
+
+            if (docs.length > 0 || collectionName) {
+                hasContent = true;
+                var docsHtml = '<div class="job-info-docs-label">';
+                if (collectionName) {
+                    docsHtml += 'Collection: <strong>' + collectionName + '</strong> (' + total + ' documents)';
+                } else {
+                    docsHtml += 'Documents analyzed (' + total + ')';
+                }
+                docsHtml += '</div>';
+                docsHtml += '<div class="job-info-docs-list">';
+                var showCount = Math.min(docs.length, 10);
+                for (var i = 0; i < showCount; i++) {
+                    docsHtml += '<span class="job-info-doc">' + docs[i].title + '</span>';
+                }
+                if (total > showCount) {
+                    docsHtml += '<span class="job-info-more">+' + (total - showCount) + ' more</span>';
+                }
+                docsHtml += '</div>';
+                docsDiv.innerHTML = docsHtml;
+            }
+
+            if (hasContent) {
+                header.style.display = 'block';
+            }
+        }
+
+        // Display process details (timings, cost)
+        function displayProcessDetails(metadata, extInfo) {
+            var details = $('job-process-details');
+            if (!details) return;
+
+            var html = '<div class="job-process-title">Analysis Process</div>';
+            html += '<div class="job-process-timings">';
+
+            if (metadata.extraction_ms) {
+                html += '<div class="job-timing"><div class="job-timing-value">' + (metadata.extraction_ms / 1000).toFixed(1) + 's</div><div class="job-timing-label">Extraction</div></div>';
+            }
+            if (metadata.curation_ms) {
+                html += '<div class="job-timing"><div class="job-timing-value">' + (metadata.curation_ms / 1000).toFixed(1) + 's</div><div class="job-timing-label">Curation</div></div>';
+            }
+            if (metadata.concretization_ms) {
+                html += '<div class="job-timing"><div class="job-timing-value">' + (metadata.concretization_ms / 1000).toFixed(1) + 's</div><div class="job-timing-label">Concretization</div></div>';
+            }
+            if (metadata.rendering_ms) {
+                html += '<div class="job-timing"><div class="job-timing-value">' + (metadata.rendering_ms / 1000).toFixed(1) + 's</div><div class="job-timing-label">Rendering</div></div>';
+            }
+            if (metadata.total_ms) {
+                html += '<div class="job-timing"><div class="job-timing-value">' + (metadata.total_ms / 1000).toFixed(1) + 's</div><div class="job-timing-label">Total</div></div>';
+            }
+
+            html += '</div>';
+
+            if (metadata.cost_usd) {
+                html += '<div class="job-process-cost">Estimated cost: $' + metadata.cost_usd.toFixed(3) + '</div>';
+            }
+
+            details.innerHTML = html;
+            details.style.display = 'block';
         }
 
         function createGalleryCard(data, index) {

@@ -6289,11 +6289,14 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     documents.forEach((doc, i) => {
                         // Add to scannedDocs array (with content for inline analysis)
+                        const sizeBytes = doc.word_count * 5;
+                        const sizeStr = sizeBytes > 1024 ? (sizeBytes / 1024).toFixed(1) + ' KB' : sizeBytes + ' B';
                         scannedDocs.push({
                             path: doc.url || `websaver_doc_${doc.id}`,
                             name: doc.title || 'Untitled',
+                            type: 'article',  // Type for display
                             content: doc.content,  // Content stored for inline analysis
-                            size: doc.word_count * 5,  // Approximate bytes
+                            size: sizeStr,
                             wordCount: doc.word_count,
                             source: doc.source_name || ''
                         });
@@ -6378,11 +6381,14 @@ HTML_PAGE = '''<!DOCTYPE html>
                     scannedDocs = [];  // Clear existing
 
                     documents.forEach((doc, i) => {
+                        const sizeBytes = doc.word_count * 5;
+                        const sizeStr = sizeBytes > 1024 ? (sizeBytes / 1024).toFixed(1) + ' KB' : sizeBytes + ' B';
                         scannedDocs.push({
                             path: doc.url || `websaver_doc_${doc.id}`,
                             name: doc.title || 'Untitled',
+                            type: 'article',
                             content: doc.content,
-                            size: doc.word_count * 5,
+                            size: sizeStr,
                             wordCount: doc.word_count,
                             source: doc.source_name || ''
                         });

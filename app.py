@@ -2744,8 +2744,9 @@ HTML_PAGE = '''<!DOCTYPE html>
         .gallery-card-preview img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
             transition: transform 0.3s;
+            background: #f8f9fa;
         }
         .gallery-card:hover .gallery-card-preview img {
             transform: scale(1.02);

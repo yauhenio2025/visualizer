@@ -2679,52 +2679,66 @@ HTML_PAGE = '''<!DOCTYPE html>
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
         }
 
         .results-gallery-header h3 {
             font-family: 'Libre Baskerville', Georgia, serif;
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             font-weight: 400;
+            margin: 0;
         }
 
         .results-count {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
+            background: var(--bg-secondary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
         }
 
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
         }
 
         .gallery-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 12px;
             overflow: hidden;
-            transition: transform 0.15s, box-shadow 0.15s;
+            transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         .gallery-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
         }
 
         .gallery-card-preview {
-            height: 180px;
-            background: var(--bg-input);
+            height: 220px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
         }
 
-        .gallery-card-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .gallery-card-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+        .gallery-card:hover .gallery-card-preview img {
+            transform: scale(1.02);
+        }
         .gallery-card-preview .text-preview {
             padding: 1rem;
             font-size: 0.75rem;
@@ -2768,30 +2782,46 @@ HTML_PAGE = '''<!DOCTYPE html>
             background: var(--bg-input);
             font-weight: 600;
         }
-        .gallery-card-preview .icon-preview { font-size: 2.5rem; opacity: 0.4; }
+        .gallery-card-preview .icon-preview { font-size: 3rem; opacity: 0.3; }
 
-        .gallery-card-info { padding: 1rem; }
-        .gallery-card-title { font-weight: 500; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .gallery-card-info {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .gallery-card-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
         .gallery-card-meta {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.5rem;
             font-size: 0.75rem;
             color: var(--text-muted);
+            align-items: center;
+        }
+        .gallery-card-meta span {
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
         }
 
         .gallery-card-actions {
             display: flex;
             gap: 0.5rem;
-            padding: 0 1rem 1rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-secondary);
         }
 
         .gallery-card-actions button {
             flex: 1;
-            padding: 0.5rem;
+            padding: 0.6rem 1rem;
             font-size: 0.8rem;
-            background: var(--bg-input);
+            font-weight: 500;
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 6px;
             color: var(--text);
             cursor: pointer;
             transition: all 0.15s;
@@ -2800,13 +2830,15 @@ HTML_PAGE = '''<!DOCTYPE html>
         .gallery-card-actions button:hover {
             background: var(--accent);
             border-color: var(--accent);
-            color: var(--bg-card);
+            color: white;
         }
 
         .gallery-card-actions button.btn-delete {
             background: transparent;
             border-color: var(--error);
             color: var(--error);
+            flex: 0 0 auto;
+            padding: 0.6rem 0.8rem;
         }
 
         .gallery-card-actions button.btn-delete:hover {

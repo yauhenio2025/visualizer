@@ -5996,8 +5996,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     '<span>' + dateStr + '</span>' +
                     '<span class="job-group-count">' + group.items.length + ' outputs</span>' +
                     '<div class="job-group-actions">' +
-                        '<button onclick="event.stopPropagation(); viewFullJob(\'' + jobId + '\')">View Full Job</button>' +
-                        '<button onclick="event.stopPropagation(); window.open(\'/job/' + jobId + '\', \'_blank\')" title="Open in new tab">↗</button>' +
+                        '<button onclick="event.stopPropagation(); viewFullJob(\\\\\\'' + jobId + '\\\\\\')">View Full Job</button>' +
+                        '<button onclick="event.stopPropagation(); window.open(\\\\\\'/job/' + jobId + '\\\\\\', \\\\\\'_blank\\\\\\')\" title="Open in new tab">↗</button>' +
                     '</div>' +
                 '</div>';
 

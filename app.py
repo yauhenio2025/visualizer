@@ -2920,32 +2920,48 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 0.5rem;
         }
 
-        /* Job Group in Library */
+        /* Job Group in Library - Clean Design */
         .job-group {
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
+            background: var(--bg-card);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s;
+        }
+        .job-group:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         .job-group-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1rem;
-            background: var(--bg-secondary);
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
             border-bottom: 1px solid var(--border);
             cursor: pointer;
+            gap: 1rem;
         }
         .job-group-header:hover {
             background: var(--bg-tertiary);
         }
+        .job-group-toggle {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .job-group.collapsed .job-group-toggle {
+            transform: rotate(-90deg);
+        }
         .job-group-title {
-            font-weight: 500;
-            font-size: 0.9rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-transform: capitalize;
         }
         .job-group-meta {
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             align-items: center;
             font-size: 0.8rem;
             color: var(--text-muted);
@@ -2953,23 +2969,43 @@ HTML_PAGE = '''<!DOCTYPE html>
         .job-group-count {
             background: var(--accent);
             color: white;
-            padding: 0.15rem 0.5rem;
-            border-radius: 10px;
-            font-size: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
         }
         .job-group-actions {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
         .job-group-actions button {
-            padding: 0.25rem 0.6rem;
+            padding: 0.35rem 0.7rem;
             font-size: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .job-group-actions button:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .job-group-actions button.delete-job {
+            color: var(--error);
+            border-color: var(--error);
+        }
+        .job-group-actions button.delete-job:hover {
+            background: var(--error);
+            color: white;
         }
         .job-group-items {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
             padding: 1rem;
+            background: var(--bg-secondary);
         }
         .job-group.collapsed .job-group-items {
             display: none;
@@ -5970,20 +6006,32 @@ HTML_PAGE = '''<!DOCTYPE html>
             groupEl.className = 'job-group';
             groupEl.dataset.jobId = jobId;
 
+            // Deduplicate items by key (keep the latest one)
+            var seen = {};
+            var uniqueItems = [];
+            group.items.forEach(function(item) {
+                var key = item.key || item.title;
+                if (!seen[key]) {
+                    seen[key] = true;
+                    uniqueItems.push(item);
+                }
+            });
+
             // Get pipeline/engine info from first item
-            var firstItem = group.items[0];
+            var firstItem = uniqueItems[0];
             var pipelineName = '';
             if (firstItem.metadata && firstItem.metadata.pipeline) {
                 pipelineName = firstItem.metadata.pipeline.replace(/_/g, ' ');
             } else if (firstItem.metadata && firstItem.metadata.engine) {
                 pipelineName = firstItem.metadata.engine.replace(/_/g, ' ');
             } else {
-                // Try to infer from item titles
-                pipelineName = group.items.map(function(i) { return i.key; }).join(' + ').replace(/_/g, ' ');
+                // Try to infer from unique output keys
+                var keys = uniqueItems.map(function(i) { return i.key || i.title; });
+                pipelineName = keys.slice(0, 3).join(' + ').replace(/_/g, ' ');
+                if (keys.length > 3) pipelineName += ' +' + (keys.length - 3) + ' more';
             }
 
             var dateStr = group.addedAt ? new Date(group.addedAt).toLocaleDateString() : '';
-            var shortId = jobId.substring(0, 8);
 
             var header = document.createElement('div');
             header.className = 'job-group-header';
@@ -5994,10 +6042,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '</div>' +
                 '<div class="job-group-meta">' +
                     '<span>' + dateStr + '</span>' +
-                    '<span class="job-group-count">' + group.items.length + ' outputs</span>' +
+                    '<span class="job-group-count">' + uniqueItems.length + '</span>' +
                     '<div class="job-group-actions">' +
-                        '<button onclick="event.stopPropagation(); viewFullJob(\\\\\\'' + jobId + '\\\\\\')">View Full Job</button>' +
-                        '<button onclick="event.stopPropagation(); window.open(\\\\\\'/job/' + jobId + '\\\\\\', \\\\\\'_blank\\\\\\')\" title="Open in new tab">↗</button>' +
+                        '<button onclick="event.stopPropagation(); viewFullJob(\\'' + jobId + '\\')">View</button>' +
+                        '<button onclick="event.stopPropagation(); window.open(\\'/job/' + jobId + '\\', \\'_blank\\')" title="Open job page">↗</button>' +
+                        '<button class="delete-job" onclick="event.stopPropagation(); deleteJob(\\'' + jobId + '\\')" title="Delete entire job">✕</button>' +
                     '</div>' +
                 '</div>';
 
@@ -6010,7 +6059,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             var itemsContainer = document.createElement('div');
             itemsContainer.className = 'job-group-items';
 
-            group.items.forEach(function(item) {
+            uniqueItems.forEach(function(item) {
                 var card = createLibraryCard(item, item._libraryIndex);
                 itemsContainer.appendChild(card);
             });
@@ -6019,6 +6068,25 @@ HTML_PAGE = '''<!DOCTYPE html>
             groupEl.appendChild(itemsContainer);
 
             return groupEl;
+        }
+
+        // Delete entire job from library
+        function deleteJob(jobId) {
+            if (!confirm('Delete all outputs from this job?')) return;
+
+            // Remove all items with this job_id
+            libraryItems = libraryItems.filter(function(item) {
+                return item.job_id !== jobId;
+            });
+
+            // Update localStorage
+            try {
+                localStorage.setItem('vizLibrary', JSON.stringify(libraryItems));
+            } catch (e) {
+                console.error('Failed to save library:', e);
+            }
+
+            renderLibrary();
         }
 
         function viewFullJob(jobId) {

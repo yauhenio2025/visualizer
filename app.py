@@ -6273,34 +6273,47 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    // Clear existing files and add imported documents
-                    const filesList = document.getElementById('files-list');
-                    filesList.innerHTML = '';
+                    // Clear existing docs and add imported documents
+                    const docList = document.getElementById('doc-list');
+                    docList.innerHTML = '';
+                    scannedDocs = [];  // Clear existing
 
                     documents.forEach(doc => {
-                        // Create virtual file entry for each document
-                        const fileDiv = document.createElement('div');
-                        fileDiv.className = 'file-item';
-                        fileDiv.innerHTML = `
-                            <span class="file-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
-                            <span class="file-meta">${doc.word_count.toLocaleString()} words</span>
-                            <button class="file-remove" onclick="this.parentElement.remove(); updateFileCount();">✕</button>
+                        // Create doc entry for each document (matching scannedDocs format)
+                        const docDiv = document.createElement('div');
+                        docDiv.className = 'doc-item selected';
+                        docDiv.innerHTML = `
+                            <input type="checkbox" checked onchange="toggleDocSelection(this)">
+                            <span class="doc-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
+                            <span class="doc-meta">${doc.word_count.toLocaleString()} words</span>
                         `;
                         // Store content as data attribute (for later analysis)
-                        fileDiv.dataset.documentId = doc.id;
-                        fileDiv.dataset.title = doc.title;
-                        fileDiv.dataset.content = doc.content;
-                        fileDiv.dataset.source = doc.source_name || '';
-                        fileDiv.dataset.url = doc.url || '';
+                        docDiv.dataset.documentId = doc.id;
+                        docDiv.dataset.title = doc.title;
+                        docDiv.dataset.content = doc.content;
+                        docDiv.dataset.source = doc.source_name || '';
+                        docDiv.dataset.url = doc.url || '';
+                        docDiv.dataset.path = doc.url || '';  // Use URL as path for imported docs
 
-                        filesList.appendChild(fileDiv);
+                        docList.appendChild(docDiv);
+
+                        // Also add to scannedDocs array for analysis
+                        scannedDocs.push({
+                            path: doc.url || doc.id.toString(),
+                            name: doc.title || 'Untitled',
+                            content: doc.content,
+                            size: doc.word_count * 5,  // Approximate bytes
+                            wordCount: doc.word_count,
+                            source: doc.source_name || '',
+                            selected: true
+                        });
                     });
 
-                    // Update file count
-                    updateFileCount();
+                    // Update doc count display
+                    document.getElementById('doc-count').textContent = documents.length + ' documents';
 
-                    // Update UI state
-                    document.getElementById('files-section').classList.add('has-files');
+                    // Show doc list container
+                    document.getElementById('doc-list-container').style.display = 'block';
 
                     // Close modal
                     closeWebSaverModal();
@@ -6369,27 +6382,39 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
 
                     // Clear and add documents
-                    const filesList = document.getElementById('files-list');
-                    filesList.innerHTML = '';
+                    const docList = document.getElementById('doc-list');
+                    docList.innerHTML = '';
+                    scannedDocs = [];  // Clear existing
 
                     documents.forEach(doc => {
-                        const fileDiv = document.createElement('div');
-                        fileDiv.className = 'file-item';
-                        fileDiv.innerHTML = `
-                            <span class="file-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
-                            <span class="file-meta">${doc.word_count.toLocaleString()} words</span>
-                            <button class="file-remove" onclick="this.parentElement.remove(); updateFileCount();">✕</button>
+                        const docDiv = document.createElement('div');
+                        docDiv.className = 'doc-item selected';
+                        docDiv.innerHTML = `
+                            <input type="checkbox" checked onchange="toggleDocSelection(this)">
+                            <span class="doc-name">📄 ${escapeHtml(doc.title || 'Untitled')}</span>
+                            <span class="doc-meta">${doc.word_count.toLocaleString()} words</span>
                         `;
-                        fileDiv.dataset.documentId = doc.id;
-                        fileDiv.dataset.title = doc.title;
-                        fileDiv.dataset.content = doc.content;
-                        fileDiv.dataset.source = doc.source_name || '';
-                        fileDiv.dataset.url = doc.url || '';
-                        filesList.appendChild(fileDiv);
+                        docDiv.dataset.documentId = doc.id;
+                        docDiv.dataset.title = doc.title;
+                        docDiv.dataset.content = doc.content;
+                        docDiv.dataset.source = doc.source_name || '';
+                        docDiv.dataset.url = doc.url || '';
+                        docDiv.dataset.path = doc.url || '';
+                        docList.appendChild(docDiv);
+
+                        scannedDocs.push({
+                            path: doc.url || doc.id.toString(),
+                            name: doc.title || 'Untitled',
+                            content: doc.content,
+                            size: doc.word_count * 5,
+                            wordCount: doc.word_count,
+                            source: doc.source_name || '',
+                            selected: true
+                        });
                     });
 
-                    updateFileCount();
-                    document.getElementById('files-section').classList.add('has-files');
+                    document.getElementById('doc-count').textContent = documents.length + ' documents';
+                    document.getElementById('doc-list-container').style.display = 'block';
                     showToast(`Imported ${documents.length} documents from "${data.collection?.name || 'Collection'}"`);
 
                     // Clean up URL

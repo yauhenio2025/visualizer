@@ -2183,8 +2183,6 @@ HTML_PAGE = '''<!DOCTYPE html>
         .pipeline-card.selected { border-color: var(--accent); background: var(--bg-card); border-width: 2px; }
         .pipeline-card .name { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
         .pipeline-card .desc { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.35rem; line-height: 1.4; }
-        .pipeline-card .more-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-        .pipeline-card .more-link:hover { text-decoration: underline; }
         .pipeline-card .synergy { font-size: 0.75rem; color: var(--accent); margin-top: 0.5rem; font-style: italic; }
         .pipeline-card .stages { margin-top: 0.75rem; display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
         .pipeline-card .stage-chip {
@@ -4193,34 +4191,6 @@ HTML_PAGE = '''<!DOCTYPE html>
             return desc.substring(0, maxLen).replace(/\\s+\\S*$/, '') + '...';
         }
 
-        // Create expandable description HTML
-        function expandableDesc(desc, maxLen, id) {
-            if (!desc) return '';
-            if (desc.length <= maxLen) return '<span>' + desc + '</span>';
-            var truncated = desc.substring(0, maxLen).replace(/\\s+\\S*$/, '');
-            return '<span class="desc-truncated" id="' + id + '-short">' + truncated +
-                   '<a href="#" class="more-link" onclick="toggleDesc(\\'' + id + '\\', event)">... more</a></span>' +
-                   '<span class="desc-full" id="' + id + '-full" style="display:none;">' + desc +
-                   ' <a href="#" class="more-link" onclick="toggleDesc(\\'' + id + '\\', event)">less</a></span>';
-        }
-
-        // Toggle description expand/collapse
-        function toggleDesc(id, event) {
-            event.preventDefault();
-            event.stopPropagation();
-            var short = $(id + '-short');
-            var full = $(id + '-full');
-            if (short && full) {
-                if (short.style.display === 'none') {
-                    short.style.display = 'inline';
-                    full.style.display = 'none';
-                } else {
-                    short.style.display = 'none';
-                    full.style.display = 'inline';
-                }
-            }
-        }
-
         // Category icons mapping
         var categoryIcons = {
             'argument': '&#128218;',    // Books
@@ -4403,8 +4373,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         '<span class="tier-badge">Tier ' + p.tier + '</span> ' +
                         p.pipeline_name +
                     '</div>' +
-                    '<div class="desc">' + expandableDesc(p.description, 120, 'desc-' + p.pipeline_key) + '</div>' +
-                    (p.synergy_rationale ? '<div class="synergy">"' + expandableDesc(p.synergy_rationale, 100, 'syn-' + p.pipeline_key) + '"</div>' : '') +
+                    '<div class="desc">' + (p.description || '') + '</div>' +
+                    (p.synergy_rationale ? '<div class="synergy">"' + p.synergy_rationale + '"</div>' : '') +
                     '<div class="stages">' + stagesHtml + '</div>' +
                 '</div>';
             }).join('');

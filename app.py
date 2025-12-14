@@ -6315,11 +6315,14 @@ HTML_PAGE = '''<!DOCTYPE html>
                     // Show doc list container
                     document.getElementById('doc-list-container').style.display = 'block';
 
+                    // Save name before closing modal (which clears wsSelectedCollection)
+                    const collectionName = wsSelectedCollection?.name || 'Collection';
+
                     // Close modal
                     closeWebSaverModal();
 
                     // Show success message
-                    showToast(`Imported ${documents.length} documents from "${wsSelectedCollection.name}"`);
+                    showToast(`Imported ${documents.length} documents from "${collectionName}"`);
                 })
                 .catch(error => {
                     alert('Import failed: ' + error.message);

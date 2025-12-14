@@ -1928,6 +1928,17 @@ HTML_PAGE = '''<!DOCTYPE html>
             .main-layout { grid-template-columns: 1fr; }
         }
 
+        /* Job view mode - full width results */
+        body.job-view-mode .main-layout {
+            grid-template-columns: 1fr;
+        }
+        body.job-view-mode .results-grid {
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        }
+        body.job-view-mode .gallery-card-preview {
+            height: 280px;
+        }
+
         /* Cards */
         .card {
             background: var(--bg-card);
@@ -4015,13 +4026,12 @@ HTML_PAGE = '''<!DOCTYPE html>
             updateKeysButtonState();
 
             if (isJobUrl) {
-                // Loading job from URL - hide panels immediately before any async loading
+                // Loading job from URL - hide panels and expand results
+                document.body.classList.add('job-view-mode');
                 var leftPanel = document.querySelector('.left-panel');
-                var engineSelector = document.querySelector('.engine-selector');
-                var curatorSection = document.getElementById('curator-section');
+                var rightPanelCard = document.querySelector('.right-panel > .card');
                 if (leftPanel) leftPanel.style.display = 'none';
-                if (engineSelector) engineSelector.style.display = 'none';
-                if (curatorSection) curatorSection.style.display = 'none';
+                if (rightPanelCard) rightPanelCard.style.display = 'none';
 
                 // Then load job
                 var jobId = isJobUrl[1];

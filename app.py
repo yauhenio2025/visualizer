@@ -6027,11 +6027,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 var header = document.createElement('div');
                 header.className = 'job-group-header';
-                header.innerHTML =
-                    '<span class="job-group-toggle">▼</span>' +
-                    '<span class="job-group-title">Ungrouped Items</span>' +
-                    '<span class="job-group-count">' + ungrouped.length + ' items</span>' +
-                    '<button class="job-group-delete" onclick="event.stopPropagation(); clearUngrouped()" title="Clear all ungrouped">&times;</button>';
+                header.innerHTML = '<span class="job-group-toggle">▼</span><span class="job-group-title">Ungrouped Items</span><span class="job-group-count">' + ungrouped.length + ' items</span><button class="job-group-delete" onclick="event.stopPropagation(); clearUngrouped()" title="Clear all ungrouped">&times;</button>';
                 header.onclick = function(e) {
                     if (e.target.tagName !== 'BUTTON') {
                         ungroupedSection.classList.toggle('collapsed');
@@ -6086,12 +6082,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var header = document.createElement('div');
             header.className = 'job-group-header';
-            header.innerHTML =
-                '<span class="job-group-toggle">▼</span>' +
-                '<span class="job-group-title" title="' + pipelineName.replace(/"/g, '&quot;') + '">' + pipelineName + '</span>' +
-                '<span class="job-group-count">' + uniqueItems.length + ' outputs</span>' +
-                '<span class="job-group-date">' + dateStr + '</span>' +
-                '<button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(\'' + jobId + '\')" title="Delete job">&times;</button>';
+            header.innerHTML = '<span class="job-group-toggle">▼</span><span class="job-group-title" title="' + pipelineName.replace(/"/g, '&quot;') + '">' + pipelineName + '</span><span class="job-group-count">' + uniqueItems.length + ' outputs</span><span class="job-group-date">' + dateStr + '</span><button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(\'' + jobId + '\')" title="Delete job">&times;</button>';
 
             header.onclick = function(e) {
                 if (e.target.tagName !== 'BUTTON') {

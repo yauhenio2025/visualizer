@@ -2894,9 +2894,11 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         /* Library View */
         .library-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         .library-empty {
@@ -2922,99 +2924,111 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         /* Job Group in Library - Clean Design */
         .job-group {
-            margin-bottom: 1rem;
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
             background: var(--bg-card);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            transition: box-shadow 0.2s;
-        }
-        .job-group:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         .job-group-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.25rem;
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
             cursor: pointer;
-            gap: 1rem;
+            gap: 0.75rem;
         }
         .job-group-header:hover {
             background: var(--bg-tertiary);
         }
         .job-group-toggle {
-            font-size: 0.7rem;
+            font-size: 0.6rem;
             color: var(--text-muted);
             transition: transform 0.2s;
+            flex-shrink: 0;
         }
         .job-group.collapsed .job-group-toggle {
             transform: rotate(-90deg);
         }
         .job-group-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            text-transform: capitalize;
-        }
-        .job-group-meta {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            font-size: 0.8rem;
-            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9rem;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
         .job-group-count {
             background: var(--accent);
             color: white;
-            padding: 0.2rem 0.6rem;
-            border-radius: 12px;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
             font-size: 0.7rem;
             font-weight: 500;
+            flex-shrink: 0;
         }
-        .job-group-actions {
-            display: flex;
-            gap: 0.4rem;
-        }
-        .job-group-actions button {
-            padding: 0.35rem 0.7rem;
+        .job-group-date {
             font-size: 0.75rem;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--bg-card);
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .job-group-delete {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
             transition: all 0.15s;
         }
-        .job-group-actions button:hover {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-        .job-group-actions button.delete-job {
-            color: var(--error);
-            border-color: var(--error);
-        }
-        .job-group-actions button.delete-job:hover {
-            background: var(--error);
-            color: white;
+        .job-group-delete:hover {
+            background: #fee2e2;
+            color: #dc2626;
         }
         .job-group-items {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: 0.75rem;
-            padding: 1rem;
-            background: var(--bg-secondary);
+            padding: 0.75rem;
         }
         .job-group.collapsed .job-group-items {
             display: none;
         }
-        .job-group-toggle {
-            transition: transform 0.2s;
-        }
         .job-group.collapsed .job-group-toggle {
             transform: rotate(-90deg);
+        }
+        /* Compact cards inside job groups */
+        .job-group-items .gallery-card {
+            border-radius: 6px;
+        }
+        .job-group-items .gallery-card-preview {
+            height: 100px;
+        }
+        .job-group-items .gallery-card-info {
+            padding: 0.5rem 0.75rem;
+        }
+        .job-group-items .gallery-card-title {
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .job-group-items .gallery-card-meta {
+            font-size: 0.7rem;
+        }
+        .job-group-items .gallery-card-actions {
+            padding: 0 0.75rem 0.5rem;
+        }
+        .job-group-items .gallery-card-actions button {
+            padding: 0.35rem;
+            font-size: 0.7rem;
         }
 
         /* Output select */
@@ -5981,10 +5995,15 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 var header = document.createElement('div');
                 header.className = 'job-group-header';
-                header.innerHTML = '<div class="job-group-title">📁 Ungrouped Items</div>' +
-                    '<div class="job-group-meta"><span class="job-group-count">' + ungrouped.length + '</span></div>';
-                header.onclick = function() {
-                    ungroupedSection.classList.toggle('collapsed');
+                header.innerHTML =
+                    '<span class="job-group-toggle">▼</span>' +
+                    '<span class="job-group-title">Ungrouped Items</span>' +
+                    '<span class="job-group-count">' + ungrouped.length + ' items</span>' +
+                    '<button class="job-group-delete" onclick="event.stopPropagation(); clearUngrouped()" title="Clear all ungrouped">🗑</button>';
+                header.onclick = function(e) {
+                    if (e.target.tagName !== 'BUTTON') {
+                        ungroupedSection.classList.toggle('collapsed');
+                    }
                 };
 
                 var itemsContainer = document.createElement('div');
@@ -6036,19 +6055,11 @@ HTML_PAGE = '''<!DOCTYPE html>
             var header = document.createElement('div');
             header.className = 'job-group-header';
             header.innerHTML =
-                '<div style="display:flex;align-items:center;gap:0.75rem;">' +
-                    '<span class="job-group-toggle">▼</span>' +
-                    '<div class="job-group-title">' + pipelineName + '</div>' +
-                '</div>' +
-                '<div class="job-group-meta">' +
-                    '<span>' + dateStr + '</span>' +
-                    '<span class="job-group-count">' + uniqueItems.length + '</span>' +
-                    '<div class="job-group-actions">' +
-                        '<button onclick="event.stopPropagation(); viewFullJob(\\'' + jobId + '\\')">View</button>' +
-                        '<button onclick="event.stopPropagation(); window.open(\\'/job/' + jobId + '\\', \\'_blank\\')" title="Open job page">↗</button>' +
-                        '<button class="delete-job" onclick="event.stopPropagation(); deleteJob(\\'' + jobId + '\\')" title="Delete entire job">✕</button>' +
-                    '</div>' +
-                '</div>';
+                '<span class="job-group-toggle">▼</span>' +
+                '<span class="job-group-title" title="' + pipelineName.replace(/"/g, '&quot;') + '">' + pipelineName + '</span>' +
+                '<span class="job-group-count">' + uniqueItems.length + ' outputs</span>' +
+                '<span class="job-group-date">' + dateStr + '</span>' +
+                '<button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(\'' + jobId + '\')" title="Delete job">🗑</button>';
 
             header.onclick = function(e) {
                 if (e.target.tagName !== 'BUTTON') {
@@ -6080,6 +6091,23 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
 
             // Update localStorage
+            try {
+                localStorage.setItem('vizLibrary', JSON.stringify(libraryItems));
+            } catch (e) {
+                console.error('Failed to save library:', e);
+            }
+
+            renderLibrary();
+        }
+
+        // Clear all ungrouped items
+        function clearUngrouped() {
+            if (!confirm('Delete all ungrouped items?')) return;
+
+            libraryItems = libraryItems.filter(function(item) {
+                return item.job_id;  // Keep only items WITH job_id
+            });
+
             try {
                 localStorage.setItem('vizLibrary', JSON.stringify(libraryItems));
             } catch (e) {

@@ -2445,6 +2445,31 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 1rem;
         }
 
+        .progress-warnings {
+            margin-top: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--warning-bg, #fff8e6);
+            border-left: 3px solid var(--warning, #f59e0b);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-radius: 0 4px 4px 0;
+        }
+        .progress-warnings .warning-count {
+            font-weight: 600;
+            color: var(--warning, #f59e0b);
+        }
+        .progress-warnings .warning-list {
+            margin-top: 0.25rem;
+            font-family: var(--mono-font);
+            font-size: 0.7rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .progress-warnings .warning-item {
+            margin: 2px 0;
+            opacity: 0.85;
+        }
+
         .stage-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 999px;
@@ -3471,6 +3496,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <span class="stage-badge" id="stage-concretization">Concretization</span>
                             <span class="stage-badge" id="stage-rendering">Rendering</span>
                         </div>
+                        <div id="progress-warnings" class="progress-warnings" style="display:none;"></div>
                         <div id="job-url-section" class="job-url-section" style="display:none;">
                             <span class="job-url-label">Job URL:</span>
                             <a id="job-url-link" href="#" class="job-url-link" target="_blank"></a>
@@ -5073,6 +5099,28 @@ HTML_PAGE = '''<!DOCTYPE html>
                     el.className = 'stage-badge';
                 }
             });
+
+            // Display processing warnings (validation fallbacks, JSON repairs, etc.)
+            const warningsEl = $('progress-warnings');
+            if (warningsEl && job.warnings && job.warnings.length > 0) {
+                const count = job.warnings.length;
+                let html = '<span class="warning-count">⚠️ ' + count + ' warning' + (count > 1 ? 's' : '') + ' during processing</span>';
+                html += '<div class="warning-list">';
+                // Show up to 10 warnings
+                job.warnings.slice(0, 10).forEach(function(w) {
+                    const typeLabel = (w.type || 'warning').replace(/_/g, ' ');
+                    const context = w.context ? ': ' + w.context : '';
+                    html += '<div class="warning-item">' + typeLabel + context + '</div>';
+                });
+                if (count > 10) {
+                    html += '<div class="warning-item">... and ' + (count - 10) + ' more</div>';
+                }
+                html += '</div>';
+                warningsEl.innerHTML = html;
+                warningsEl.style.display = 'block';
+            } else if (warningsEl) {
+                warningsEl.style.display = 'none';
+            }
         }
 
         function updateProgressMulti(completed, total, currentJob) {
@@ -5092,6 +5140,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const el = $('stage-' + s);
                 if (el) el.className = 'stage-badge';
             });
+            // Reset warnings display
+            const warningsEl = $('progress-warnings');
+            if (warningsEl) {
+                warningsEl.style.display = 'none';
+                warningsEl.innerHTML = '';
+            }
         }
 
         function resetProgressDetails() {

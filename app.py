@@ -2920,6 +2920,67 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 0.5rem;
         }
 
+        /* Job Group in Library */
+        .job-group {
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .job-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .job-group-header:hover {
+            background: var(--bg-tertiary);
+        }
+        .job-group-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .job-group-meta {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .job-group-count {
+            background: var(--accent);
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+        .job-group-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .job-group-actions button {
+            padding: 0.25rem 0.6rem;
+            font-size: 0.75rem;
+        }
+        .job-group-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .job-group.collapsed .job-group-items {
+            display: none;
+        }
+        .job-group-toggle {
+            transition: transform 0.2s;
+        }
+        .job-group.collapsed .job-group-toggle {
+            transform: rotate(-90deg);
+        }
+
         /* Output select */
         .output-select { margin: 1rem 0 1.5rem; }
 
@@ -5209,6 +5270,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var resultData = {
                     key: key,
                     title: (title ? title + ' - ' : '') + key.replace(/_/g, ' '),
+                    job_id: currentJobId,  // Include job_id for library grouping
                     output: output,
                     metadata: metadata,
                     isImage: !!output.image_url,
@@ -5840,10 +5902,139 @@ HTML_PAGE = '''<!DOCTYPE html>
             empty.style.display = 'none';
             grid.innerHTML = '';
 
+            // Group items by job_id
+            var groups = {};
+            var ungrouped = [];
+
             libraryItems.forEach(function(item, index) {
-                var card = createLibraryCard(item, index);
-                grid.appendChild(card);
+                item._libraryIndex = index;  // Store original index for deletion
+                if (item.job_id) {
+                    if (!groups[item.job_id]) {
+                        groups[item.job_id] = {
+                            items: [],
+                            addedAt: item.addedAt,
+                            metadata: item.metadata || {}
+                        };
+                    }
+                    groups[item.job_id].items.push(item);
+                    // Use earliest addedAt for the group
+                    if (item.addedAt && item.addedAt < groups[item.job_id].addedAt) {
+                        groups[item.job_id].addedAt = item.addedAt;
+                    }
+                } else {
+                    ungrouped.push(item);
+                }
             });
+
+            // Sort groups by date (newest first)
+            var sortedJobIds = Object.keys(groups).sort(function(a, b) {
+                return new Date(groups[b].addedAt) - new Date(groups[a].addedAt);
+            });
+
+            // Render grouped items
+            sortedJobIds.forEach(function(jobId) {
+                var group = groups[jobId];
+                var groupEl = createJobGroup(jobId, group);
+                grid.appendChild(groupEl);
+            });
+
+            // Render ungrouped items (legacy items without job_id)
+            if (ungrouped.length > 0) {
+                var ungroupedSection = document.createElement('div');
+                ungroupedSection.className = 'job-group';
+
+                var header = document.createElement('div');
+                header.className = 'job-group-header';
+                header.innerHTML = '<div class="job-group-title">📁 Ungrouped Items</div>' +
+                    '<div class="job-group-meta"><span class="job-group-count">' + ungrouped.length + '</span></div>';
+                header.onclick = function() {
+                    ungroupedSection.classList.toggle('collapsed');
+                };
+
+                var itemsContainer = document.createElement('div');
+                itemsContainer.className = 'job-group-items';
+
+                ungrouped.forEach(function(item) {
+                    var card = createLibraryCard(item, item._libraryIndex);
+                    itemsContainer.appendChild(card);
+                });
+
+                ungroupedSection.appendChild(header);
+                ungroupedSection.appendChild(itemsContainer);
+                grid.appendChild(ungroupedSection);
+            }
+        }
+
+        function createJobGroup(jobId, group) {
+            var groupEl = document.createElement('div');
+            groupEl.className = 'job-group';
+            groupEl.dataset.jobId = jobId;
+
+            // Get pipeline/engine info from first item
+            var firstItem = group.items[0];
+            var pipelineName = '';
+            if (firstItem.metadata && firstItem.metadata.pipeline) {
+                pipelineName = firstItem.metadata.pipeline.replace(/_/g, ' ');
+            } else if (firstItem.metadata && firstItem.metadata.engine) {
+                pipelineName = firstItem.metadata.engine.replace(/_/g, ' ');
+            } else {
+                // Try to infer from item titles
+                pipelineName = group.items.map(function(i) { return i.key; }).join(' + ').replace(/_/g, ' ');
+            }
+
+            var dateStr = group.addedAt ? new Date(group.addedAt).toLocaleDateString() : '';
+            var shortId = jobId.substring(0, 8);
+
+            var header = document.createElement('div');
+            header.className = 'job-group-header';
+            header.innerHTML =
+                '<div style="display:flex;align-items:center;gap:0.75rem;">' +
+                    '<span class="job-group-toggle">▼</span>' +
+                    '<div class="job-group-title">' + pipelineName + '</div>' +
+                '</div>' +
+                '<div class="job-group-meta">' +
+                    '<span>' + dateStr + '</span>' +
+                    '<span class="job-group-count">' + group.items.length + ' outputs</span>' +
+                    '<div class="job-group-actions">' +
+                        '<button onclick="event.stopPropagation(); viewFullJob(\'' + jobId + '\')">View Full Job</button>' +
+                        '<button onclick="event.stopPropagation(); window.open(\'/job/' + jobId + '\', \'_blank\')" title="Open in new tab">↗</button>' +
+                    '</div>' +
+                '</div>';
+
+            header.onclick = function(e) {
+                if (e.target.tagName !== 'BUTTON') {
+                    groupEl.classList.toggle('collapsed');
+                }
+            };
+
+            var itemsContainer = document.createElement('div');
+            itemsContainer.className = 'job-group-items';
+
+            group.items.forEach(function(item) {
+                var card = createLibraryCard(item, item._libraryIndex);
+                itemsContainer.appendChild(card);
+            });
+
+            groupEl.appendChild(header);
+            groupEl.appendChild(itemsContainer);
+
+            return groupEl;
+        }
+
+        function viewFullJob(jobId) {
+            // Find all items for this job and display them in the modal
+            var jobItems = libraryItems.filter(function(item) {
+                return item.job_id === jobId;
+            });
+
+            if (jobItems.length === 0) {
+                alert('No items found for job ' + jobId);
+                return;
+            }
+
+            // Set up allResults for the modal navigation
+            allResults = jobItems;
+            openResultModal(0);
         }
 
         function createLibraryCard(data, index) {

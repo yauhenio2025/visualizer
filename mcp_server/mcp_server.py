@@ -7,8 +7,8 @@ Usage:
     claude mcp add --transport stdio visualizer -- python /path/to/mcp_server.py
 
 Configuration via environment variables:
-    VISUALIZER_API_URL: Visualizer API base URL (default: http://localhost:5847)
-    ANALYZER_API_URL: Analyzer API base URL (default: http://localhost:8847)
+    VISUALIZER_API_URL: Visualizer API base URL (default: https://visualizer-tw4i.onrender.com)
+    ANALYZER_API_URL: Analyzer API base URL (default: https://analyzer-3wsg.onrender.com)
     GEMINI_API_KEY: User's Gemini API key (optional, can be provided per-request)
     ANTHROPIC_API_KEY: User's Anthropic API key (optional, can be provided per-request)
     VISUALIZER_NTFY_TOPIC: Notification topic for job completion alerts
@@ -92,6 +92,23 @@ POLL_INTERVAL = 5  # seconds
 MAX_POLL_ATTEMPTS = 600  # 30 minutes max
 
 
+def get_llm_keys(anthropic_api_key: Optional[str] = None, gemini_api_key: Optional[str] = None) -> Dict[str, str]:
+    """Build llm_keys dict from provided keys or environment."""
+    llm_keys = {}
+
+    if anthropic_api_key:
+        llm_keys['anthropic_api_key'] = anthropic_api_key
+    elif os.environ.get('ANTHROPIC_API_KEY'):
+        llm_keys['anthropic_api_key'] = os.environ.get('ANTHROPIC_API_KEY')
+
+    if gemini_api_key:
+        llm_keys['gemini_api_key'] = gemini_api_key
+    elif os.environ.get('GEMINI_API_KEY'):
+        llm_keys['gemini_api_key'] = os.environ.get('GEMINI_API_KEY')
+
+    return llm_keys
+
+
 def api_request(
     base_url: str,
     method: str,
@@ -123,7 +140,12 @@ def api_request(
     except requests.Timeout:
         return {"error": f"Request timeout after {timeout}s"}
     except requests.HTTPError as e:
-        return {"error": f"HTTP {e.response.status_code}: {e.response.text[:500]}"}
+        error_text = ""
+        try:
+            error_text = e.response.text[:500]
+        except:
+            pass
+        return {"error": f"API error: {str(e)}", "details": error_text}
     except requests.RequestException as e:
         return {"error": f"Request failed: {str(e)}"}
 
@@ -214,35 +236,38 @@ def get_ai_recommendations(
         return json.dumps({"error": doc["error"]})
 
     # Extract sample text for curator (up to 2000 chars)
-    sample_text = doc["content"][:2000] if doc["encoding"] == "text" else f"[PDF document: {doc['title']}]"
+    # For PDFs, we need to send the base64 content - the visualizer will extract text
+    if doc["encoding"] == "base64":
+        sample_text = f"[PDF document: {doc['title']}]"
+    else:
+        sample_text = doc["content"][:2000]
 
-    # Build headers with API keys
+    # Build llm_keys for request body
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+
+    # Also build headers as backup (for curator endpoint)
     headers = {}
-    if anthropic_api_key:
-        headers['X-Anthropic-Api-Key'] = anthropic_api_key
-    elif os.environ.get('ANTHROPIC_API_KEY'):
-        headers['X-Anthropic-Api-Key'] = os.environ.get('ANTHROPIC_API_KEY')
+    if llm_keys.get('anthropic_api_key'):
+        headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
+    if llm_keys.get('gemini_api_key'):
+        headers['X-Gemini-Api-Key'] = llm_keys['gemini_api_key']
 
-    if gemini_api_key:
-        headers['X-Gemini-Api-Key'] = gemini_api_key
-    elif os.environ.get('GEMINI_API_KEY'):
-        headers['X-Gemini-Api-Key'] = os.environ.get('GEMINI_API_KEY')
-
-    # Call curator endpoint
+    # Call curator endpoint with llm_keys in body
     result = api_request(
         VISUALIZER_API_URL,
         'POST',
         '/api/analyzer/curator/recommend',
         data={
             "sample_text": sample_text,
-            "max_recommendations": max_recommendations
+            "max_recommendations": max_recommendations,
+            "llm_keys": llm_keys  # Include in body
         },
-        headers=headers,
-        timeout=60  # Curator may take longer
+        headers=headers,  # Also in headers as backup
+        timeout=120  # Curator may take longer
     )
 
     if "error" in result:
-        return json.dumps({"error": result["error"]})
+        return json.dumps({"error": result["error"], "details": result.get("details", "")})
 
     # Format response for readability
     output = {
@@ -277,20 +302,23 @@ def list_available_engines(
     if "error" in result:
         return json.dumps({"error": result["error"]})
 
+    # Handle if result is a list directly
+    engines_list = result if isinstance(result, list) else result.get('engines', [])
+
     # Filter by category if specified
     if category:
-        engines = [e for e in result if e.get('category', '').lower() == category.lower()]
+        engines = [e for e in engines_list if e.get('category', '').lower() == category.lower()]
     else:
-        engines = result
+        engines = engines_list
 
-    # Format for readability
+    # Format for readability - handle missing keys gracefully
     output = {
         "total_engines": len(engines),
         "engines": [
             {
-                "key": e.get("key"),
-                "name": e.get("name"),
-                "description": e.get("description", "")[:100] + "..." if len(e.get("description", "")) > 100 else e.get("description", ""),
+                "key": e.get("key") or e.get("engine_key"),
+                "name": e.get("name") or e.get("engine_name"),
+                "description": (e.get("description", "") or "")[:100] + "..." if len(e.get("description", "") or "") > 100 else (e.get("description", "") or ""),
                 "category": e.get("category")
             }
             for e in engines
@@ -303,7 +331,7 @@ def list_available_engines(
 @mcp.tool()
 def submit_analysis(
     document_path: Annotated[str, Field(description="Path to the document to analyze")],
-    engine_keys: Annotated[List[str], Field(description="List of engine keys to use (e.g., ['anomaly-detector', 'argument-architecture-mapper'])")],
+    engine_keys: Annotated[List[str], Field(description="List of engine keys to use (e.g., ['anomaly_detector', 'argument_architecture'])")],
     output_mode: Annotated[str, Field(description="Output mode: 'visual' for 4K images, 'textual' for reports/diagrams")] = "visual",
     anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
     gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key (required for visual mode)")] = None,
@@ -328,85 +356,77 @@ def submit_analysis(
     if "error" in doc:
         return json.dumps({"error": doc["error"]})
 
-    # Build headers with API keys
-    headers = {}
-    if anthropic_api_key:
-        headers['X-Anthropic-Api-Key'] = anthropic_api_key
-    elif os.environ.get('ANTHROPIC_API_KEY'):
-        headers['X-Anthropic-Api-Key'] = os.environ.get('ANTHROPIC_API_KEY')
-
-    if gemini_api_key:
-        headers['X-Gemini-Api-Key'] = gemini_api_key
-    elif os.environ.get('GEMINI_API_KEY'):
-        headers['X-Gemini-Api-Key'] = os.environ.get('GEMINI_API_KEY')
+    # Build llm_keys for request body (this is what the visualizer expects!)
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
 
     # Validate output mode
     if output_mode not in ['visual', 'textual']:
         return json.dumps({"error": "output_mode must be 'visual' or 'textual'"})
 
-    # For multiple engines, use bundle analysis
-    if len(engine_keys) > 1:
-        # Create a temporary bundle
-        result = api_request(
-            VISUALIZER_API_URL,
-            'POST',
-            '/api/analyzer/analyze/bundle',
-            data={
-                "documents": [doc],
-                "bundle": engine_keys,  # Pass as array
-                "output_modes": {"visual": "nano_banana"} if output_mode == "visual" else {"textual": "memo"}
-            },
-            headers=headers,
-            timeout=60
-        )
-    else:
-        # Single engine analysis
+    # Determine the actual output mode string for the API
+    api_output_mode = "nano_banana" if output_mode == "visual" else "executive_memo"
+
+    # Prepare document for submission (remove extra fields the API doesn't need)
+    doc_for_api = {
+        "id": doc["id"],
+        "title": doc["title"],
+        "content": doc["content"],
+        "encoding": doc["encoding"]
+    }
+
+    job_ids = []
+    errors = []
+
+    # Submit each engine separately (more reliable than bundle for arbitrary engine lists)
+    for engine_key in engine_keys:
         result = api_request(
             VISUALIZER_API_URL,
             'POST',
             '/api/analyzer/analyze',
             data={
-                "documents": [doc],
-                "engine": engine_keys[0],
-                "output_mode": "nano_banana" if output_mode == "visual" else "memo",
-                "collection_mode": "single"
+                "documents": [doc_for_api],
+                "engine": engine_key,
+                "output_mode": api_output_mode,
+                "collection_mode": "single",
+                "llm_keys": llm_keys  # Pass API keys in body!
             },
-            headers=headers,
-            timeout=60
+            timeout=120
         )
 
-    if "error" in result:
-        return json.dumps({"error": result["error"]})
+        if "error" in result:
+            errors.append(f"{engine_key}: {result['error']}")
+        elif result.get("job_id"):
+            job_ids.append({
+                "engine": engine_key,
+                "job_id": result["job_id"]
+            })
+        else:
+            errors.append(f"{engine_key}: No job ID returned")
 
-    job_id = result.get("job_id")
-
-    if not job_id:
-        return json.dumps({"error": "No job ID returned from API"})
+    if not job_ids and errors:
+        return json.dumps({"error": "All submissions failed", "details": errors})
 
     output = {
-        "job_id": job_id,
+        "jobs": job_ids,
         "status": "submitted",
         "document": doc["title"],
         "engines": engine_keys,
         "output_mode": output_mode,
-        "monitor_url": f"{VISUALIZER_API_URL}/api/analyzer/jobs/{job_id}",
-        "message": "Analysis job submitted successfully. Use check_job_status() to monitor progress."
+        "errors": errors if errors else None,
+        "message": f"Submitted {len(job_ids)} analysis job(s). Use check_job_status() with each job_id to monitor progress."
     }
 
     # Send notification
     send_notification(
         "📊 Analysis Started",
-        f"Analyzing {doc['title']} with {len(engine_keys)} engine(s)",
+        f"Analyzing {doc['title']} with {len(job_ids)} engine(s)",
         "visualizer,started"
     )
 
-    # Auto-monitor if requested (async in background)
     if auto_monitor:
-        output["message"] += " Auto-monitoring enabled - you'll be notified when complete."
-        # Note: In a real implementation, you'd spawn a background thread here
-        # For now, we'll rely on manual status checks
+        output["message"] += " You'll be notified when jobs complete."
 
-    logger.info(f"Job submitted: {job_id}")
+    logger.info(f"Jobs submitted: {job_ids}")
     return json.dumps(output, indent=2)
 
 
@@ -442,8 +462,18 @@ def check_job_status(
     if status == "completed":
         output["result_available"] = True
         output["message"] = "Job completed! Use get_results() to download outputs."
+        send_notification(
+            "✅ Job Complete",
+            f"Analysis job {job_id[:8]}... is ready",
+            "visualizer,completed"
+        )
     elif status == "failed":
         output["error"] = result.get("error", "Job failed")
+        send_notification(
+            "❌ Job Failed",
+            f"Analysis job {job_id[:8]}... failed",
+            "visualizer,failed"
+        )
     elif status in ["pending", "running"]:
         output["message"] = f"Job is {status}. Check back in a few moments."
 

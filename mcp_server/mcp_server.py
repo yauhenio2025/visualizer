@@ -31,6 +31,7 @@ import json
 import logging
 import requests
 import base64
+import subprocess
 from datetime import datetime
 from typing import Annotated, Optional, List, Dict, Any
 from pathlib import Path
@@ -248,6 +249,49 @@ def send_notification(title: str, message: str, tags: str = "visualizer", sound:
         )
     except Exception as e:
         logger.warning(f"Failed to send notification: {e}")
+
+
+def spawn_job_poller(job_ids: List[str]):
+    """Spawn job_poller.py as a background process to monitor and auto-download results.
+
+    Args:
+        job_ids: List of job IDs to monitor
+    """
+    if not job_ids:
+        return
+
+    # Get path to job_poller.py (in same directory as this script)
+    poller_path = Path(__file__).parent / "job_poller.py"
+
+    if not poller_path.exists():
+        logger.warning(f"job_poller.py not found at {poller_path}")
+        return
+
+    try:
+        # Spawn poller as detached background process
+        # Uses nohup + disown pattern to fully detach
+        cmd = [sys.executable, str(poller_path)] + job_ids
+
+        # Open /dev/null for stdin, redirect stdout/stderr to log file
+        log_file = OUTPUT_DIR / "poller.log"
+
+        with open(log_file, 'a') as log:
+            log.write(f"\n{'='*50}\n")
+            log.write(f"[{datetime.now().isoformat()}] Starting poller for {len(job_ids)} jobs\n")
+            log.write(f"Jobs: {job_ids}\n")
+            log.flush()
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Detach from parent process group
+            )
+
+        logger.info(f"Spawned job_poller (PID {process.pid}) for {len(job_ids)} jobs")
+    except Exception as e:
+        logger.error(f"Failed to spawn job_poller: {e}")
 
 
 def download_file_from_url(url: str, output_path: Path) -> tuple[bool, str]:
@@ -489,8 +533,12 @@ def submit_analysis(
         sound=False
     )
 
-    if auto_monitor:
-        output["message"] += " You'll be notified when jobs complete."
+    if auto_monitor and job_ids:
+        # Extract just the job IDs and spawn background poller
+        all_job_ids = [j["job_id"] for j in job_ids]
+        spawn_job_poller(all_job_ids)
+        output["message"] += " Results will auto-download when complete."
+        output["auto_monitor"] = True
 
     logger.info(f"Jobs submitted: {job_ids}")
     return json.dumps(output, indent=2)
@@ -891,6 +939,17 @@ def submit_batch_analysis(
         sound=False
     )
 
+    # Collect all job IDs for auto-download
+    all_job_ids = []
+    for doc_result in batch_results:
+        for job_info in doc_result.get("jobs", []):
+            if job_info.get("job_id"):
+                all_job_ids.append(job_info["job_id"])
+
+    # Spawn background poller for auto-download
+    if all_job_ids:
+        spawn_job_poller(all_job_ids)
+
     output = {
         "batch_status": "submitted",
         "folder": folder_path,
@@ -900,7 +959,8 @@ def submit_batch_analysis(
         "total_errors": total_errors,
         "output_mode": output_mode,
         "documents": batch_results,
-        "message": f"Submitted {total_jobs} job(s) for {len(files)} document(s). Use check_job_status() with individual job_ids to monitor."
+        "message": f"Submitted {total_jobs} job(s) for {len(files)} document(s). Results will auto-download when complete.",
+        "auto_monitor": True if all_job_ids else False
     }
 
     logger.info(f"Batch submitted: {total_jobs} jobs for {len(files)} documents")
@@ -986,6 +1046,11 @@ def submit_pipeline_analysis(
         "visualizer,pipeline,started",
         sound=False
     )
+
+    # Spawn background poller for auto-download
+    spawn_job_poller([job_id])
+    output["message"] += " Results will auto-download when complete."
+    output["auto_monitor"] = True
 
     logger.info(f"Pipeline submitted: {job_id}")
     return json.dumps(output, indent=2)

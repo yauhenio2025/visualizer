@@ -81,6 +81,7 @@ mcp = FastMCP(
     - Multiple output modes: visual (4K images) and textual (reports, diagrams)
     - Bundle analysis: Run multiple engines in parallel
     - Pipeline analysis: Chain engines sequentially
+    - Batch analysis: Process entire folders of documents
     - Automatic notifications with sound alerts when jobs complete
     """
 )
@@ -98,6 +99,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 REQUEST_TIMEOUT = 30
 POLL_INTERVAL = 5  # seconds
 MAX_POLL_ATTEMPTS = 600  # 30 minutes max
+
+# Supported file extensions for batch processing
+SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.markdown', '.rst', '.tex'}
 
 
 def get_llm_keys(anthropic_api_key: Optional[str] = None, gemini_api_key: Optional[str] = None) -> Dict[str, str]:
@@ -211,7 +215,7 @@ def read_document(file_path: str) -> Dict[str, Any]:
             return {"error": f"Cannot read file: {str(e)}"}
 
     return {
-        "id": f"doc_{int(time.time())}",
+        "id": f"doc_{int(time.time())}_{hash(str(path)) % 10000}",
         "title": path.name,
         "content": content,
         "encoding": encoding,
@@ -237,6 +241,23 @@ def send_notification(title: str, message: str, tags: str = "visualizer"):
         )
     except Exception as e:
         logger.warning(f"Failed to send notification: {e}")
+
+
+def download_file_from_url(url: str, output_path: Path) -> bool:
+    """Download a file from URL to the specified path."""
+    try:
+        response = requests.get(url, timeout=60, stream=True)
+        response.raise_for_status()
+
+        with open(output_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        logger.info(f"Downloaded: {output_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to download {url}: {e}")
+        return False
 
 
 # =============================================================================
@@ -502,7 +523,7 @@ def check_job_status(
             f"Analysis job {job_id[:8]}... failed",
             "visualizer,failed"
         )
-    elif status in ["pending", "running"]:
+    elif status in ["pending", "running", "extracting", "curating", "rendering"]:
         output["message"] = f"Job is {status}. Check back in a few moments."
 
     return json.dumps(output, indent=2)
@@ -540,44 +561,84 @@ def get_results(
 
     downloaded_files = []
 
-    # Handle different result structures
-    results = result.get("result", {})
+    # Handle the CORRECT response structure: outputs.{engine_key}.{image_url|text|...}
+    outputs = result.get("outputs", {})
 
-    # Check if results contain S3 URLs
-    if isinstance(results, dict):
-        for engine_key, engine_result in results.items():
-            if isinstance(engine_result, dict) and "output" in engine_result:
-                output_data = engine_result["output"]
+    if isinstance(outputs, dict):
+        for engine_key, engine_result in outputs.items():
+            if not isinstance(engine_result, dict):
+                continue
 
-                # Handle S3 URL
-                if isinstance(output_data, str) and output_data.startswith("s3://"):
-                    # Convert S3 URL to HTTP URL (assuming bucket is public or accessible)
-                    http_url = output_data.replace("s3://", "https://").replace(".s3.amazonaws.com/", "/")
+            # Check for image_url (visual mode - Gemini image)
+            image_url = engine_result.get("image_url")
+            if image_url:
+                # Determine file extension from URL or default to .jpg
+                if ".png" in image_url.lower():
+                    ext = ".png"
+                elif ".jpg" in image_url.lower() or ".jpeg" in image_url.lower():
+                    ext = ".jpg"
+                else:
+                    ext = ".jpg"  # Default for S3 images
 
-                    # Download file
-                    try:
-                        response = requests.get(http_url, timeout=30)
-                        response.raise_for_status()
+                file_path = job_dir / f"{engine_key}{ext}"
+                if download_file_from_url(image_url, file_path):
+                    downloaded_files.append(str(file_path))
+                continue
 
-                        # Determine file extension
-                        if "image" in response.headers.get("Content-Type", ""):
-                            ext = ".png"
-                        else:
-                            ext = ".md"
+            # Check for text content (textual mode)
+            text_content = engine_result.get("text") or engine_result.get("content") or engine_result.get("output")
+            if text_content and isinstance(text_content, str):
+                file_path = job_dir / f"{engine_key}.md"
+                file_path.write_text(text_content, encoding='utf-8')
+                downloaded_files.append(str(file_path))
+                logger.info(f"Saved text: {file_path}")
+                continue
 
+            # Check for S3 URL in output field (legacy format)
+            output_data = engine_result.get("output")
+            if isinstance(output_data, str):
+                if output_data.startswith("s3://"):
+                    # Convert S3 URL to HTTP URL
+                    # s3://bucket-name/path -> https://bucket-name.s3.amazonaws.com/path
+                    parts = output_data[5:].split("/", 1)
+                    if len(parts) == 2:
+                        bucket, key = parts
+                        http_url = f"https://{bucket}.s3.amazonaws.com/{key}"
+
+                        # Determine extension
+                        ext = ".png" if any(x in key.lower() for x in ['.png', '.jpg', '.jpeg', 'image']) else ".md"
                         file_path = job_dir / f"{engine_key}{ext}"
-                        file_path.write_bytes(response.content)
+
+                        if download_file_from_url(http_url, file_path):
+                            downloaded_files.append(str(file_path))
+                elif output_data.startswith("http"):
+                    # Direct HTTP URL
+                    ext = ".png" if any(x in output_data.lower() for x in ['.png', '.jpg', '.jpeg']) else ".md"
+                    file_path = job_dir / f"{engine_key}{ext}"
+                    if download_file_from_url(output_data, file_path):
                         downloaded_files.append(str(file_path))
-                        logger.info(f"Downloaded: {file_path}")
-
-                    except Exception as e:
-                        logger.error(f"Failed to download {http_url}: {e}")
-
-                # Handle inline content
-                elif isinstance(output_data, str):
+                else:
+                    # Inline text content
                     file_path = job_dir / f"{engine_key}.md"
                     file_path.write_text(output_data, encoding='utf-8')
                     downloaded_files.append(str(file_path))
+
+    # Also check legacy "result" structure for backwards compatibility
+    legacy_results = result.get("result", {})
+    if isinstance(legacy_results, dict) and not outputs:
+        for engine_key, engine_result in legacy_results.items():
+            if isinstance(engine_result, dict) and "output" in engine_result:
+                output_data = engine_result["output"]
+                if isinstance(output_data, str):
+                    if output_data.startswith("http"):
+                        ext = ".png" if "image" in output_data.lower() else ".md"
+                        file_path = job_dir / f"{engine_key}{ext}"
+                        if download_file_from_url(output_data, file_path):
+                            downloaded_files.append(str(file_path))
+                    else:
+                        file_path = job_dir / f"{engine_key}.md"
+                        file_path.write_text(output_data, encoding='utf-8')
+                        downloaded_files.append(str(file_path))
 
     # Save raw JSON for reference
     json_path = job_dir / "results.json"
@@ -634,6 +695,272 @@ def list_pipelines() -> str:
         return json.dumps({"error": result["error"]})
 
     return json.dumps({"pipelines": result}, indent=2)
+
+
+# =============================================================================
+# BATCH ANALYSIS TOOLS
+# =============================================================================
+
+@mcp.tool()
+def scan_folder(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents to analyze")],
+    file_types: Annotated[str, Field(description="Comma-separated file extensions to include (default: 'pdf,txt,md')")] = "pdf,txt,md"
+) -> str:
+    """
+    Scan a folder and list all documents available for batch analysis.
+
+    Use this to preview what files would be processed before submitting a batch.
+
+    Returns: JSON with list of files found, sizes, and types.
+    """
+    logger.info(f"Scanning folder: {folder_path}")
+
+    path = Path(folder_path).expanduser().resolve()
+
+    if not path.exists():
+        return json.dumps({"error": f"Folder not found: {folder_path}"})
+
+    if not path.is_dir():
+        return json.dumps({"error": f"Not a directory: {folder_path}"})
+
+    # Parse file types
+    extensions = {f".{ext.strip().lower().lstrip('.')}" for ext in file_types.split(",")}
+
+    files = []
+    total_size = 0
+
+    for file_path in path.iterdir():
+        if file_path.is_file() and file_path.suffix.lower() in extensions:
+            size = file_path.stat().st_size
+            files.append({
+                "name": file_path.name,
+                "path": str(file_path),
+                "type": file_path.suffix.lower(),
+                "size_bytes": size,
+                "size_human": f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
+            })
+            total_size += size
+
+    # Sort by name
+    files.sort(key=lambda x: x["name"])
+
+    output = {
+        "folder": str(path),
+        "file_types_searched": list(extensions),
+        "files_found": len(files),
+        "total_size_bytes": total_size,
+        "total_size_human": f"{total_size / 1024:.1f} KB" if total_size < 1024 * 1024 else f"{total_size / (1024 * 1024):.1f} MB",
+        "files": files
+    }
+
+    return json.dumps(output, indent=2)
+
+
+@mcp.tool()
+def submit_batch_analysis(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents")],
+    engine_keys: Annotated[List[str], Field(description="List of engine keys to run on EACH document")],
+    output_mode: Annotated[str, Field(description="Output mode: 'visual' for 4K images, 'textual' for reports")] = "visual",
+    file_types: Annotated[str, Field(description="Comma-separated extensions to process (default: 'pdf,txt,md')")] = "pdf,txt,md",
+    max_documents: Annotated[int, Field(description="Maximum number of documents to process (default: 20)")] = 20,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key (required for visual mode)")] = None
+) -> str:
+    """
+    Submit an entire folder of documents for batch analysis.
+
+    Each document will be analyzed with ALL selected engines, generating N × M jobs
+    (N documents × M engines).
+
+    Returns: Grouped job IDs for tracking each document's analysis.
+    """
+    logger.info(f"Batch analysis: {folder_path} with {len(engine_keys)} engines")
+
+    # First scan the folder
+    scan_result = json.loads(scan_folder(folder_path, file_types))
+    if "error" in scan_result:
+        return json.dumps(scan_result)
+
+    files = scan_result.get("files", [])
+    if not files:
+        return json.dumps({"error": f"No matching files found in {folder_path}"})
+
+    # Limit number of documents
+    if len(files) > max_documents:
+        logger.warning(f"Limiting to {max_documents} documents (found {len(files)})")
+        files = files[:max_documents]
+
+    # Build llm_keys
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+
+    # Determine API output mode
+    api_output_mode = "gemini_image" if output_mode == "visual" else "executive_memo"
+
+    batch_results = []
+    total_jobs = 0
+    total_errors = 0
+
+    for file_info in files:
+        file_path = file_info["path"]
+        doc = read_document(file_path)
+
+        if "error" in doc:
+            batch_results.append({
+                "file": file_info["name"],
+                "status": "error",
+                "error": doc["error"],
+                "jobs": []
+            })
+            total_errors += 1
+            continue
+
+        doc_for_api = {
+            "id": doc["id"],
+            "title": doc["title"],
+            "content": doc["content"],
+            "encoding": doc["encoding"]
+        }
+
+        file_jobs = []
+        file_errors = []
+
+        for engine_key in engine_keys:
+            result = api_request(
+                VISUALIZER_API_URL,
+                'POST',
+                '/api/analyzer/analyze',
+                data={
+                    "documents": [doc_for_api],
+                    "engine": engine_key,
+                    "output_mode": api_output_mode,
+                    "collection_mode": "single",
+                    "llm_keys": llm_keys
+                },
+                timeout=120
+            )
+
+            if "error" in result:
+                file_errors.append(f"{engine_key}: {result['error']}")
+            elif result.get("job_id"):
+                file_jobs.append({
+                    "engine": engine_key,
+                    "job_id": result["job_id"]
+                })
+                total_jobs += 1
+            else:
+                file_errors.append(f"{engine_key}: No job ID returned")
+
+        batch_results.append({
+            "file": file_info["name"],
+            "status": "submitted" if file_jobs else "failed",
+            "jobs": file_jobs,
+            "errors": file_errors if file_errors else None
+        })
+
+    # Send notification
+    send_notification(
+        "📊 Batch Analysis Started",
+        f"Processing {len(files)} documents with {len(engine_keys)} engines ({total_jobs} total jobs)",
+        "visualizer,batch,started"
+    )
+
+    output = {
+        "batch_status": "submitted",
+        "folder": folder_path,
+        "documents_processed": len(files),
+        "engines_per_document": len(engine_keys),
+        "total_jobs": total_jobs,
+        "total_errors": total_errors,
+        "output_mode": output_mode,
+        "documents": batch_results,
+        "message": f"Submitted {total_jobs} job(s) for {len(files)} document(s). Use check_job_status() with individual job_ids to monitor."
+    }
+
+    logger.info(f"Batch submitted: {total_jobs} jobs for {len(files)} documents")
+    return json.dumps(output, indent=2)
+
+
+# =============================================================================
+# PIPELINE ANALYSIS TOOLS
+# =============================================================================
+
+@mcp.tool()
+def submit_pipeline_analysis(
+    document_path: Annotated[str, Field(description="Path to the document to analyze")],
+    pipeline_key: Annotated[str, Field(description="Pipeline key (e.g., 'argument_deep_dive', 'evidence_chain')")],
+    output_mode: Annotated[str, Field(description="Output mode: 'visual' for 4K images, 'textual' for reports")] = "visual",
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key (required for visual mode)")] = None
+) -> str:
+    """
+    Submit a document for pipeline analysis.
+
+    Pipelines chain multiple engines sequentially, where each engine's output
+    feeds into the next. This provides deeper, multi-stage analysis.
+
+    Returns: Job ID for the pipeline execution.
+    """
+    logger.info(f"Pipeline analysis: {document_path} with pipeline '{pipeline_key}'")
+
+    # Read document
+    doc = read_document(document_path)
+    if "error" in doc:
+        return json.dumps({"error": doc["error"]})
+
+    # Build llm_keys
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+
+    # Determine API output mode
+    api_output_mode = "gemini_image" if output_mode == "visual" else "executive_memo"
+
+    # Prepare document
+    doc_for_api = {
+        "id": doc["id"],
+        "title": doc["title"],
+        "content": doc["content"],
+        "encoding": doc["encoding"]
+    }
+
+    # Submit pipeline analysis
+    result = api_request(
+        VISUALIZER_API_URL,
+        'POST',
+        '/api/analyzer/analyze',
+        data={
+            "documents": [doc_for_api],
+            "pipeline": pipeline_key,  # Use pipeline instead of engine
+            "output_mode": api_output_mode,
+            "collection_mode": "single",
+            "llm_keys": llm_keys
+        },
+        timeout=120
+    )
+
+    if "error" in result:
+        return json.dumps({"error": result["error"], "details": result.get("details", "")})
+
+    job_id = result.get("job_id")
+    if not job_id:
+        return json.dumps({"error": "No job ID returned from pipeline submission"})
+
+    output = {
+        "job_id": job_id,
+        "status": "submitted",
+        "document": doc["title"],
+        "pipeline": pipeline_key,
+        "output_mode": output_mode,
+        "message": f"Pipeline '{pipeline_key}' started. Use check_job_status('{job_id}') to monitor progress."
+    }
+
+    # Send notification
+    send_notification(
+        "🔗 Pipeline Analysis Started",
+        f"Running pipeline '{pipeline_key}' on {doc['title']}",
+        "visualizer,pipeline,started"
+    )
+
+    logger.info(f"Pipeline submitted: {job_id}")
+    return json.dumps(output, indent=2)
 
 
 if __name__ == "__main__":

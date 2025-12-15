@@ -34,17 +34,17 @@ This will:
 - ✅ Configure notification listener with sound alerts
 - ✅ Set up environment configuration
 
-### Start Services
+### Start Notification Listener
 
 ```bash
-# 1. Start the visualizer and analyzer APIs
-cd /home/evgeny/projects/visualizer
-./start
-
-# 2. Start the notification listener (in a new terminal)
+# Start the notification listener
 cd /home/evgeny/projects/visualizer/mcp_server
 ./start-listener.sh
 ```
+
+**Note**: The visualizer and analyzer APIs are deployed on Render and always available:
+- Visualizer: `https://visualizer-tw4i.onrender.com`
+- Analyzer: `https://analyzer-3wsg.onrender.com`
 
 ### Use in Claude Code
 
@@ -290,9 +290,9 @@ Pipelines are sequences where engine outputs feed into subsequent engines:
 Located at `/home/evgeny/projects/visualizer/mcp_server/.env.mcp`:
 
 ```bash
-# API Endpoints
-VISUALIZER_API_URL=http://localhost:5847
-ANALYZER_API_URL=http://localhost:8847
+# API Endpoints (Deployed on Render)
+VISUALIZER_API_URL=https://visualizer-tw4i.onrender.com
+ANALYZER_API_URL=https://analyzer-3wsg.onrender.com
 
 # Notifications
 VISUALIZER_NTFY_TOPIC=visualizer-evgeny-1234
@@ -442,13 +442,12 @@ cd /home/evgeny/projects/visualizer/mcp_server
 ### API Connection Errors
 
 ```bash
-# Ensure services are running
-cd /home/evgeny/projects/visualizer
-./start
+# Check services are accessible (deployed on Render)
+curl https://visualizer-tw4i.onrender.com/api/analyzer/engines
+curl https://analyzer-3wsg.onrender.com/v1/engines
 
-# Check status
-curl http://localhost:5847/api/analyzer/engines
-curl http://localhost:8847/v1/engines
+# Note: First request may be slow if services are sleeping (free tier)
+# They auto-wake on request
 ```
 
 ### No Notifications
@@ -479,8 +478,8 @@ submit_analysis(
 
 ## 📚 Additional Resources
 
-- **Visualizer Web UI**: http://localhost:5847
-- **Analyzer API Docs**: http://localhost:8847/docs
+- **Visualizer Web UI**: https://visualizer-tw4i.onrender.com
+- **Analyzer API Docs**: https://analyzer-3wsg.onrender.com/docs
 - **ntfy.sh Docs**: https://ntfy.sh
 - **FastMCP Docs**: https://github.com/jlowin/fastmcp
 
@@ -508,8 +507,8 @@ This MCP server is part of the Visualizer project.
 After installation, verify:
 
 - [ ] `claude mcp list` shows "visualizer"
-- [ ] Visualizer API running on port 5847
-- [ ] Analyzer API running on port 8847
+- [ ] Visualizer API accessible: `curl https://visualizer-tw4i.onrender.com/api/analyzer/engines`
+- [ ] Analyzer API accessible: `curl https://analyzer-3wsg.onrender.com/v1/engines`
 - [ ] Notification listener running (`ps aux | grep visualizer-listener`)
 - [ ] Test: "Get AI recommendations for ~/Documents/test.pdf"
 - [ ] Notification sound plays when job completes

@@ -82,8 +82,8 @@ ENV_FILE="$INSTALL_DIR/.env.mcp"
 
 cat > "$ENV_FILE" << EOF
 # Visualizer MCP Server Configuration
-VISUALIZER_API_URL=http://localhost:5847
-ANALYZER_API_URL=http://localhost:8847
+VISUALIZER_API_URL=https://visualizer-tw4i.onrender.com
+ANALYZER_API_URL=https://analyzer-3wsg.onrender.com
 VISUALIZER_NTFY_TOPIC=$NTFY_TOPIC
 VISUALIZER_OUTPUT_DIR=~/visualizer-results
 
@@ -224,12 +224,14 @@ echo "    - list_bundles              View engine bundles"
 echo "    - list_pipelines            View analysis pipelines"
 echo ""
 echo "  Quick start:"
-echo "    1. Ensure visualizer and analyzer are running:"
-echo "       cd $PROJECT_DIR && ./start"
-echo "    2. Start the notification listener:"
+echo "    1. Start the notification listener:"
 echo "       $START_LISTENER"
-echo "    3. Open Claude Code and try:"
+echo "    2. Open Claude Code and try:"
 echo "       'Get AI recommendations for document.pdf'"
+echo ""
+echo "  Services (deployed on Render - always available):"
+echo "    - Visualizer: https://visualizer-tw4i.onrender.com"
+echo "    - Analyzer: https://analyzer-3wsg.onrender.com"
 echo ""
 echo "  Test with: claude"
 echo ""

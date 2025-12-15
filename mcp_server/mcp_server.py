@@ -78,8 +78,8 @@ mcp = FastMCP(
 )
 
 # Configuration from environment
-VISUALIZER_API_URL = os.environ.get('VISUALIZER_API_URL', 'http://localhost:5847')
-ANALYZER_API_URL = os.environ.get('ANALYZER_API_URL', 'http://localhost:8847')
+VISUALIZER_API_URL = os.environ.get('VISUALIZER_API_URL', 'https://visualizer-tw4i.onrender.com')
+ANALYZER_API_URL = os.environ.get('ANALYZER_API_URL', 'https://analyzer-3wsg.onrender.com')
 OUTPUT_DIR = Path(os.environ.get('VISUALIZER_OUTPUT_DIR', '~/visualizer-results')).expanduser()
 NTFY_TOPIC = os.environ.get('VISUALIZER_NTFY_TOPIC', f'visualizer-{os.getenv("USER", "user")}-{hash(os.getenv("USER", "user")) % 10000}')
 

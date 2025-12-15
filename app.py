@@ -812,6 +812,7 @@ def websaver_get_collection(collection_id: int):
                 "url": article.get("url"),
                 "date_published": article.get("date_published"),
                 "word_count": article.get("word_count", 0),
+                "authors": article.get("authors"),
             })
 
             # Create file-like entry for UI display

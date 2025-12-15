@@ -38,6 +38,14 @@ from pathlib import Path
 from fastmcp import FastMCP
 from pydantic import Field
 
+# PDF support
+try:
+    import fitz  # pymupdf
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+    logging.warning("pymupdf not installed - PDF text extraction disabled")
+
 # Configure logging to stderr (stdout is reserved for JSON-RPC)
 logging.basicConfig(
     level=logging.INFO,
@@ -150,6 +158,24 @@ def api_request(
         return {"error": f"Request failed: {str(e)}"}
 
 
+def extract_pdf_text(file_path: Path) -> str:
+    """Extract text from a PDF file using PyMuPDF."""
+    if not PDF_SUPPORT:
+        return "[PDF text extraction not available - install pymupdf]"
+
+    try:
+        doc = fitz.open(str(file_path))
+        text_parts = []
+        for page_num, page in enumerate(doc):
+            text = page.get_text()
+            if text.strip():
+                text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
+        doc.close()
+        return "\n\n".join(text_parts) if text_parts else "[No text extracted from PDF]"
+    except Exception as e:
+        return f"[Error extracting PDF text: {str(e)}]"
+
+
 def read_document(file_path: str) -> Dict[str, Any]:
     """Read a document from file path and return structured document object."""
     path = Path(file_path).expanduser().resolve()
@@ -163,12 +189,14 @@ def read_document(file_path: str) -> Dict[str, Any]:
     # Determine file type
     suffix = path.suffix.lower()
 
-    # For PDFs, read as base64
+    # For PDFs, read as base64 AND extract text
     if suffix == '.pdf':
         try:
             with open(path, 'rb') as f:
                 content = base64.b64encode(f.read()).decode('utf-8')
             encoding = 'base64'
+            # Also extract text for sample_text usage
+            extracted_text = extract_pdf_text(path)
         except Exception as e:
             return {"error": f"Cannot read PDF: {str(e)}"}
     else:
@@ -176,6 +204,7 @@ def read_document(file_path: str) -> Dict[str, Any]:
         try:
             content = path.read_text(encoding='utf-8')
             encoding = 'text'
+            extracted_text = content  # Same as content for text files
         except UnicodeDecodeError:
             return {"error": f"Cannot read file as text (try PDF format): {file_path}"}
         except Exception as e:
@@ -186,6 +215,7 @@ def read_document(file_path: str) -> Dict[str, Any]:
         "title": path.name,
         "content": content,
         "encoding": encoding,
+        "extracted_text": extracted_text,  # Always have text available
         "path": str(path),
         "size": path.stat().st_size
     }
@@ -236,11 +266,8 @@ def get_ai_recommendations(
         return json.dumps({"error": doc["error"]})
 
     # Extract sample text for curator (up to 2000 chars)
-    # For PDFs, we need to send the base64 content - the visualizer will extract text
-    if doc["encoding"] == "base64":
-        sample_text = f"[PDF document: {doc['title']}]"
-    else:
-        sample_text = doc["content"][:2000]
+    # Use extracted_text which has actual text content for PDFs
+    sample_text = doc.get("extracted_text", doc["content"])[:2000]
 
     # Build llm_keys for request body
     llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)

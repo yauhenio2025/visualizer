@@ -2045,7 +2045,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         .doc-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.75rem;
             padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--border);
@@ -2053,11 +2053,46 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         .doc-item:last-child { border-bottom: none; }
-        .doc-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
-        .doc-item .icon { font-size: 1.25rem; opacity: 0.6; }
+        .doc-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; margin-top: 3px; }
+        .doc-item .icon { font-size: 1.25rem; opacity: 0.6; margin-top: 2px; }
         .doc-item .info { flex: 1; min-width: 0; }
-        .doc-item .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .doc-item .name { font-weight: 500; line-height: 1.3; }
         .doc-item .meta { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Article metadata for web-saver imports */
+        .doc-item.article .name {
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .doc-item .article-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem 0.75rem;
+            margin-top: 0.35rem;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .doc-item .article-meta .author {
+            color: var(--text);
+            font-weight: 500;
+        }
+        .doc-item .article-meta .source {
+            background: var(--surface-raised);
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .doc-item .article-meta .date {
+            opacity: 0.8;
+        }
+        .doc-item .article-meta .size {
+            opacity: 0.6;
+        }
 
         .doc-count {
             font-size: 0.8rem;
@@ -4983,16 +5018,43 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Render Document List
         function renderDocList() {
             const list = $('doc-list');
-            const icons = { pdf: '&#128196;', md: '&#128221;', txt: '&#128195;', json: '&#128196;', xml: '&#128196;' };
+            const icons = { pdf: '&#128196;', md: '&#128221;', txt: '&#128195;', json: '&#128196;', xml: '&#128196;', article: '&#128240;' };
 
             list.innerHTML = scannedDocs.map(function(d) {
                 var escapedPath = d.path.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
-                return '<div class="doc-item">' +
+                const isArticle = d.type === 'article';
+                const itemClass = isArticle ? 'doc-item article' : 'doc-item';
+
+                // Format date if available
+                let dateStr = '';
+                if (d.date_published) {
+                    try {
+                        const date = new Date(d.date_published);
+                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    } catch (e) {
+                        dateStr = d.date_published;
+                    }
+                }
+
+                // Build metadata line for articles
+                let metaHtml = '';
+                if (isArticle) {
+                    const parts = [];
+                    if (d.authors) parts.push('<span class="author">' + escapeHtml(d.authors) + '</span>');
+                    if (d.source_name) parts.push('<span class="source">' + escapeHtml(d.source_name) + '</span>');
+                    if (dateStr) parts.push('<span class="date">' + dateStr + '</span>');
+                    if (d.size) parts.push('<span class="size">' + d.size + '</span>');
+                    metaHtml = '<div class="article-meta">' + parts.join('') + '</div>';
+                } else {
+                    metaHtml = '<div class="meta">' + d.type.toUpperCase() + ' - ' + d.size + '</div>';
+                }
+
+                return '<div class="' + itemClass + '">' +
                 '<input type="checkbox" ' + (selectedDocs.has(d.path) ? 'checked' : '') + ' onchange="toggleDoc(\\'' + escapedPath + '\\')">' +
                 '<span class="icon">' + (icons[d.type] || '&#128196;') + '</span>' +
                 '<div class="info">' +
-                '<div class="name">' + d.name + '</div>' +
-                '<div class="meta">' + d.type.toUpperCase() + ' - ' + d.size + '</div>' +
+                '<div class="name">' + escapeHtml(d.name) + '</div>' +
+                metaHtml +
                 '</div>' +
                 '</div>';
             }).join('');
@@ -7315,7 +7377,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                             content: doc.content,
                             size: sizeStr,
                             wordCount: doc.word_count,
-                            source: doc.source_name || ''
+                            source: doc.source_name || '',
+                            // METADATA for citation/footnotes
+                            source_name: doc.source_name,
+                            date_published: doc.date_published,
+                            url: doc.url,
+                            authors: doc.authors
                         });
                     });
 

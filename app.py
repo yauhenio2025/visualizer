@@ -3078,24 +3078,32 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 0.5rem;
         }
 
-        /* Job Group in Library - Clean Design */
+        /* Job Group in Library - Premium Design */
         .job-group {
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
             background: var(--bg-card);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: box-shadow 0.2s;
+        }
+        .job-group:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
         .job-group-header {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            background: var(--bg-secondary);
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, #fafbfc 0%, #f0f2f5 100%);
             border-bottom: 1px solid var(--border);
             cursor: pointer;
-            gap: 0.75rem;
         }
         .job-group-header:hover {
-            background: var(--bg-tertiary);
+            background: linear-gradient(135deg, #f0f2f5 0%, #e8ebef 100%);
+        }
+        .job-group-top-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
         }
         .job-group-toggle {
             font-size: 0.6rem;
@@ -3106,33 +3114,45 @@ HTML_PAGE = '''<!DOCTYPE html>
         .job-group.collapsed .job-group-toggle {
             transform: rotate(-90deg);
         }
-        .job-group-title {
-            font-weight: 500;
-            font-size: 0.9rem;
+        .job-group-pipeline {
             flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
             min-width: 0;
+        }
+        .job-group-pipeline-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text);
+            text-transform: capitalize;
+        }
+        .job-group-pipeline-type {
+            font-size: 0.7rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        .job-group-meta {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-shrink: 0;
         }
         .job-group-count {
             background: var(--accent);
             color: white;
-            padding: 0.15rem 0.5rem;
-            border-radius: 10px;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
             font-size: 0.7rem;
             font-weight: 500;
-            flex-shrink: 0;
         }
         .job-group-date {
             font-size: 0.75rem;
             color: var(--text-muted);
-            flex-shrink: 0;
         }
         .job-group-delete {
             width: 28px;
             height: 28px;
-            border-radius: 4px;
+            border-radius: 6px;
             border: none;
             background: transparent;
             color: var(--text-muted);
@@ -3141,24 +3161,37 @@ HTML_PAGE = '''<!DOCTYPE html>
             align-items: center;
             justify-content: center;
             font-size: 1rem;
-            flex-shrink: 0;
             transition: all 0.15s;
         }
         .job-group-delete:hover {
             background: #fee2e2;
             color: #dc2626;
         }
+        .job-group-collection {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .job-group-collection-icon {
+            font-size: 0.9rem;
+        }
+        .job-group-collection-name {
+            font-weight: 500;
+        }
+        .job-group-docs-count {
+            color: var(--text-muted);
+        }
         .job-group-items {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: 0.75rem;
-            padding: 0.75rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
         }
         .job-group.collapsed .job-group-items {
             display: none;
-        }
-        .job-group.collapsed .job-group-toggle {
-            transform: rotate(-90deg);
         }
         /* Compact cards inside job groups */
         .job-group-items .gallery-card {
@@ -5494,6 +5527,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     job_id: currentJobId,  // Include job_id for library grouping
                     output: output,
                     metadata: metadata,
+                    extended_info: extInfo,  // Include extended info for library display
                     isImage: !!output.image_url,
                     imageUrl: output.image_url || null,
                     content: output.content || output.html_content || '',
@@ -6231,7 +6265,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         groups[item.job_id] = {
                             items: [],
                             addedAt: item.addedAt,
-                            metadata: item.metadata || {}
+                            metadata: item.metadata || {},
+                            extended_info: item.extended_info || {}
                         };
                     }
                     groups[item.job_id].items.push(item);
@@ -6300,25 +6335,50 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
             });
 
-            // Get pipeline/engine info from first item
-            var firstItem = uniqueItems[0];
-            var pipelineName = '';
-            if (firstItem.metadata && firstItem.metadata.pipeline) {
-                pipelineName = firstItem.metadata.pipeline.replace(/_/g, ' ');
-            } else if (firstItem.metadata && firstItem.metadata.engine) {
-                pipelineName = firstItem.metadata.engine.replace(/_/g, ' ');
-            } else {
-                // Try to infer from unique output keys
+            // Get extended info for display
+            var extInfo = group.extended_info || {};
+            var pipelineName = extInfo.pipeline || extInfo.engine || '';
+            var pipelineType = extInfo.is_pipeline ? 'Pipeline' : (extInfo.is_bundle ? 'Bundle' : 'Engine');
+            var collectionName = extInfo.collection_name || '';
+            var docsTotal = extInfo.documents_total || 0;
+
+            // Fallback if no extended info
+            if (!pipelineName) {
                 var keys = uniqueItems.map(function(i) { return i.key || i.title; });
-                pipelineName = keys.slice(0, 3).join(' + ').replace(/_/g, ' ');
-                if (keys.length > 3) pipelineName += ' +' + (keys.length - 3) + ' more';
+                pipelineName = keys.slice(0, 2).join(' + ').replace(/_/g, ' ');
+                if (keys.length > 2) pipelineName += ' +' + (keys.length - 2) + ' more';
+                pipelineType = 'Analysis';
             }
 
             var dateStr = group.addedAt ? new Date(group.addedAt).toLocaleDateString() : '';
 
             var header = document.createElement('div');
             header.className = 'job-group-header';
-            header.innerHTML = '<span class="job-group-toggle">▼</span><span class="job-group-title" title="' + pipelineName.replace(/"/g, '&quot;') + '">' + pipelineName + '</span><span class="job-group-count">' + uniqueItems.length + ' outputs</span><span class="job-group-date">' + dateStr + '</span><button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(&apos;' + jobId + '&apos;)" title="Delete job">&times;</button>';
+
+            // Build header HTML with two rows
+            var headerHtml = '<div class="job-group-top-row">' +
+                '<span class="job-group-toggle">▼</span>' +
+                '<div class="job-group-pipeline">' +
+                    '<div class="job-group-pipeline-type">' + pipelineType + '</div>' +
+                    '<div class="job-group-pipeline-name">' + pipelineName.replace(/_/g, ' ') + '</div>' +
+                '</div>' +
+                '<div class="job-group-meta">' +
+                    '<span class="job-group-count">' + uniqueItems.length + ' outputs</span>' +
+                    '<span class="job-group-date">' + dateStr + '</span>' +
+                    '<button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(&apos;' + jobId + '&apos;)" title="Delete job">&times;</button>' +
+                '</div>' +
+            '</div>';
+
+            // Add collection info if available
+            if (collectionName || docsTotal > 0) {
+                headerHtml += '<div class="job-group-collection">' +
+                    '<span class="job-group-collection-icon">📁</span>' +
+                    (collectionName ? '<span class="job-group-collection-name">' + collectionName + '</span>' : '') +
+                    (docsTotal > 0 ? '<span class="job-group-docs-count">(' + docsTotal + ' docs)</span>' : '') +
+                '</div>';
+            }
+
+            header.innerHTML = headerHtml;
 
             header.onclick = function(e) {
                 if (e.target.tagName !== 'BUTTON') {

@@ -33,7 +33,60 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def send_notification(title: str, message: str, sound: bool = True):
-    """Send notification via ntfy."""
+    """Send notification via native Linux desktop notification + sound."""
+    # 1. Native Linux desktop notification (notify-send)
+    try:
+        subprocess.run(
+            ['notify-send', '--urgency=critical', '--app-name=Visualizer', title, message],
+            timeout=5,
+            capture_output=True
+        )
+        print(f"📢 Notification sent: {title}")
+    except Exception as e:
+        print(f"⚠️  notify-send failed: {e}")
+
+    # 2. Play sound
+    if sound:
+        # Try multiple sound options
+        sound_files = [
+            '/usr/share/sounds/freedesktop/stereo/complete.oga',
+            '/usr/share/sounds/gnome/default/alerts/drip.ogg',
+            '/usr/share/sounds/ubuntu/stereo/message.ogg',
+            '/usr/share/sounds/sound-icons/trumpet-12.wav',
+        ]
+
+        sound_played = False
+        for sound_file in sound_files:
+            if Path(sound_file).exists():
+                try:
+                    # Try paplay first (PulseAudio)
+                    result = subprocess.run(
+                        ['paplay', sound_file],
+                        timeout=5,
+                        capture_output=True
+                    )
+                    if result.returncode == 0:
+                        print(f"🔊 Sound played: {sound_file}")
+                        sound_played = True
+                        break
+                except:
+                    pass
+
+        # Fallback: use speaker-test for a beep
+        if not sound_played:
+            try:
+                subprocess.run(
+                    ['speaker-test', '-t', 'sine', '-f', '1000', '-l', '1'],
+                    timeout=2,
+                    capture_output=True
+                )
+                print("🔊 Beep sound played")
+            except:
+                # Final fallback: terminal bell
+                print("\a")  # ASCII bell
+                print("🔔 Terminal bell attempted")
+
+    # 3. Also send to ntfy.sh as backup (for mobile notifications)
     try:
         requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",

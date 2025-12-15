@@ -3369,6 +3369,60 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--accent-muted);
         }
 
+        /* Interactive citations */
+        .citation {
+            cursor: pointer;
+            color: var(--accent);
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+        }
+
+        .citation:hover {
+            color: var(--accent-muted);
+            border-bottom-color: var(--accent-muted);
+        }
+
+        /* Citation Preview Tooltip */
+        .citation-preview {
+            position: fixed;
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            max-width: 400px;
+            z-index: 10000;
+            display: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .citation-preview.visible {
+            display: block;
+        }
+
+        .citation-preview-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        .citation-preview-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .citation-preview-meta div {
+            margin-bottom: 0.25rem;
+        }
+
+        .citation-preview-meta div:last-child {
+            margin-bottom: 0;
+        }
+
         /* Table styling */
         .markdown-body table {
             width: 100%;
@@ -5850,6 +5904,157 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
         }
 
+        function showCitationPreview(event, element) {
+            var preview = document.getElementById('citation-preview');
+            var titleEl = document.getElementById('preview-title');
+            var metaEl = document.getElementById('preview-meta');
+
+            // Get data from element attributes
+            var headline = element.getAttribute('data-headline') || 'Unknown';
+            var source = element.getAttribute('data-source') || '';
+            var authors = element.getAttribute('data-authors') || '';
+            var date = element.getAttribute('data-date') || '';
+            var articleId = element.getAttribute('data-article-id');
+
+            // Build preview content
+            titleEl.textContent = headline;
+
+            var metaHtml = '';
+            if (source) {
+                metaHtml += '<div><strong>Source:</strong> ' + source + '</div>';
+            }
+            if (authors) {
+                metaHtml += '<div><strong>Authors:</strong> ' + authors + '</div>';
+            }
+            if (date) {
+                metaHtml += '<div><strong>Date:</strong> ' + date + '</div>';
+            }
+            metaHtml += '<div style="margin-top:0.5rem;font-size:0.7rem;color:var(--text-muted);">Click to view full article</div>';
+
+            metaEl.innerHTML = metaHtml;
+
+            // Position near cursor (viewport coordinates)
+            var left = event.clientX + 10;
+            var top = event.clientY + 10;
+
+            // Make sure tooltip doesn't go off right edge
+            if (left + 400 > window.innerWidth) {
+                left = event.clientX - 410;
+            }
+
+            // Make sure tooltip doesn't go off bottom
+            if (top + 150 > window.innerHeight) {
+                top = event.clientY - 160;
+            }
+
+            preview.style.left = left + 'px';
+            preview.style.top = top + 'px';
+            preview.classList.add('visible');
+        }
+
+        function hideCitationPreview() {
+            var preview = document.getElementById('citation-preview');
+            preview.classList.remove('visible');
+        }
+
+        function viewArticleFromCitation(articleId) {
+            // Placeholder - in a full implementation, this would open the article
+            // For now, just show a toast
+            showToast('Article view: ID ' + articleId);
+            // TODO: Integrate with article viewer if available
+        }
+
+        function makeFootnotesInteractive(container, documents) {
+            /**
+             * Convert superscript footnotes to interactive, clickable citations with hover previews.
+             * Matches superscript numbers (¹²³⁴⁵⁶⁷⁸⁹⁰) and wraps them with citation spans.
+             */
+
+            // Unicode superscript mapping
+            var superscriptMap = {
+                '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+                '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9'
+            };
+
+            function superscriptToNumber(superscriptStr) {
+                var result = '';
+                for (var i = 0; i < superscriptStr.length; i++) {
+                    var char = superscriptStr[i];
+                    result += superscriptMap[char] || char;
+                }
+                return parseInt(result, 10);
+            }
+
+            // Find all superscript elements in the content (excluding Sources/References section)
+            var supElements = container.querySelectorAll('sup');
+            supElements.forEach(function(sup) {
+                // Check if this is in the Sources/References section - skip those
+                var parent = sup.parentElement;
+                while (parent && parent !== container) {
+                    if (parent.tagName === 'H2') {
+                        var headerText = parent.textContent.toLowerCase();
+                        if (headerText.includes('source') || headerText.includes('reference')) {
+                            return; // Skip footnotes in Sources/References section
+                        }
+                    }
+                    parent = parent.parentElement;
+                }
+
+                // Check if we're after a Sources/References heading
+                var prevHeading = null;
+                var node = sup.parentElement;
+                while (node && node.previousElementSibling) {
+                    if (node.previousElementSibling.tagName === 'H2') {
+                        prevHeading = node.previousElementSibling;
+                        break;
+                    }
+                    node = node.previousElementSibling;
+                }
+                if (prevHeading) {
+                    var headingText = prevHeading.textContent.toLowerCase();
+                    if (headingText.includes('source') || headingText.includes('reference')) {
+                        return; // Skip if after Sources/References section
+                    }
+                }
+
+                var supText = sup.textContent.trim();
+                if (!supText) return;
+
+                // Convert superscript to article number
+                var articleNum = superscriptToNumber(supText);
+                if (isNaN(articleNum) || articleNum < 1 || articleNum > documents.length) {
+                    return; // Invalid article number
+                }
+
+                // Get article info (1-indexed)
+                var article = documents[articleNum - 1];
+                if (!article) return;
+
+                // Create citation span
+                var citation = document.createElement('span');
+                citation.className = 'citation';
+                citation.innerHTML = '<sup>' + supText + '</sup>';
+
+                // Add metadata as data attributes
+                citation.setAttribute('data-article-id', article.id || articleNum);
+                citation.setAttribute('data-headline', article.title || 'Article ' + articleNum);
+                citation.setAttribute('data-source', article.source || '');
+                citation.setAttribute('data-authors', article.authors || '');
+                citation.setAttribute('data-date', article.date || '');
+
+                // Add event handlers
+                citation.onmouseover = function(e) { showCitationPreview(e, citation); };
+                citation.onmouseout = function() { hideCitationPreview(); };
+                citation.onclick = function() {
+                    hideCitationPreview();
+                    viewArticleFromCitation(article.id || articleNum);
+                };
+
+                // Replace the original sup with our interactive citation
+                sup.parentNode.replaceChild(citation, sup);
+            });
+        }
+
         function openResultModal(index) {
             var data = allResults[index];
             if (!data) return;
@@ -5914,6 +6119,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var mdContainer = document.createElement('div');
                 mdContainer.className = 'markdown-body';
                 mdContainer.innerHTML = marked.parse(data.content);
+
+                // Convert footnotes to interactive citations (if metadata available)
+                var documents = (data.extended_info && data.extended_info.documents) || [];
+                if (documents.length > 0) {
+                    makeFootnotesInteractive(mdContainer, documents);
+                }
 
                 // Format footnotes in Sources section - each on its own line
                 formatSourcesFootnotes(mdContainer);
@@ -7115,6 +7326,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 <button class="btn btn-sm btn-primary" onclick="importSelectedCollection()" id="ws-import-btn" disabled>Import</button>
             </div>
         </div>
+    </div>
+
+    <!-- Citation Preview Tooltip -->
+    <div class="citation-preview" id="citation-preview">
+        <div class="citation-preview-title" id="preview-title"></div>
+        <div class="citation-preview-meta" id="preview-meta"></div>
     </div>
 </body>
 </html>

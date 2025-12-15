@@ -36,9 +36,9 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-### Step 3: Configure Environment
+### Step 3: Configure API Keys
 
-Create a `.env.mcp` file in the `mcp_server` directory:
+Create a `.env.mcp` file in the `mcp_server` directory with your API keys:
 
 ```bash
 # Visualizer MCP Server Configuration
@@ -46,23 +46,26 @@ VISUALIZER_API_URL=https://visualizer-tw4i.onrender.com
 ANALYZER_API_URL=https://analyzer-3wsg.onrender.com
 VISUALIZER_OUTPUT_DIR=~/visualizer-results
 
+# YOUR API KEYS (required)
+ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+GEMINI_API_KEY=AIzaSy-your-key-here
+
 # Optional: notification topic (generates unique one if not set)
 # VISUALIZER_NTFY_TOPIC=my-custom-topic
-
-# Optional: Default API keys (can also provide per-request)
-# ANTHROPIC_API_KEY=sk-ant-api03-...
-# GEMINI_API_KEY=AIza...
 ```
 
-**Note:** You can set API keys in `.env.mcp` OR provide them per-request in Claude Code.
+**Tip:** You can ask Claude Code to create this file for you! Just say:
+> "Create the .env.mcp file with my API keys: Anthropic key is sk-ant-... and Gemini key is AIza..."
+
+Claude Code will create the file with the correct format.
 
 ### Step 4: Add to Claude Code
 
 Edit your Claude Code MCP settings file:
 
 **Location:**
-- Linux/Mac: `~/.claude/claude_desktop_config.json`
-- Or check Claude Code settings for MCP configuration
+- Linux/Mac: `~/.claude.json` (in your home directory)
+- Or: `~/.claude/claude_desktop_config.json`
 
 Add this server configuration:
 
@@ -70,11 +73,7 @@ Add this server configuration:
 {
   "mcpServers": {
     "visualizer": {
-      "command": "/absolute/path/to/visualizer/mcp_server/run-mcp-server.sh",
-      "env": {
-        "ANTHROPIC_API_KEY": "your-anthropic-api-key-here",
-        "GEMINI_API_KEY": "your-gemini-api-key-here"
-      }
+      "command": "/absolute/path/to/visualizer/mcp_server/run-mcp-server.sh"
     }
   }
 }
@@ -82,7 +81,7 @@ Add this server configuration:
 
 **Important:**
 - Replace `/absolute/path/to/` with the actual path where you cloned/downloaded the repo
-- Replace the API keys with your actual keys
+- **No need to put API keys here** - they're loaded from `.env.mcp` automatically
 
 ### Step 5: Restart Claude Code
 
@@ -169,13 +168,25 @@ Results are automatically downloaded to `~/visualizer-results/` when jobs comple
 - Optional for: Textual output mode
 - Get one at: https://aistudio.google.com/apikey
 
-### Providing Keys
+### Where to Put Your Keys (Recommended: .env.mcp)
 
-**Option 1: Environment variables** (recommended for regular use)
-Set in `.env.mcp` or in Claude Code's MCP server config.
+**Best option: Put keys in `.env.mcp`** (in the mcp_server folder)
 
-**Option 2: Per-request** (useful for testing or multiple accounts)
-When calling tools, provide `anthropic_api_key` and `gemini_api_key` parameters.
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-your-actual-key-here
+GEMINI_API_KEY=AIzaSy-your-actual-key-here
+```
+
+This keeps your keys in one place, separate from Claude Code config, and easy to update.
+
+**Ask Claude Code to do it for you:**
+> "Please create the .env.mcp file at /path/to/visualizer/mcp_server/.env.mcp with my Anthropic key sk-ant-... and Gemini key AIza..."
+
+Claude Code will write the file in the correct format.
+
+**Alternative: Per-request keys**
+You can also provide keys when calling tools (useful for testing or multiple accounts):
+> "Analyze document.pdf using Anthropic key sk-ant-... and Gemini key AIza..."
 
 ---
 

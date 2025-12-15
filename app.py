@@ -980,11 +980,11 @@ def curator_recommend():
     """Get engine recommendations from the Curator AI."""
     try:
         data = request.get_json()
-        llm_keys = data.get('llm_keys')  # Extract llm_keys from request body
+        llm_keys = data.pop('llm_keys', None)  # Extract and REMOVE llm_keys from body
         response = httpx.post(
             f"{ANALYZER_API_URL}/v1/curator/recommend",
-            headers=get_analyzer_headers(llm_keys),  # Pass llm_keys to headers
-            json=data,
+            headers=get_analyzer_headers(llm_keys),  # Pass llm_keys to headers only
+            json=data,  # Send clean data without llm_keys
             timeout=120.0,  # Longer timeout for AI processing
         )
         response.raise_for_status()

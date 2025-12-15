@@ -391,7 +391,8 @@ def submit_analysis(
         return json.dumps({"error": "output_mode must be 'visual' or 'textual'"})
 
     # Determine the actual output mode string for the API
-    api_output_mode = "nano_banana" if output_mode == "visual" else "executive_memo"
+    # Valid modes: gemini_image, structured_text_report, executive_memo, mermaid, d3_interactive, etc.
+    api_output_mode = "gemini_image" if output_mode == "visual" else "executive_memo"
 
     # Prepare document for submission (remove extra fields the API doesn't need)
     doc_for_api = {

@@ -105,19 +105,26 @@ MAX_POLL_ATTEMPTS = 600  # 30 minutes max
 SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.markdown', '.rst', '.tex'}
 
 
+def sanitize_api_key(key: Optional[str]) -> Optional[str]:
+    """Strip whitespace/newlines from API keys that may come from display formatting."""
+    if key:
+        # Remove all whitespace including newlines, spaces, tabs
+        return ''.join(key.split())
+    return key
+
+
 def get_llm_keys(anthropic_api_key: Optional[str] = None, gemini_api_key: Optional[str] = None) -> Dict[str, str]:
     """Build llm_keys dict from provided keys or environment."""
     llm_keys = {}
 
-    if anthropic_api_key:
-        llm_keys['anthropic_api_key'] = anthropic_api_key
-    elif os.environ.get('ANTHROPIC_API_KEY'):
-        llm_keys['anthropic_api_key'] = os.environ.get('ANTHROPIC_API_KEY')
+    # Sanitize keys to remove any whitespace/newlines from display formatting
+    anthropic_key = sanitize_api_key(anthropic_api_key) or sanitize_api_key(os.environ.get('ANTHROPIC_API_KEY'))
+    gemini_key = sanitize_api_key(gemini_api_key) or sanitize_api_key(os.environ.get('GEMINI_API_KEY'))
 
-    if gemini_api_key:
-        llm_keys['gemini_api_key'] = gemini_api_key
-    elif os.environ.get('GEMINI_API_KEY'):
-        llm_keys['gemini_api_key'] = os.environ.get('GEMINI_API_KEY')
+    if anthropic_key:
+        llm_keys['anthropic_api_key'] = anthropic_key
+    if gemini_key:
+        llm_keys['gemini_api_key'] = gemini_key
 
     return llm_keys
 

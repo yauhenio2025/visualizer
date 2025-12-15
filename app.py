@@ -3715,6 +3715,157 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-size: 0.85rem;
             color: var(--text-muted);
         }
+
+        /* Document Selection Modal */
+        .doc-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .doc-modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .doc-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .doc-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        .doc-modal-header .collection-name {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-left: 1rem;
+        }
+        .doc-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+            line-height: 1;
+        }
+        .doc-modal-close:hover { color: var(--text); }
+        .doc-modal-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .doc-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .doc-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        /* Document Table */
+        .doc-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .doc-table th {
+            text-align: left;
+            padding: 0.6rem 1rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .doc-table th:first-child { width: 40px; text-align: center; }
+        .doc-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+        .doc-table td:first-child { text-align: center; }
+        .doc-table tr:hover { background: var(--surface); }
+        .doc-table tr.selected { background: rgba(59, 130, 246, 0.08); }
+        .doc-table .title-cell {
+            max-width: 350px;
+        }
+        .doc-table .title-cell .title {
+            font-weight: 500;
+            line-height: 1.3;
+            margin-bottom: 0.2rem;
+        }
+        .doc-table .title-cell .url {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        .doc-table .author-cell {
+            color: var(--text);
+            font-weight: 500;
+            max-width: 180px;
+        }
+        .doc-table .source-cell {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: var(--text-muted);
+        }
+        .doc-table .date-cell {
+            white-space: nowrap;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        .doc-table .size-cell {
+            white-space: nowrap;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        .doc-table input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Selected count badge */
+        .selected-count {
+            background: var(--accent);
+            color: white;
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -7240,6 +7391,11 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
+        // Document Modal state
+        let docModalDocs = [];
+        let docModalSelected = new Set();
+        let docModalCollectionName = '';
+
         function importSelectedCollection() {
             if (!wsSelectedCollection) return;
 
@@ -7257,7 +7413,6 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    // Add documents to the analysis panel
                     const documents = data.documents || [];
                     if (documents.length === 0) {
                         alert('Collection has no documents with content.');
@@ -7266,40 +7421,32 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    // Clear existing docs and add imported documents
-                    scannedDocs = [];  // Clear existing
-
-                    documents.forEach((doc, i) => {
-                        // Add to scannedDocs array (with content for inline analysis)
+                    // Prepare documents for modal
+                    docModalDocs = documents.map((doc, i) => {
                         const sizeBytes = doc.word_count * 5;
                         const sizeStr = sizeBytes > 1024 ? (sizeBytes / 1024).toFixed(1) + ' KB' : sizeBytes + ' B';
-                        scannedDocs.push({
+                        return {
+                            id: doc.id,
                             path: doc.url || `websaver_doc_${doc.id}`,
                             name: doc.title || 'Untitled',
-                            type: 'article',  // Type for display
-                            content: doc.content,  // Content stored for inline analysis
+                            type: 'article',
+                            content: doc.content,
                             size: sizeStr,
                             wordCount: doc.word_count,
-                            source: doc.source_name || '',
-                            // METADATA for citation tooltips
                             source_name: doc.source_name,
                             date_published: doc.date_published,
                             url: doc.url,
                             authors: doc.authors
-                        });
+                        };
                     });
 
-                    // Use existing selection system - select all imported docs
-                    selectAllDocs();
+                    // Select all by default
+                    docModalSelected = new Set(docModalDocs.map(d => d.path));
+                    docModalCollectionName = wsSelectedCollection?.name || '';
 
-                    // Show doc list container
-                    document.getElementById('doc-list-container').style.display = 'block';
-
-                    // Save collection name globally for analysis requests
-                    currentCollectionName = wsSelectedCollection?.name || null;
-
-                    // Close modal
+                    // Close web-saver modal and open document modal
                     closeWebSaverModal();
+                    openDocModal();
 
                     // Show success message
                     showToast(`Imported ${documents.length} documents from "${currentCollectionName || 'Collection'}"`);
@@ -7312,6 +7459,124 @@ HTML_PAGE = '''<!DOCTYPE html>
                     importBtn.textContent = 'Import';
                 });
         }
+
+        // ==================== DOCUMENT MODAL FUNCTIONS ====================
+
+        function openDocModal() {
+            document.getElementById('doc-modal').style.display = 'flex';
+            document.getElementById('doc-modal-collection').textContent = docModalCollectionName ? `— ${docModalCollectionName}` : '';
+            renderDocModalTable();
+            updateDocModalCount();
+        }
+
+        function closeDocModal() {
+            document.getElementById('doc-modal').style.display = 'none';
+        }
+
+        function renderDocModalTable() {
+            const tbody = document.getElementById('doc-modal-tbody');
+            tbody.innerHTML = docModalDocs.map(doc => {
+                const isSelected = docModalSelected.has(doc.path);
+                const escapedPath = doc.path.replace(/'/g, "\\'");
+
+                // Format date
+                let dateStr = '';
+                if (doc.date_published) {
+                    try {
+                        const date = new Date(doc.date_published);
+                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    } catch (e) {
+                        dateStr = doc.date_published;
+                    }
+                }
+
+                // Truncate URL for display
+                let urlDisplay = '';
+                if (doc.url) {
+                    try {
+                        const u = new URL(doc.url);
+                        urlDisplay = u.hostname + u.pathname.substring(0, 30) + (u.pathname.length > 30 ? '...' : '');
+                    } catch (e) {
+                        urlDisplay = doc.url.substring(0, 40);
+                    }
+                }
+
+                return `<tr class="${isSelected ? 'selected' : ''}" onclick="docModalToggleRow('${escapedPath}')">
+                    <td><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); docModalToggle('${escapedPath}')"></td>
+                    <td class="title-cell">
+                        <div class="title">${escapeHtml(doc.name)}</div>
+                        ${urlDisplay ? `<div class="url">${escapeHtml(urlDisplay)}</div>` : ''}
+                    </td>
+                    <td class="author-cell">${doc.authors ? escapeHtml(doc.authors) : '<span style="opacity:0.4">—</span>'}</td>
+                    <td class="source-cell">${doc.source_name ? escapeHtml(doc.source_name) : ''}</td>
+                    <td class="date-cell">${dateStr || ''}</td>
+                    <td class="size-cell">${doc.size || ''}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function docModalToggle(path) {
+            if (docModalSelected.has(path)) {
+                docModalSelected.delete(path);
+            } else {
+                docModalSelected.add(path);
+            }
+            renderDocModalTable();
+            updateDocModalCount();
+        }
+
+        function docModalToggleRow(path) {
+            docModalToggle(path);
+        }
+
+        function docModalToggleAll(checked) {
+            if (checked) {
+                docModalSelected = new Set(docModalDocs.map(d => d.path));
+            } else {
+                docModalSelected.clear();
+            }
+            renderDocModalTable();
+            updateDocModalCount();
+        }
+
+        function docModalSelectAll() {
+            document.getElementById('doc-modal-check-all').checked = true;
+            docModalToggleAll(true);
+        }
+
+        function docModalDeselectAll() {
+            document.getElementById('doc-modal-check-all').checked = false;
+            docModalToggleAll(false);
+        }
+
+        function updateDocModalCount() {
+            const count = docModalSelected.size;
+            document.getElementById('doc-modal-count').textContent = `${count} selected`;
+            document.getElementById('doc-modal-confirm').disabled = count === 0;
+
+            // Update header checkbox
+            const allChecked = count === docModalDocs.length && count > 0;
+            document.getElementById('doc-modal-check-all').checked = allChecked;
+            document.getElementById('doc-modal-check-all').indeterminate = count > 0 && count < docModalDocs.length;
+        }
+
+        function confirmDocSelection() {
+            // Transfer selected docs to main scannedDocs
+            scannedDocs = docModalDocs.filter(d => docModalSelected.has(d.path));
+            selectedDocs = new Set(scannedDocs.map(d => d.path));
+
+            // Save collection name
+            currentCollectionName = docModalCollectionName;
+
+            // Close modal and show doc list
+            closeDocModal();
+            document.getElementById('doc-list-container').style.display = 'block';
+            renderDocList();
+
+            showToast(`${scannedDocs.length} documents ready for analysis`);
+        }
+
+        // ==================== END DOCUMENT MODAL ====================
 
         function formatDate(isoString) {
             if (!isoString) return '';
@@ -7364,32 +7629,31 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    // Clear and add documents
-                    scannedDocs = [];  // Clear existing
-
-                    documents.forEach((doc, i) => {
+                    // Prepare documents for modal
+                    docModalDocs = documents.map((doc, i) => {
                         const sizeBytes = doc.word_count * 5;
                         const sizeStr = sizeBytes > 1024 ? (sizeBytes / 1024).toFixed(1) + ' KB' : sizeBytes + ' B';
-                        scannedDocs.push({
+                        return {
+                            id: doc.id,
                             path: doc.url || `websaver_doc_${doc.id}`,
                             name: doc.title || 'Untitled',
                             type: 'article',
                             content: doc.content,
                             size: sizeStr,
                             wordCount: doc.word_count,
-                            source: doc.source_name || '',
-                            // METADATA for citation/footnotes
                             source_name: doc.source_name,
                             date_published: doc.date_published,
                             url: doc.url,
                             authors: doc.authors
-                        });
+                        };
                     });
 
-                    // Use existing selection system
-                    selectAllDocs();
-                    document.getElementById('doc-list-container').style.display = 'block';
-                    showToast(`Imported ${documents.length} documents from "${data.collection?.name || 'Collection'}"`);
+                    // Select all by default
+                    docModalSelected = new Set(docModalDocs.map(d => d.path));
+                    docModalCollectionName = data.collection?.name || '';
+
+                    // Open document selection modal
+                    openDocModal();
 
                     // Clean up URL
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -7441,6 +7705,44 @@ HTML_PAGE = '''<!DOCTYPE html>
                 <span id="ws-selected-info"></span>
                 <button class="btn btn-sm" onclick="closeWebSaverModal()">Cancel</button>
                 <button class="btn btn-sm btn-primary" onclick="importSelectedCollection()" id="ws-import-btn" disabled>Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Selection Modal -->
+    <div id="doc-modal" class="doc-modal" style="display:none;">
+        <div class="doc-modal-content">
+            <div class="doc-modal-header">
+                <div style="display: flex; align-items: center;">
+                    <h3>📄 Select Documents</h3>
+                    <span class="collection-name" id="doc-modal-collection"></span>
+                </div>
+                <button class="doc-modal-close" onclick="closeDocModal()">✕</button>
+            </div>
+            <div class="doc-modal-toolbar">
+                <button class="btn btn-sm" onclick="docModalSelectAll()">Select All</button>
+                <button class="btn btn-sm" onclick="docModalDeselectAll()">Deselect All</button>
+                <div style="flex:1;"></div>
+                <span id="doc-modal-count" class="selected-count">0 selected</span>
+            </div>
+            <div class="doc-modal-body">
+                <table class="doc-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="doc-modal-check-all" onchange="docModalToggleAll(this.checked)"></th>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Source</th>
+                            <th>Date</th>
+                            <th>Size</th>
+                        </tr>
+                    </thead>
+                    <tbody id="doc-modal-tbody"></tbody>
+                </table>
+            </div>
+            <div class="doc-modal-footer">
+                <button class="btn btn-sm" onclick="closeDocModal()">Cancel</button>
+                <button class="btn btn-sm btn-primary" onclick="confirmDocSelection()" id="doc-modal-confirm">Use Selected Documents</button>
             </div>
         </div>
     </div>

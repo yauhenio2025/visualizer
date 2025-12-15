@@ -3906,6 +3906,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let engineMode = 'engine';  // 'engine', 'bundle', or 'pipeline'
         let currentJobId = null;
         let allResults = [];
+        let currentCollectionName = null;  // Track imported collection name
         let libraryItems = [];
 
         // Progress tracking
@@ -5130,7 +5131,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     const payload = {
                         engine: selectedEngine,
                         output_mode: outputMode,
-                        collection_mode: collectionMode
+                        collection_mode: collectionMode,
+                        collection_name: currentCollectionName
                     };
 
                     if (docData.type === 'paths') {
@@ -5153,7 +5155,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     const payload = {
                         bundle: selectedBundle,
-                        output_modes: outputModes
+                        output_modes: outputModes,
+                        collection_name: currentCollectionName
                     };
 
                     if (docData.type === 'paths') {
@@ -5172,7 +5175,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     const payload = {
                         pipeline: selectedPipeline,
                         output_mode: outputMode,
-                        include_intermediate_outputs: true
+                        include_intermediate_outputs: true,
+                        collection_name: currentCollectionName
                     };
 
                     if (docData.type === 'paths') {
@@ -6968,14 +6972,14 @@ HTML_PAGE = '''<!DOCTYPE html>
                     // Show doc list container
                     document.getElementById('doc-list-container').style.display = 'block';
 
-                    // Save name before closing modal (which clears wsSelectedCollection)
-                    const collectionName = wsSelectedCollection?.name || 'Collection';
+                    // Save collection name globally for analysis requests
+                    currentCollectionName = wsSelectedCollection?.name || null;
 
                     // Close modal
                     closeWebSaverModal();
 
                     // Show success message
-                    showToast(`Imported ${documents.length} documents from "${collectionName}"`);
+                    showToast(`Imported ${documents.length} documents from "${currentCollectionName || 'Collection'}"`);
                 })
                 .catch(error => {
                     alert('Import failed: ' + error.message);

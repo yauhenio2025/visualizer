@@ -5137,7 +5137,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                         id: 'doc_' + (i + 1),
                         title: doc.name,
                         content: doc.content,
-                        encoding: 'text'
+                        encoding: 'text',
+                        // METADATA for citation tooltips
+                        source_name: doc.source_name,
+                        date_published: doc.date_published,
+                        url: doc.url,
+                        authors: doc.authors
                     });
                 }
             }
@@ -7212,7 +7217,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                             content: doc.content,  // Content stored for inline analysis
                             size: sizeStr,
                             wordCount: doc.word_count,
-                            source: doc.source_name || ''
+                            source: doc.source_name || '',
+                            // METADATA for citation tooltips
+                            source_name: doc.source_name,
+                            date_published: doc.date_published,
+                            url: doc.url,
+                            authors: doc.authors
                         });
                     });
 

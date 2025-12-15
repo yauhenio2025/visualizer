@@ -250,10 +250,13 @@ def send_notification(title: str, message: str, tags: str = "visualizer", sound:
         logger.warning(f"Failed to send notification: {e}")
 
 
-def download_file_from_url(url: str, output_path: Path) -> bool:
-    """Download a file from URL to the specified path."""
+def download_file_from_url(url: str, output_path: Path) -> tuple[bool, str]:
+    """Download a file from URL to the specified path.
+
+    Returns: (success, error_message)
+    """
     try:
-        response = requests.get(url, timeout=60, stream=True)
+        response = requests.get(url, timeout=120, stream=True)
         response.raise_for_status()
 
         with open(output_path, 'wb') as f:
@@ -261,10 +264,11 @@ def download_file_from_url(url: str, output_path: Path) -> bool:
                 f.write(chunk)
 
         logger.info(f"Downloaded: {output_path}")
-        return True
+        return True, ""
     except Exception as e:
-        logger.error(f"Failed to download {url}: {e}")
-        return False
+        error_msg = f"Failed to download: {e}"
+        logger.error(f"{error_msg} - URL: {url[:100]}")
+        return False, error_msg
 
 
 # =============================================================================
@@ -573,21 +577,18 @@ def get_results(
     job_dir.mkdir(parents=True, exist_ok=True)
 
     downloaded_files = []
+    download_errors = []
 
     # Handle the CORRECT response structure: outputs.{engine_key}.{image_url|text|...}
     outputs = result.get("outputs", {})
-    logger.info(f"[DEBUG] outputs type: {type(outputs)}, keys: {list(outputs.keys()) if isinstance(outputs, dict) else 'N/A'}")
 
     if isinstance(outputs, dict):
         for engine_key, engine_result in outputs.items():
-            logger.info(f"[DEBUG] Processing engine: {engine_key}, result type: {type(engine_result)}")
             if not isinstance(engine_result, dict):
-                logger.info(f"[DEBUG] Skipping {engine_key} - not a dict")
                 continue
 
             # Check for image_url (visual mode - Gemini image)
             image_url = engine_result.get("image_url")
-            logger.info(f"[DEBUG] {engine_key} image_url: {image_url[:50] if image_url else 'NONE'}...")
             if image_url:
                 # Determine file extension from URL or default to .jpg
                 if ".png" in image_url.lower():
@@ -598,8 +599,11 @@ def get_results(
                     ext = ".jpg"  # Default for S3 images
 
                 file_path = job_dir / f"{engine_key}{ext}"
-                if download_file_from_url(image_url, file_path):
+                success, error = download_file_from_url(image_url, file_path)
+                if success:
                     downloaded_files.append(str(file_path))
+                else:
+                    download_errors.append(f"{engine_key}: {error}")
                 continue
 
             # Check for text content (textual mode)
@@ -616,24 +620,25 @@ def get_results(
             if isinstance(output_data, str):
                 if output_data.startswith("s3://"):
                     # Convert S3 URL to HTTP URL
-                    # s3://bucket-name/path -> https://bucket-name.s3.amazonaws.com/path
                     parts = output_data[5:].split("/", 1)
                     if len(parts) == 2:
                         bucket, key = parts
                         http_url = f"https://{bucket}.s3.amazonaws.com/{key}"
-
-                        # Determine extension
                         ext = ".png" if any(x in key.lower() for x in ['.png', '.jpg', '.jpeg', 'image']) else ".md"
                         file_path = job_dir / f"{engine_key}{ext}"
-
-                        if download_file_from_url(http_url, file_path):
+                        success, error = download_file_from_url(http_url, file_path)
+                        if success:
                             downloaded_files.append(str(file_path))
+                        else:
+                            download_errors.append(f"{engine_key}: {error}")
                 elif output_data.startswith("http"):
-                    # Direct HTTP URL
                     ext = ".png" if any(x in output_data.lower() for x in ['.png', '.jpg', '.jpeg']) else ".md"
                     file_path = job_dir / f"{engine_key}{ext}"
-                    if download_file_from_url(output_data, file_path):
+                    success, error = download_file_from_url(output_data, file_path)
+                    if success:
                         downloaded_files.append(str(file_path))
+                    else:
+                        download_errors.append(f"{engine_key}: {error}")
                 else:
                     # Inline text content
                     file_path = job_dir / f"{engine_key}.md"
@@ -650,8 +655,11 @@ def get_results(
                     if output_data.startswith("http"):
                         ext = ".png" if "image" in output_data.lower() else ".md"
                         file_path = job_dir / f"{engine_key}{ext}"
-                        if download_file_from_url(output_data, file_path):
+                        success, error = download_file_from_url(output_data, file_path)
+                        if success:
                             downloaded_files.append(str(file_path))
+                        else:
+                            download_errors.append(f"{engine_key}: {error}")
                     else:
                         file_path = job_dir / f"{engine_key}.md"
                         file_path.write_text(output_data, encoding='utf-8')
@@ -667,10 +675,7 @@ def get_results(
         "download_directory": str(job_dir),
         "files_downloaded": len(downloaded_files),
         "files": downloaded_files,
-        "_debug": {
-            "outputs_keys": list(outputs.keys()) if isinstance(outputs, dict) else "not_dict",
-            "outputs_type": str(type(outputs))
-        }
+        "errors": download_errors if download_errors else None
     }
 
     # Send notification

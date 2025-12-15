@@ -12,6 +12,7 @@ Or pipe from stdin:
 
 import os
 import sys
+import platform
 # Force unbuffered output
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
@@ -23,6 +24,11 @@ from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Detect OS
+IS_MACOS = platform.system() == 'Darwin'
+IS_LINUX = platform.system() == 'Linux'
+IS_WINDOWS = platform.system() == 'Windows'
+
 # Config
 VISUALIZER_API_URL = os.environ.get('VISUALIZER_API_URL', 'https://visualizer-tw4i.onrender.com')
 OUTPUT_DIR = Path(os.environ.get('VISUALIZER_OUTPUT_DIR', '~/visualizer-results')).expanduser()
@@ -33,60 +39,133 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def send_notification(title: str, message: str, sound: bool = True):
-    """Send notification via native Linux desktop notification + sound."""
-    # 1. Native Linux desktop notification (notify-send)
-    try:
-        subprocess.run(
-            ['notify-send', '--urgency=critical', '--app-name=Visualizer', title, message],
-            timeout=5,
-            capture_output=True
-        )
-        print(f"📢 Notification sent: {title}")
-    except Exception as e:
-        print(f"⚠️  notify-send failed: {e}")
+    """Send notification via native desktop notification + sound (cross-platform)."""
+    notification_sent = False
+    sound_played = False
 
-    # 2. Play sound
-    if sound:
-        # Try multiple sound options
-        sound_files = [
-            '/usr/share/sounds/freedesktop/stereo/complete.oga',
-            '/usr/share/sounds/gnome/default/alerts/drip.ogg',
-            '/usr/share/sounds/ubuntu/stereo/message.ogg',
-            '/usr/share/sounds/sound-icons/trumpet-12.wav',
-        ]
+    # === MACOS ===
+    if IS_MACOS:
+        # 1. macOS notification via osascript
+        try:
+            script = f'display notification "{message}" with title "{title}" sound name "Glass"'
+            subprocess.run(
+                ['osascript', '-e', script],
+                timeout=5,
+                capture_output=True
+            )
+            print(f"📢 Notification sent: {title}")
+            notification_sent = True
+            if sound:
+                sound_played = True  # Sound included in notification
+        except Exception as e:
+            print(f"⚠️  osascript notification failed: {e}")
 
-        sound_played = False
-        for sound_file in sound_files:
-            if Path(sound_file).exists():
+        # 2. macOS sound fallback via afplay
+        if sound and not sound_played:
+            macos_sounds = [
+                '/System/Library/Sounds/Glass.aiff',
+                '/System/Library/Sounds/Ping.aiff',
+                '/System/Library/Sounds/Pop.aiff',
+                '/System/Library/Sounds/Purr.aiff',
+            ]
+            for sound_file in macos_sounds:
+                if Path(sound_file).exists():
+                    try:
+                        result = subprocess.run(
+                            ['afplay', sound_file],
+                            timeout=5,
+                            capture_output=True
+                        )
+                        if result.returncode == 0:
+                            print(f"🔊 Sound played: {sound_file}")
+                            sound_played = True
+                            break
+                    except:
+                        pass
+
+    # === LINUX ===
+    elif IS_LINUX:
+        # 1. Linux notification via notify-send
+        try:
+            subprocess.run(
+                ['notify-send', '--urgency=critical', '--app-name=Visualizer', title, message],
+                timeout=5,
+                capture_output=True
+            )
+            print(f"📢 Notification sent: {title}")
+            notification_sent = True
+        except Exception as e:
+            print(f"⚠️  notify-send failed: {e}")
+
+        # 2. Linux sound via paplay
+        if sound:
+            linux_sounds = [
+                '/usr/share/sounds/freedesktop/stereo/complete.oga',
+                '/usr/share/sounds/freedesktop/stereo/bell.oga',
+                '/usr/share/sounds/gnome/default/alerts/drip.ogg',
+                '/usr/share/sounds/ubuntu/stereo/message.ogg',
+            ]
+            for sound_file in linux_sounds:
+                if Path(sound_file).exists():
+                    try:
+                        result = subprocess.run(
+                            ['paplay', sound_file],
+                            timeout=5,
+                            capture_output=True
+                        )
+                        if result.returncode == 0:
+                            print(f"🔊 Sound played: {sound_file}")
+                            sound_played = True
+                            break
+                    except:
+                        pass
+
+            # Fallback: speaker-test beep
+            if not sound_played:
                 try:
-                    # Try paplay first (PulseAudio)
-                    result = subprocess.run(
-                        ['paplay', sound_file],
-                        timeout=5,
+                    subprocess.run(
+                        ['speaker-test', '-t', 'sine', '-f', '1000', '-l', '1'],
+                        timeout=2,
                         capture_output=True
                     )
-                    if result.returncode == 0:
-                        print(f"🔊 Sound played: {sound_file}")
-                        sound_played = True
-                        break
+                    print("🔊 Beep sound played")
+                    sound_played = True
                 except:
                     pass
 
-        # Fallback: use speaker-test for a beep
-        if not sound_played:
-            try:
-                subprocess.run(
-                    ['speaker-test', '-t', 'sine', '-f', '1000', '-l', '1'],
-                    timeout=2,
-                    capture_output=True
-                )
-                print("🔊 Beep sound played")
-            except:
-                # Final fallback: terminal bell
-                print("\a")  # ASCII bell
-                print("🔔 Terminal bell attempted")
+    # === WINDOWS ===
+    elif IS_WINDOWS:
+        # Windows notification via PowerShell
+        try:
+            ps_script = f'''
+            [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+            $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+            $template.SelectSingleNode("//text[@id='1']").InnerText = "{title}"
+            $template.SelectSingleNode("//text[@id='2']").InnerText = "{message}"
+            [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Visualizer").Show($template)
+            '''
+            subprocess.run(['powershell', '-Command', ps_script], timeout=10, capture_output=True)
+            print(f"📢 Notification sent: {title}")
+            notification_sent = True
+        except:
+            pass
 
-    # 3. Also send to ntfy.sh as backup (for mobile notifications)
+        # Windows sound
+        if sound:
+            try:
+                import winsound
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+                print("🔊 Windows sound played")
+                sound_played = True
+            except:
+                pass
+
+    # === FALLBACK: Terminal bell ===
+    if sound and not sound_played:
+        print("\a")  # ASCII bell
+        print("🔔 Terminal bell attempted")
+
+    # === NTFY.SH for mobile/remote notifications ===
     try:
         requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",

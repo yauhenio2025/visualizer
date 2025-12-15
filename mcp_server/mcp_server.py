@@ -321,12 +321,17 @@ def get_ai_recommendations(
     output = {
         "document": doc["title"],
         "recommendations": result.get("primary_recommendations", []),
+        "bundle_recommendations": result.get("bundle_recommendations", []),
+        "pipeline_recommendations": result.get("pipeline_recommendations", []),
         "document_characteristics": result.get("document_characteristics", {}),
         "analysis_strategy": result.get("analysis_strategy", ""),
-        "curator_note": "The AI has analyzed your document and suggests these engines for optimal insights."
+        "curator_note": "The AI has analyzed your document and suggests these engines, bundles, and pipelines for optimal insights."
     }
 
-    logger.info(f"Got {len(output['recommendations'])} recommendations")
+    num_engines = len(output['recommendations'])
+    num_bundles = len(output['bundle_recommendations'])
+    num_pipelines = len(output['pipeline_recommendations'])
+    logger.info(f"Got {num_engines} engine, {num_bundles} bundle, {num_pipelines} pipeline recommendations")
     return json.dumps(output, indent=2)
 
 

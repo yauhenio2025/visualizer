@@ -242,7 +242,7 @@ def send_notification(title: str, message: str, tags: str = "visualizer", sound:
                 "title": title,
                 "message": message,
                 "tags": tags,
-                "priority": 4 if sound else 3  # 4=high (sound), 3=default (silent)
+                "priority": 4 if sound else 1  # 4=high (sound), 1=min (truly silent)
             },
             timeout=5
         )

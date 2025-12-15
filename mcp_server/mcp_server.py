@@ -225,8 +225,15 @@ def read_document(file_path: str) -> Dict[str, Any]:
     }
 
 
-def send_notification(title: str, message: str, tags: str = "visualizer"):
-    """Send notification via ntfy.sh."""
+def send_notification(title: str, message: str, tags: str = "visualizer", sound: bool = True):
+    """Send notification via ntfy.sh.
+
+    Args:
+        title: Notification title
+        message: Notification body
+        tags: Comma-separated tags
+        sound: If True, plays sound (priority 4). If False, silent (priority 3).
+    """
     try:
         requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
@@ -235,7 +242,7 @@ def send_notification(title: str, message: str, tags: str = "visualizer"):
                 "title": title,
                 "message": message,
                 "tags": tags,
-                "priority": 4
+                "priority": 4 if sound else 3  # 4=high (sound), 3=default (silent)
             },
             timeout=5
         )
@@ -470,11 +477,12 @@ def submit_analysis(
         "message": f"Submitted {len(job_ids)} analysis job(s). Use check_job_status() with each job_id to monitor progress."
     }
 
-    # Send notification
+    # Send notification (silent - no sound for submission)
     send_notification(
         "📊 Analysis Started",
         f"Analyzing {doc['title']} with {len(job_ids)} engine(s)",
-        "visualizer,started"
+        "visualizer,started",
+        sound=False
     )
 
     if auto_monitor:
@@ -862,11 +870,12 @@ def submit_batch_analysis(
             "errors": file_errors if file_errors else None
         })
 
-    # Send notification
+    # Send notification (silent - no sound for submission)
     send_notification(
         "📊 Batch Analysis Started",
         f"Processing {len(files)} documents with {len(engine_keys)} engines ({total_jobs} total jobs)",
-        "visualizer,batch,started"
+        "visualizer,batch,started",
+        sound=False
     )
 
     output = {
@@ -926,16 +935,16 @@ def submit_pipeline_analysis(
         "encoding": doc["encoding"]
     }
 
-    # Submit pipeline analysis
+    # Submit pipeline analysis (use /analyze/pipeline endpoint)
     result = api_request(
         VISUALIZER_API_URL,
         'POST',
-        '/api/analyzer/analyze',
+        '/api/analyzer/analyze/pipeline',
         data={
             "documents": [doc_for_api],
-            "pipeline": pipeline_key,  # Use pipeline instead of engine
+            "pipeline": pipeline_key,
             "output_mode": api_output_mode,
-            "collection_mode": "single",
+            "include_intermediate_outputs": True,
             "llm_keys": llm_keys
         },
         timeout=120
@@ -957,11 +966,12 @@ def submit_pipeline_analysis(
         "message": f"Pipeline '{pipeline_key}' started. Use check_job_status('{job_id}') to monitor progress."
     }
 
-    # Send notification
+    # Send notification (silent - no sound for submission)
     send_notification(
         "🔗 Pipeline Analysis Started",
         f"Running pipeline '{pipeline_key}' on {doc['title']}",
-        "visualizer,pipeline,started"
+        "visualizer,pipeline,started",
+        sound=False
     )
 
     logger.info(f"Pipeline submitted: {job_id}")

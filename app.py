@@ -5966,8 +5966,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function makeFootnotesInteractive(container, documents) {
             /**
-             * Convert superscript footnotes to interactive, clickable citations with hover previews.
-             * Matches superscript numbers (¹²³⁴⁵⁶⁷⁸⁹⁰) and wraps them with citation spans.
+             * Convert unicode superscript footnotes to interactive, clickable citations with hover previews.
+             * Handles RAW unicode superscripts (¹²³⁴⁵⁶⁷⁸⁹⁰) in text, not just <sup> elements.
              */
 
             // Unicode superscript mapping
@@ -5985,55 +5985,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 return parseInt(result, 10);
             }
 
-            // Find all superscript elements in the content (excluding Sources/References section)
-            var supElements = container.querySelectorAll('sup');
-            supElements.forEach(function(sup) {
-                // Check if this is in the Sources/References section - skip those
-                var parent = sup.parentElement;
-                while (parent && parent !== container) {
-                    if (parent.tagName === 'H2') {
-                        var headerText = parent.textContent.toLowerCase();
-                        if (headerText.includes('source') || headerText.includes('reference')) {
-                            return; // Skip footnotes in Sources/References section
-                        }
-                    }
-                    parent = parent.parentElement;
-                }
-
-                // Check if we're after a Sources/References heading
-                var prevHeading = null;
-                var node = sup.parentElement;
-                while (node && node.previousElementSibling) {
-                    if (node.previousElementSibling.tagName === 'H2') {
-                        prevHeading = node.previousElementSibling;
-                        break;
-                    }
-                    node = node.previousElementSibling;
-                }
-                if (prevHeading) {
-                    var headingText = prevHeading.textContent.toLowerCase();
-                    if (headingText.includes('source') || headingText.includes('reference')) {
-                        return; // Skip if after Sources/References section
-                    }
-                }
-
-                var supText = sup.textContent.trim();
-                if (!supText) return;
-
-                // Convert superscript to article number
-                var articleNum = superscriptToNumber(supText);
-                if (isNaN(articleNum) || articleNum < 1 || articleNum > documents.length) {
-                    return; // Invalid article number
-                }
-
-                // Get article info (1-indexed)
-                var article = documents[articleNum - 1];
-                if (!article) return;
-
-                // Create citation span
+            function createCitation(superscriptChar, article, articleNum) {
                 var citation = document.createElement('span');
                 citation.className = 'citation';
-                citation.innerHTML = '<sup>' + supText + '</sup>';
+                citation.textContent = superscriptChar;
 
                 // Add metadata as data attributes
                 citation.setAttribute('data-article-id', article.id || articleNum);
@@ -6050,8 +6005,92 @@ HTML_PAGE = '''<!DOCTYPE html>
                     viewArticleFromCitation(article.id || articleNum);
                 };
 
-                // Replace the original sup with our interactive citation
-                sup.parentNode.replaceChild(citation, sup);
+                return citation;
+            }
+
+            // Find the Sources/References section to avoid processing it
+            var sourcesSection = null;
+            var headings = container.querySelectorAll('h2');
+            for (var i = 0; i < headings.length; i++) {
+                var h2Text = headings[i].textContent.toLowerCase();
+                if (h2Text.includes('source') || h2Text.includes('reference')) {
+                    sourcesSection = headings[i];
+                    break;
+                }
+            }
+
+            // Process all text nodes, replacing unicode superscripts with citation spans
+            var walker = document.createTreeWalker(
+                container,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: function(node) {
+                        // Skip if this text node is after the Sources section
+                        if (sourcesSection) {
+                            var compareResult = sourcesSection.compareDocumentPosition(node);
+                            if (compareResult & Node.DOCUMENT_POSITION_FOLLOWING) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                        }
+                        // Only process text nodes that contain superscript characters
+                        if (/[⁰¹²³⁴⁵⁶⁷⁸⁹]/.test(node.textContent)) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            );
+
+            var textNodes = [];
+            while (walker.nextNode()) {
+                textNodes.push(walker.currentNode);
+            }
+
+            // Replace superscripts in each text node
+            textNodes.forEach(function(textNode) {
+                var text = textNode.textContent;
+                var regex = /[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g;
+                var match;
+                var parts = [];
+                var lastIndex = 0;
+
+                while ((match = regex.exec(text)) !== null) {
+                    // Add text before the match
+                    if (match.index > lastIndex) {
+                        parts.push(document.createTextNode(text.substring(lastIndex, match.index)));
+                    }
+
+                    // Convert superscript to article number
+                    var superscriptStr = match[0];
+                    var articleNum = superscriptToNumber(superscriptStr);
+
+                    if (articleNum >= 1 && articleNum <= documents.length) {
+                        var article = documents[articleNum - 1];
+                        if (article) {
+                            parts.push(createCitation(superscriptStr, article, articleNum));
+                        } else {
+                            parts.push(document.createTextNode(superscriptStr));
+                        }
+                    } else {
+                        parts.push(document.createTextNode(superscriptStr));
+                    }
+
+                    lastIndex = regex.lastIndex;
+                }
+
+                // Add remaining text
+                if (lastIndex < text.length) {
+                    parts.push(document.createTextNode(text.substring(lastIndex)));
+                }
+
+                // Replace the text node with the new parts
+                if (parts.length > 0) {
+                    var parent = textNode.parentNode;
+                    parts.forEach(function(part) {
+                        parent.insertBefore(part, textNode);
+                    });
+                    parent.removeChild(textNode);
+                }
             });
         }
 

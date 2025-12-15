@@ -576,14 +576,18 @@ def get_results(
 
     # Handle the CORRECT response structure: outputs.{engine_key}.{image_url|text|...}
     outputs = result.get("outputs", {})
+    logger.info(f"[DEBUG] outputs type: {type(outputs)}, keys: {list(outputs.keys()) if isinstance(outputs, dict) else 'N/A'}")
 
     if isinstance(outputs, dict):
         for engine_key, engine_result in outputs.items():
+            logger.info(f"[DEBUG] Processing engine: {engine_key}, result type: {type(engine_result)}")
             if not isinstance(engine_result, dict):
+                logger.info(f"[DEBUG] Skipping {engine_key} - not a dict")
                 continue
 
             # Check for image_url (visual mode - Gemini image)
             image_url = engine_result.get("image_url")
+            logger.info(f"[DEBUG] {engine_key} image_url: {image_url[:50] if image_url else 'NONE'}...")
             if image_url:
                 # Determine file extension from URL or default to .jpg
                 if ".png" in image_url.lower():
@@ -662,7 +666,11 @@ def get_results(
         "job_id": job_id,
         "download_directory": str(job_dir),
         "files_downloaded": len(downloaded_files),
-        "files": downloaded_files
+        "files": downloaded_files,
+        "_debug": {
+            "outputs_keys": list(outputs.keys()) if isinstance(outputs, dict) else "not_dict",
+            "outputs_type": str(type(outputs))
+        }
     }
 
     # Send notification

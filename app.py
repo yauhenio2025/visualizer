@@ -1087,11 +1087,21 @@ def submit_analysis():
                 content = extract_pdf_from_base64(content)
 
             if content and not content.startswith('[Error'):
-                documents.append({
+                doc_entry = {
                     "id": doc_id,
                     "title": title,
-                    "content": content
-                })
+                    "content": content,
+                }
+                # Pass through citation metadata for footnotes
+                if doc.get('authors'):
+                    doc_entry['authors'] = doc['authors']
+                if doc.get('source_name'):
+                    doc_entry['source_name'] = doc['source_name']
+                if doc.get('date_published'):
+                    doc_entry['date_published'] = doc['date_published']
+                if doc.get('url'):
+                    doc_entry['url'] = doc['url']
+                documents.append(doc_entry)
             else:
                 errors.append(f"Failed to extract content from {title}")
 
@@ -1239,11 +1249,21 @@ def submit_bundle_analysis():
                 content = extract_pdf_from_base64(content)
 
             if content and not content.startswith('[Error'):
-                documents.append({
+                doc_entry = {
                     "id": doc_id,
                     "title": title,
-                    "content": content
-                })
+                    "content": content,
+                }
+                # Pass through citation metadata for footnotes
+                if doc.get('authors'):
+                    doc_entry['authors'] = doc['authors']
+                if doc.get('source_name'):
+                    doc_entry['source_name'] = doc['source_name']
+                if doc.get('date_published'):
+                    doc_entry['date_published'] = doc['date_published']
+                if doc.get('url'):
+                    doc_entry['url'] = doc['url']
+                documents.append(doc_entry)
             else:
                 errors.append(f"Failed to extract content from {title}")
 
@@ -1334,11 +1354,21 @@ def submit_pipeline_analysis():
                 content = extract_pdf_from_base64(content)
 
             if content and not content.startswith('[Error'):
-                documents.append({
+                doc_entry = {
                     "id": doc_id,
                     "title": title,
-                    "content": content
-                })
+                    "content": content,
+                }
+                # Pass through citation metadata for footnotes
+                if doc.get('authors'):
+                    doc_entry['authors'] = doc['authors']
+                if doc.get('source_name'):
+                    doc_entry['source_name'] = doc['source_name']
+                if doc.get('date_published'):
+                    doc_entry['date_published'] = doc['date_published']
+                if doc.get('url'):
+                    doc_entry['url'] = doc['url']
+                documents.append(doc_entry)
             else:
                 errors.append(f"Failed to extract content from {title}")
 

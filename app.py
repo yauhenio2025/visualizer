@@ -3831,7 +3831,12 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-weight: 600;
             font-size: 1rem;
             color: var(--text);
-            text-transform: capitalize;
+            text-decoration: none;
+            display: block;
+        }
+        a.job-group-pipeline-name:hover {
+            color: var(--accent);
+            text-decoration: underline;
         }
         .job-group-pipeline-type {
             font-size: 0.7rem;
@@ -8016,12 +8021,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<span class="job-group-toggle">▼</span>' +
                 '<div class="job-group-pipeline">' +
                     '<div class="job-group-pipeline-type">' + pipelineType + '</div>' +
-                    '<div class="job-group-pipeline-name">' + pipelineName.replace(/_/g, ' ') + '</div>' +
+                    '<a href="/job/' + jobId + '" class="job-group-pipeline-name" onclick="event.stopPropagation();">' + pipelineName.replace(/_/g, ' ') + '</a>' +
                 '</div>' +
                 '<div class="job-group-meta">' +
                     '<span class="job-group-count">' + uniqueItems.length + ' outputs</span>' +
                     '<span class="job-group-date">' + dateStr + '</span>' +
-                    '<button class="job-group-view btn btn-primary btn-sm" onclick="event.stopPropagation(); navigateToJob(&apos;' + jobId + '&apos;)" title="View full job">View</button>' +
                     '<button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(&apos;' + jobId + '&apos;)" title="Delete job">&times;</button>' +
                 '</div>' +
             '</div>';

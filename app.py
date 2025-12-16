@@ -6725,7 +6725,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 .replace(/^# (.+)$/gm, '<h1>$1</h1>')
                 .replace(boldRe, '<strong>$1</strong>')
                 .replace(italicRe, '<em>$1</em>')
-                .replace(/\n\n/g, '</p><p>')
+                .replace(new RegExp('\\n\\n', 'g'), '</p><p>')
                 .replace(/^/, '<p>')
                 .replace(/$/, '</p>');
         }

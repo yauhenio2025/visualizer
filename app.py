@@ -3184,41 +3184,48 @@ HTML_PAGE = '''<!DOCTYPE html>
             display: none;
         }
 
-        /* Image Panel Content */
+        /* Image Panel Content - Full width, stacked vertically */
         .image-panel-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
-            gap: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
         }
         .image-panel-item {
             background: var(--bg-card);
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .image-panel-item img {
             width: 100%;
             height: auto;
             display: block;
-            cursor: pointer;
-            transition: transform 0.2s;
+            cursor: zoom-in;
+            transition: opacity 0.2s;
         }
         .image-panel-item:hover img {
-            transform: scale(1.02);
+            opacity: 0.95;
         }
         .image-panel-item-footer {
-            padding: 1rem 1.25rem;
+            padding: 1rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         }
         .image-panel-item-title {
-            font-size: 0.9rem;
+            font-size: 1rem;
             font-weight: 500;
-            color: var(--text);
+            color: white;
+        }
+        .image-panel-item-footer .btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .image-panel-item-footer .btn:hover {
+            background: rgba(255,255,255,0.25);
         }
 
         /* Table Panel Content */
@@ -3271,44 +3278,43 @@ HTML_PAGE = '''<!DOCTYPE html>
             background: var(--bg-input);
         }
 
-        /* Text/Memo Panel Content */
+        /* Text/Memo Panel Content - Full width, stacked vertically */
         .text-panel-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-            gap: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
         }
         .text-section {
             background: var(--bg-card);
             border-radius: 12px;
             border: 1px solid var(--border);
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .text-section-title {
             font-weight: 600;
+            font-size: 1rem;
             color: white;
-            padding: 1rem 1.25rem;
+            padding: 1rem 1.5rem;
             background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
         }
         .text-section-content {
-            padding: 1.5rem;
-            font-size: 0.95rem;
-            line-height: 1.8;
+            padding: 2rem;
+            font-size: 1rem;
+            line-height: 1.9;
             color: var(--text);
-            max-height: 500px;
-            overflow-y: auto;
         }
         .text-section-content h1, .text-section-content h2, .text-section-content h3 {
             color: var(--text);
-            margin-top: 1.25rem;
+            margin-top: 1.5rem;
             margin-bottom: 0.75rem;
             font-weight: 600;
         }
-        .text-section-content h1 { font-size: 1.4rem; }
-        .text-section-content h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem; }
-        .text-section-content h3 { font-size: 1.05rem; }
-        .text-section-content p { margin-bottom: 1rem; }
-        .text-section-content strong { color: var(--text); }
+        .text-section-content h1 { font-size: 1.5rem; }
+        .text-section-content h2 { font-size: 1.25rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+        .text-section-content h3 { font-size: 1.1rem; color: var(--text-secondary); }
+        .text-section-content p { margin-bottom: 1.25rem; }
+        .text-section-content strong { color: var(--text); font-weight: 600; }
 
         /* Job Info Header */
         .job-info-header {
@@ -3377,6 +3383,75 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--accent);
             font-size: 0.8rem;
             cursor: pointer;
+        }
+
+        /* Document metadata table */
+        .job-info-docs-label {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .job-info-docs-label .collection-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .job-info-docs-label .docs-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .job-docs-table-wrap {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+        }
+        .job-docs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .job-docs-table td {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border-light);
+            vertical-align: top;
+        }
+        .job-docs-table tr:last-child td {
+            border-bottom: none;
+        }
+        .job-docs-table tr:hover {
+            background: var(--bg-input);
+        }
+        .job-doc-title {
+            font-weight: 500;
+            color: var(--text);
+            max-width: 400px;
+        }
+        .job-doc-source {
+            color: var(--accent);
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .job-doc-author {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .job-doc-date {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .job-docs-more {
+            padding: 0.75rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
         }
 
         /* Job Process Details */
@@ -4459,6 +4534,97 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-size: 0.8rem;
             font-weight: 500;
         }
+
+        /* Lightbox Modal */
+        .lightbox-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .lightbox-modal.active {
+            display: flex;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            z-index: 10001;
+        }
+        .lightbox-close:hover {
+            opacity: 1;
+        }
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 30px;
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            cursor: pointer;
+            padding: 20px 15px;
+            border-radius: 4px;
+            opacity: 0.7;
+            transition: all 0.2s;
+            z-index: 10001;
+        }
+        .lightbox-nav:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.2);
+        }
+        .lightbox-prev { left: 20px; }
+        .lightbox-next { right: 20px; }
+        .lightbox-content {
+            max-width: 90vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .lightbox-content img {
+            max-width: 100%;
+            max-height: calc(85vh - 60px);
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+        }
+        .lightbox-caption {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            padding: 0 1rem;
+        }
+        .lightbox-title {
+            color: white;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        .lightbox-actions .btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .lightbox-actions .btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -4803,6 +4969,66 @@ HTML_PAGE = '''<!DOCTYPE html>
         let allResults = [];
         let currentCollectionName = null;  // Track imported collection name
         let libraryItems = [];
+        let currentLightboxIndex = 0;
+
+        // Lightbox functions
+        function openLightbox(index) {
+            var imageResults = allResults.filter(function(r) { return r.isImage && r.imageUrl; });
+            if (imageResults.length === 0) return;
+
+            // Find the actual index in imageResults
+            var item = allResults[index];
+            currentLightboxIndex = imageResults.findIndex(function(r) { return r === item; });
+            if (currentLightboxIndex === -1) currentLightboxIndex = 0;
+
+            showLightboxImage(currentLightboxIndex);
+            document.getElementById('lightbox-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('lightbox-modal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function navigateLightbox(direction) {
+            var imageResults = allResults.filter(function(r) { return r.isImage && r.imageUrl; });
+            if (imageResults.length === 0) return;
+
+            currentLightboxIndex += direction;
+            if (currentLightboxIndex < 0) currentLightboxIndex = imageResults.length - 1;
+            if (currentLightboxIndex >= imageResults.length) currentLightboxIndex = 0;
+
+            showLightboxImage(currentLightboxIndex);
+        }
+
+        function showLightboxImage(index) {
+            var imageResults = allResults.filter(function(r) { return r.isImage && r.imageUrl; });
+            if (index < 0 || index >= imageResults.length) return;
+
+            var item = imageResults[index];
+            document.getElementById('lightbox-image').src = item.imageUrl;
+            document.getElementById('lightbox-title').textContent = item.title || 'Visualization';
+        }
+
+        function downloadLightboxImage() {
+            var imageResults = allResults.filter(function(r) { return r.isImage && r.imageUrl; });
+            if (currentLightboxIndex < 0 || currentLightboxIndex >= imageResults.length) return;
+
+            var item = imageResults[currentLightboxIndex];
+            downloadImage(item.imageUrl, item.key || 'visualization');
+        }
+
+        // Keyboard navigation for lightbox
+        document.addEventListener('keydown', function(e) {
+            var modal = document.getElementById('lightbox-modal');
+            if (!modal || !modal.classList.contains('active')) return;
+
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') navigateLightbox(-1);
+            if (e.key === 'ArrowRight') navigateLightbox(1);
+        });
 
         // Progress tracking
         let currentDocCount = 0;
@@ -6790,7 +7016,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 pipelineDiv.innerHTML = html;
             }
 
-            // Documents info
+            // Documents info with full metadata
             var docs = extInfo.documents || [];
             var total = extInfo.documents_total || docs.length;
             var collectionName = extInfo.collection_name;
@@ -6799,20 +7025,40 @@ HTML_PAGE = '''<!DOCTYPE html>
                 hasContent = true;
                 var docsHtml = '<div class="job-info-docs-label">';
                 if (collectionName) {
-                    docsHtml += 'Collection: <strong>' + collectionName + '</strong> (' + total + ' documents)';
-                } else {
-                    docsHtml += 'Documents analyzed (' + total + ')';
+                    docsHtml += '<span class="collection-name">' + collectionName + '</span>';
                 }
+                docsHtml += '<span class="docs-count">' + total + ' document' + (total !== 1 ? 's' : '') + ' analyzed</span>';
                 docsHtml += '</div>';
-                docsHtml += '<div class="job-info-docs-list">';
-                var showCount = Math.min(docs.length, 10);
+
+                // Show documents as a proper table with metadata
+                docsHtml += '<div class="job-docs-table-wrap"><table class="job-docs-table"><tbody>';
+                var showCount = Math.min(docs.length, 15);
                 for (var i = 0; i < showCount; i++) {
-                    docsHtml += '<span class="job-info-doc">' + docs[i].title + '</span>';
+                    var doc = docs[i];
+                    var dateStr = '';
+                    if (doc.date_published) {
+                        try {
+                            var d = new Date(doc.date_published);
+                            dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        } catch(e) { dateStr = doc.date_published; }
+                    }
+                    var sourceDisplay = doc.source_name || '';
+                    if (!sourceDisplay && doc.url) {
+                        try { sourceDisplay = new URL(doc.url).hostname.replace('www.', ''); } catch(e) {}
+                    }
+
+                    docsHtml += '<tr class="job-doc-row">';
+                    docsHtml += '<td class="job-doc-title">' + (doc.title || 'Untitled') + '</td>';
+                    docsHtml += '<td class="job-doc-source">' + (sourceDisplay || '—') + '</td>';
+                    docsHtml += '<td class="job-doc-author">' + (doc.authors || '—') + '</td>';
+                    docsHtml += '<td class="job-doc-date">' + (dateStr || '—') + '</td>';
+                    docsHtml += '</tr>';
                 }
+                docsHtml += '</tbody></table></div>';
+
                 if (total > showCount) {
-                    docsHtml += '<span class="job-info-more">+' + (total - showCount) + ' more</span>';
+                    docsHtml += '<div class="job-docs-more">+' + (total - showCount) + ' more documents</div>';
                 }
-                docsHtml += '</div>';
                 docsDiv.innerHTML = docsHtml;
             }
 
@@ -8672,6 +8918,22 @@ HTML_PAGE = '''<!DOCTYPE html>
     <div class="citation-preview" id="citation-preview">
         <div class="citation-preview-title" id="preview-title"></div>
         <div class="citation-preview-meta" id="preview-meta"></div>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="lightbox-modal" class="lightbox-modal" onclick="closeLightbox(event)">
+        <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+        <button class="lightbox-nav lightbox-prev" onclick="event.stopPropagation(); navigateLightbox(-1)">&#10094;</button>
+        <button class="lightbox-nav lightbox-next" onclick="event.stopPropagation(); navigateLightbox(1)">&#10095;</button>
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <img id="lightbox-image" src="" alt="">
+            <div class="lightbox-caption">
+                <div class="lightbox-title" id="lightbox-title"></div>
+                <div class="lightbox-actions">
+                    <button class="btn btn-sm" onclick="downloadLightboxImage()">Download</button>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

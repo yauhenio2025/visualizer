@@ -3324,7 +3324,17 @@ HTML_PAGE = '''<!DOCTYPE html>
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
+        .job-info-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .job-info-actions {
+            flex-shrink: 0;
+        }
         .job-info-pipeline {
+            flex: 1;
             margin-bottom: 1rem;
         }
         .job-info-pipeline-name {
@@ -4869,7 +4879,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     <div id="results-gallery" class="results-gallery" style="display:none;">
                         <!-- Job Info Header -->
                         <div id="job-info-header" class="job-info-header" style="display:none;">
-                            <div class="job-info-pipeline"></div>
+                            <div class="job-info-top-bar">
+                                <div class="job-info-pipeline"></div>
+                                <div class="job-info-actions">
+                                    <button class="btn btn-primary" onclick="openJobInNewTab()">Open Full View</button>
+                                </div>
+                            </div>
                             <div class="job-info-docs"></div>
                         </div>
 
@@ -5386,6 +5401,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     btn.textContent = '✓';
                     setTimeout(function() { btn.textContent = originalText; }, 1000);
                 });
+            }
+        }
+
+        // Open job in full view (new tab)
+        function openJobInNewTab() {
+            if (currentJobId) {
+                window.open('/job/' + currentJobId, '_blank');
             }
         }
 

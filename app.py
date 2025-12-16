@@ -6587,9 +6587,28 @@ HTML_PAGE = '''<!DOCTYPE html>
             images.forEach(function(img, idx) {
                 var item = document.createElement('div');
                 item.className = 'image-panel-item';
-                item.innerHTML = '<img src="' + img.imageUrl + '" alt="' + img.title + '" onclick="openLightbox(' + (allResults.indexOf(img)) + ')">' +
-                    '<div class="image-panel-item-footer"><span class="image-panel-item-title">' + img.title + '</span>' +
-                    '<button class="btn btn-sm" onclick="downloadImage(\'' + img.imageUrl + '\', \'' + img.key + '\')">Download</button></div>';
+
+                var imgEl = document.createElement('img');
+                imgEl.src = img.imageUrl;
+                imgEl.alt = img.title;
+                imgEl.onclick = function() { openLightbox(allResults.indexOf(img)); };
+
+                var footer = document.createElement('div');
+                footer.className = 'image-panel-item-footer';
+
+                var titleSpan = document.createElement('span');
+                titleSpan.className = 'image-panel-item-title';
+                titleSpan.textContent = img.title;
+
+                var downloadBtn = document.createElement('button');
+                downloadBtn.className = 'btn btn-sm';
+                downloadBtn.textContent = 'Download';
+                downloadBtn.onclick = function() { downloadImage(img.imageUrl, img.key); };
+
+                footer.appendChild(titleSpan);
+                footer.appendChild(downloadBtn);
+                item.appendChild(imgEl);
+                item.appendChild(footer);
                 gridEl.appendChild(item);
             });
             return panel;

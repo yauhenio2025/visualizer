@@ -1434,6 +1434,213 @@ def submit_pipeline_analysis():
         })
 
 
+@app.route('/api/analyzer/analyze/intent', methods=['POST'])
+def submit_intent_analysis():
+    """
+    Submit documents for intent-based analysis.
+
+    This endpoint:
+    1. Classifies the user's natural language intent
+    2. Gets AI recommendations for the best engine
+    3. Submits analysis with multi-output support
+
+    Request:
+    {
+        "documents": [...] or "file_paths": [...],
+        "intent": "Map the key stakeholders",
+        "output_modes": ["gemini_image", "smart_table", "text"]
+    }
+    """
+    data = request.json or {}
+    file_paths = data.get('file_paths', [])
+    inline_documents = data.get('documents', [])
+    intent = data.get('intent', '')
+    output_modes = data.get('output_modes', ['gemini_image'])
+    llm_keys = data.get('llm_keys')
+
+    if not file_paths and not inline_documents:
+        return jsonify({"success": False, "error": "No files provided"})
+
+    if not intent or len(intent.strip()) < 10:
+        return jsonify({"success": False, "error": "Please provide a description of what you want to understand"})
+
+    documents = []
+    errors = []
+
+    # Handle inline documents (from browser upload)
+    if inline_documents:
+        for i, doc in enumerate(inline_documents):
+            doc_id = doc.get('id', f'doc_{i+1}')
+            title = doc.get('title', f'Document {i+1}')
+            content = doc.get('content', '')
+            encoding = doc.get('encoding', 'text')
+
+            if encoding == 'base64':
+                content = extract_pdf_from_base64(content)
+
+            if content and not content.startswith('[Error'):
+                doc_entry = {
+                    "id": doc_id,
+                    "title": title,
+                    "content": content,
+                }
+                # Pass through citation metadata
+                if doc.get('authors'):
+                    doc_entry['authors'] = doc['authors']
+                if doc.get('source_name'):
+                    doc_entry['source_name'] = doc['source_name']
+                if doc.get('date_published'):
+                    doc_entry['date_published'] = doc['date_published']
+                if doc.get('url'):
+                    doc_entry['url'] = doc['url']
+                documents.append(doc_entry)
+            else:
+                errors.append(f"Failed to extract content from {title}")
+
+    # Handle file paths
+    else:
+        for i, path in enumerate(file_paths):
+            content = extract_text_from_file(path)
+            filename = os.path.basename(path)
+
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": f"doc_{i+1}",
+                    "title": filename,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to read {filename}: {content}")
+
+    if not documents:
+        return jsonify({
+            "success": False,
+            "error": "No valid documents could be processed",
+            "details": errors
+        })
+
+    # Build headers for analyzer API
+    headers = get_analyzer_headers()
+
+    # Forward user-provided LLM API keys if present
+    if llm_keys:
+        if llm_keys.get('anthropic_api_key'):
+            headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
+        if llm_keys.get('gemini_api_key'):
+            headers['X-Gemini-Api-Key'] = llm_keys['gemini_api_key']
+
+    result = {
+        "intent": intent,
+        "document_count": len(documents),
+        "output_modes": output_modes,
+    }
+
+    try:
+        # Step 1: Classify intent
+        intent_response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/classify-intent",
+            json={"user_request": intent},
+            headers=headers,
+            timeout=30.0,
+        )
+        intent_response.raise_for_status()
+        intent_data = intent_response.json()
+        result["classified_intent"] = {
+            "verb": intent_data.get("primary_verb"),
+            "noun": intent_data.get("primary_noun"),
+            "confidence": intent_data.get("confidence"),
+        }
+        print(f"[INTENT] Classified: {intent_data.get('primary_verb')} + {intent_data.get('primary_noun')}")
+
+    except Exception as e:
+        print(f"[INTENT] Classification failed: {e}")
+        result["classified_intent"] = {"error": str(e)}
+
+    try:
+        # Step 2: Get AI recommendations with intent
+        sample_text = "\n\n---\n\n".join([
+            f"[{d['title']}]\n{d['content'][:500]}"
+            for d in documents[:5]
+        ])
+
+        recommend_data = {
+            "sample_text": sample_text,
+            "analysis_goal": intent,
+            "max_recommendations": 3,
+        }
+
+        # Add intent if we have it
+        if result.get("classified_intent") and not result["classified_intent"].get("error"):
+            recommend_data["intent"] = {
+                "verb": result["classified_intent"]["verb"],
+                "noun": result["classified_intent"]["noun"],
+            }
+
+        recommend_response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/recommend",
+            json=recommend_data,
+            headers=headers,
+            timeout=60.0,
+        )
+        recommend_response.raise_for_status()
+        recommend_result = recommend_response.json()
+
+        # Get top engine recommendation
+        recommendations = recommend_result.get("primary_recommendations", [])
+        if not recommendations:
+            return jsonify({"success": False, "error": "No engine recommendations returned"})
+
+        top_engine = recommendations[0]
+        engine_key = top_engine.get("engine_key")
+        result["selected_engine"] = {
+            "engine_key": engine_key,
+            "engine_name": top_engine.get("engine_name"),
+            "confidence": top_engine.get("confidence"),
+            "rationale": top_engine.get("rationale"),
+        }
+        print(f"[INTENT] Selected engine: {engine_key}")
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Engine recommendation failed: {str(e)}",
+            **result,
+        })
+
+    try:
+        # Step 3: Submit analysis with multi-output
+        primary_output_mode = output_modes[0] if output_modes else "gemini_image"
+
+        analyze_response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/analyze",
+            json={
+                "documents": documents,
+                "engine": engine_key,
+                "output_mode": primary_output_mode,
+                "output_modes": output_modes,  # Multi-output support
+            },
+            headers=headers,
+            timeout=30.0,
+        )
+        analyze_response.raise_for_status()
+        job_data = analyze_response.json()
+
+        result["success"] = True
+        result["job_id"] = job_data.get("job_id")
+        result["warnings"] = errors if errors else None
+
+        print(f"[INTENT] Job submitted: {job_data.get('job_id')}")
+
+        return jsonify(result)
+
+    except httpx.HTTPError as e:
+        return jsonify({
+            "success": False,
+            "error": f"Analysis submission failed: {str(e)}",
+            **result,
+        })
+
+
 @app.route('/api/analyzer/jobs/<job_id>', methods=['GET'])
 def get_analysis_job(job_id):
     """Get job status from Analyzer API."""
@@ -2342,6 +2549,164 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         .category-tab .cat-icon { font-size: 1em; }
         .category-tab .cat-count { opacity: 0.7; }
+
+        /* Intent-Based Analysis Styles */
+        .intent-section {
+            padding: 1rem 0;
+        }
+
+        .intent-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            resize: vertical;
+            color: var(--text);
+        }
+
+        .intent-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .intent-input::placeholder {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .intent-quick-picks {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .quick-pick-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .intent-chip {
+            padding: 0.4rem 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.15s;
+            color: var(--text);
+        }
+
+        .intent-chip:hover {
+            border-color: var(--accent);
+            background: var(--bg-card);
+        }
+
+        .intent-classification {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: rgba(45, 125, 70, 0.08);
+            border: 1px solid rgba(45, 125, 70, 0.2);
+            border-radius: var(--radius);
+        }
+
+        .classification-header {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .classification-content {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .verb-badge, .noun-badge {
+            padding: 0.25rem 0.6rem;
+            background: var(--accent);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .noun-badge {
+            background: var(--success);
+        }
+
+        .confidence-badge {
+            padding: 0.25rem 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .intent-recommendation {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .recommendation-header {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .rec-engine-name {
+            font-family: 'Libre Baskerville', Georgia, serif;
+            font-size: 1.1rem;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .rec-engine-rationale {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .intent-outputs {
+            margin-top: 1.5rem;
+        }
+
+        .output-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .output-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .output-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
 
         /* Curator Section */
         .curator-section {
@@ -3988,8 +4353,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     <div class="card">
                         <h2 class="card-header">Analysis Engine</h2>
 
-                        <!-- Engine vs Bundle vs Pipeline Toggle -->
+                        <!-- Engine vs Bundle vs Pipeline vs Intent Toggle -->
                         <div class="mode-toggle">
+                            <div class="mode-btn" onclick="setEngineMode('intent')" id="engine-mode-intent">
+                                <div class="title">🎯 Intent-Based</div>
+                                <div class="desc">Describe what you want</div>
+                            </div>
                             <div class="mode-btn active" onclick="setEngineMode('engine')" id="engine-mode-single">
                                 <div class="title">Single Engine</div>
                                 <div class="desc">One analytical lens</div>
@@ -4018,6 +4387,63 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <!-- Category Filter Tabs -->
                         <div id="category-tabs" class="category-tabs"></div>
 
+                        <!-- Intent-Based Analysis (NEW) -->
+                        <div id="intent-selection" style="display:none;">
+                            <div class="intent-section">
+                                <span class="section-label">What do you want to understand?</span>
+                                <textarea id="intent-input" class="intent-input" placeholder="Examples:
+• Map the key players and their relationships
+• Trace how this concept evolved over time
+• Compare approaches across different jurisdictions
+• Find gaps in the current research
+• Track the money flows
+• Evaluate the strength of the arguments
+• Synthesize the main themes"></textarea>
+
+                                <div class="intent-quick-picks">
+                                    <span class="quick-pick-label">Quick picks:</span>
+                                    <button class="intent-chip" onclick="setIntentQuick('Map the key stakeholders and their power dynamics')">🎯 Map Stakeholders</button>
+                                    <button class="intent-chip" onclick="setIntentQuick('Trace how this concept evolved over time')">📈 Trace Evolution</button>
+                                    <button class="intent-chip" onclick="setIntentQuick('Evaluate the strength of arguments')">⚖️ Evaluate Arguments</button>
+                                    <button class="intent-chip" onclick="setIntentQuick('Synthesize the main themes across documents')">🔍 Synthesize Themes</button>
+                                    <button class="intent-chip" onclick="setIntentQuick('Find gaps in the research or discussion')">🕳️ Find Gaps</button>
+                                    <button class="intent-chip" onclick="setIntentQuick('Compare approaches across sources')">⚔️ Compare</button>
+                                </div>
+
+                                <div id="intent-classification" class="intent-classification" style="display:none;">
+                                    <div class="classification-header">AI Understanding:</div>
+                                    <div class="classification-content">
+                                        <span class="verb-badge" id="intent-verb"></span>
+                                        <span class="noun-badge" id="intent-noun"></span>
+                                        <span class="confidence-badge" id="intent-confidence"></span>
+                                    </div>
+                                </div>
+
+                                <div id="intent-engine-recommendation" class="intent-recommendation" style="display:none;">
+                                    <div class="recommendation-header">Selected Engine:</div>
+                                    <div class="recommendation-content">
+                                        <div class="rec-engine-name" id="rec-engine-name"></div>
+                                        <div class="rec-engine-rationale" id="rec-engine-rationale"></div>
+                                    </div>
+                                </div>
+
+                                <div class="intent-outputs">
+                                    <span class="section-label">Output Formats (select all that apply)</span>
+                                    <div class="output-checkboxes">
+                                        <label class="output-checkbox">
+                                            <input type="checkbox" id="output-image" checked> 🖼️ Visual (4K image)
+                                        </label>
+                                        <label class="output-checkbox">
+                                            <input type="checkbox" id="output-table" checked> 📊 Smart Table
+                                        </label>
+                                        <label class="output-checkbox">
+                                            <input type="checkbox" id="output-text" checked> 📝 Text Report
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Single Engine Selection -->
                         <div id="engine-selection">
                             <span class="section-label">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
@@ -4037,8 +4463,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <div id="pipeline-list" class="pipeline-list"></div>
                         </div>
 
-                        <!-- Output Mode -->
-                        <div class="output-select">
+                        <!-- Output Mode (hidden for intent mode) -->
+                        <div class="output-select" id="output-mode-section">
                             <span class="section-label">Output Format <span id="output-mode-count" style="color: #666; font-size: 11px;"></span></span>
                             <select id="output-mode">
                                 <option value="">Loading output modes...</option>
@@ -5276,9 +5702,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Set Engine Mode
         function setEngineMode(mode) {
             engineMode = mode;
+            $('engine-mode-intent').classList.toggle('active', mode === 'intent');
             $('engine-mode-single').classList.toggle('active', mode === 'engine');
             $('engine-mode-bundle').classList.toggle('active', mode === 'bundle');
             $('engine-mode-pipeline').classList.toggle('active', mode === 'pipeline');
+            $('intent-selection').style.display = mode === 'intent' ? 'block' : 'none';
             $('engine-selection').style.display = mode === 'engine' ? 'block' : 'none';
             $('bundle-selection').style.display = mode === 'bundle' ? 'block' : 'none';
             $('pipeline-selection').style.display = mode === 'pipeline' ? 'block' : 'none';
@@ -5286,6 +5714,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             $('category-tabs').style.display = mode === 'engine' ? 'flex' : 'none';
             // Show/hide curator (only for single engine mode)
             $('curator-section').style.display = mode === 'engine' ? 'block' : 'none';
+            // Show/hide output mode section (hidden for intent mode which has its own)
+            $('output-mode-section').style.display = mode === 'intent' ? 'none' : 'block';
             updateAnalyzeButton();
         }
 
@@ -5293,7 +5723,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         function updateAnalyzeButton() {
             const btn = $('analyze-btn');
             let hasSelection;
-            if (engineMode === 'engine') {
+            if (engineMode === 'intent') {
+                // For intent mode, check if there's text in the intent input
+                const intentInput = $('intent-input');
+                hasSelection = intentInput && intentInput.value.trim().length > 10;
+            } else if (engineMode === 'engine') {
                 hasSelection = selectedEngine;
             } else if (engineMode === 'bundle') {
                 hasSelection = selectedBundle;
@@ -5307,15 +5741,47 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (!hasDocs) {
                 btn.textContent = 'Select Documents First';
             } else if (!hasSelection) {
-                var modeLabel = engineMode === 'engine' ? 'Engine' : (engineMode === 'bundle' ? 'Bundle' : 'Pipeline');
-                btn.textContent = 'Select ' + modeLabel + ' to Analyze';
+                if (engineMode === 'intent') {
+                    btn.textContent = 'Describe What You Want to Understand';
+                } else {
+                    var modeLabel = engineMode === 'engine' ? 'Engine' : (engineMode === 'bundle' ? 'Bundle' : 'Pipeline');
+                    btn.textContent = 'Select ' + modeLabel + ' to Analyze';
+                }
             } else {
-                btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
+                if (engineMode === 'intent') {
+                    btn.textContent = '🎯 Analyze with Intent (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                } else {
+                    btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
+                }
             }
 
             // Also update curator button state
             updateCuratorButton();
         }
+
+        // Intent-Based Analysis Functions
+        var intentClassification = null;
+        var intentRecommendation = null;
+
+        function setIntentQuick(text) {
+            $('intent-input').value = text;
+            updateAnalyzeButton();
+        }
+
+        // Listen for changes to intent input
+        document.addEventListener('DOMContentLoaded', function() {
+            var intentInput = $('intent-input');
+            if (intentInput) {
+                intentInput.addEventListener('input', function() {
+                    updateAnalyzeButton();
+                    // Clear previous classification when text changes
+                    $('intent-classification').style.display = 'none';
+                    $('intent-engine-recommendation').style.display = 'none';
+                    intentClassification = null;
+                    intentRecommendation = null;
+                });
+            }
+        });
 
         // Read file as text or base64 for PDFs
         async function readFileContent(file) {
@@ -5470,6 +5936,33 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
 
                     response = await fetch('/api/analyzer/analyze/bundle', {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+                } else if (engineMode === 'intent') {
+                    // Intent-Based Analysis
+                    const intentText = $('intent-input').value.trim();
+
+                    // Get selected output modes
+                    const outputModes = [];
+                    if ($('output-image').checked) outputModes.push('gemini_image');
+                    if ($('output-table').checked) outputModes.push('smart_table');
+                    if ($('output-text').checked) outputModes.push('text');
+
+                    const payload = {
+                        intent: intentText,
+                        output_modes: outputModes.length > 0 ? outputModes : ['gemini_image'],
+                        collection_name: currentCollectionName
+                    };
+
+                    if (docData.type === 'paths') {
+                        payload.file_paths = docData.file_paths;
+                    } else {
+                        payload.documents = docData.documents;
+                    }
+
+                    response = await fetch('/api/analyzer/analyze/intent', {
                         method: 'POST',
                         headers: getApiHeaders(),
                         body: JSON.stringify(payload)

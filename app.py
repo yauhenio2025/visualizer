@@ -7072,9 +7072,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         function showAnalysisError(message) {
-            $('progress-text').textContent = message;
+            $('progress-text').textContent = '❌ ' + message;
             $('progress-text').style.color = 'var(--error)';
-            finishAnalysis();
+            $('analyze-btn').disabled = false;
+            updateAnalyzeButton();
+            // Don't auto-hide progress section on error - keep error visible
         }
 
         function finishAnalysis() {

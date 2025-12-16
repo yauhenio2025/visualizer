@@ -4,11 +4,13 @@
 
 Transform the visualizer from an engine-centric to an **intent-centric** system where:
 1. Users express what they want to **understand** (not which engines to run)
-2. AI detects what analyses the **document affords**
+2. AI detects what analyses the **document collection affords**
 3. AI selects optimal **engines + output formats** automatically
 4. Results arrive in **multiple media** (image + table + text) per analysis
 
 **Key Principle**: Let LLMs figure out the best output format, don't engineer rigid typologies.
+
+**Collection-First Design**: The system operates on **collections of documents** (5-50 articles, papers, reports), not single documents. Engines extract from each document individually, then synthesize patterns across the entire collection. This is the core value proposition - seeing what emerges from a corpus.
 
 ---
 
@@ -17,18 +19,21 @@ Transform the visualizer from an engine-centric to an **intent-centric** system 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           USER INTERFACE                                │
-│  "I want to MAP the key players in this policy debate"                  │
+│  Collection: 15 FT articles about EU AI regulation                      │
+│  Intent: "I want to MAP the key players in this policy debate"          │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    1. DOCUMENT AFFORDANCE DETECTOR                       │
-│  Input: Document content (first 3000 chars)                             │
+│                    1. COLLECTION AFFORDANCE DETECTOR                     │
+│  Input: Sample from collection (e.g., 500 chars × 10 docs = 5000 chars) │
 │  Output: {                                                              │
+│    "collection_size": 15,                                               │
 │    "domain": "policy/regulation",                                       │
 │    "entity_density": "high",                                            │
 │    "temporal_content": "medium",                                        │
 │    "quantitative_content": "low",                                       │
+│    "source_diversity": "medium",  // Same vs different publications    │
 │    "suitable_analyses": ["stakeholder", "comparative", "timeline"],     │
 │    "unsuitable_analyses": ["deal_flow", "intellectual_genealogy"]       │
 │  }                                                                      │
@@ -198,33 +203,47 @@ Recommend 1-3 output formats with rationale.
 
 ## Implementation Phases
 
-### Phase 1: Document Affordance Detector (Analyzer)
+### Phase 1: Collection Affordance Detector (Analyzer)
 **Files to modify**: `analyzer/src/core/curator.py` (NEW)
 
 Create a new curator module that:
-1. Takes document sample text
+1. Takes a **collection** of documents (or samples from them)
 2. Uses Claude to detect domain, entity density, temporal content, quantitative content
-3. Returns list of suitable/unsuitable engine categories
+3. Considers collection-level factors (size, diversity, time span)
+4. Returns list of suitable/unsuitable engine categories
+
+**Sampling Strategy**:
+- For collections ≤10 docs: sample 500 chars from each
+- For collections >10 docs: sample 500 chars from 10 representative docs
+- Total context to LLM: ~5000 chars + collection metadata
 
 **New endpoint**: `POST /api/curator/affordances`
 ```json
 {
-  "sample_text": "...",
-  "max_chars": 3000
+  "documents": [
+    {"id": "doc1", "title": "...", "content": "...", "source": "FT"},
+    {"id": "doc2", "title": "...", "content": "...", "source": "Reuters"},
+    ...
+  ],
+  "sample_chars_per_doc": 500,
+  "max_docs_to_sample": 10
 }
 ```
 
 **Response**:
 ```json
 {
+  "collection_size": 15,
   "domain": "policy",
   "entity_density": "high",
   "temporal_content": "medium",
   "quantitative_content": "low",
+  "source_diversity": "high",
+  "time_span": "2024-01 to 2024-12",
   "genre": "news_analysis",
   "suitable_engine_categories": ["power", "argument", "temporal"],
   "unsuitable_engine_categories": ["scholarly", "financial"],
-  "reasoning": "This appears to be a policy analysis piece..."
+  "reasoning": "This collection of 15 policy articles from diverse sources..."
 }
 ```
 
@@ -345,31 +364,50 @@ This parallels how Gemini renderer works - LLM decides visualization, not code.
 ### Phase 6: MCP Server Enhancement (Visualizer)
 **Files to modify**: `visualizer/mcp_server/mcp_server.py`
 
-Add new high-level tool:
+Add new high-level tools:
 
 ```python
 @mcp.tool()
-def analyze_with_intent(
-    document_path: str,
+def analyze_collection_with_intent(
+    document_paths: List[str],  # List of file paths OR folder path
     intent: str,  # Natural language: "Map the key players"
     anthropic_api_key: Optional[str] = None,
     gemini_api_key: Optional[str] = None
 ) -> str:
     """
-    Analyze a document based on what you want to understand.
+    Analyze a collection of documents based on what you want to understand.
+
+    Provide either:
+    - A list of document paths: ["/path/to/doc1.pdf", "/path/to/doc2.pdf"]
+    - A folder path: "/path/to/collection/"
 
     Instead of selecting engines, describe your intent:
     - "Map the key players and their relationships"
     - "Trace how this concept evolved over time"
-    - "Evaluate the strength of the arguments"
+    - "Compare approaches across jurisdictions"
     - "Find gaps in the current research"
+    - "Track the money flows"
 
     The AI will:
-    1. Detect what analyses your document supports
+    1. Sample the collection to detect what analyses it supports
     2. Select the best engine(s) for your intent
-    3. Generate outputs in optimal formats (image, table, text)
+    3. Extract from each document, synthesize across collection
+    4. Generate outputs in optimal formats (image, table, text)
 
-    Returns: Multiple outputs tailored to your request.
+    Returns: Multiple outputs showing patterns across the collection.
+    """
+
+@mcp.tool()
+def analyze_websaver_collection_with_intent(
+    collection_id: int,  # Web-saver collection ID
+    intent: str,
+    anthropic_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
+) -> str:
+    """
+    Analyze a web-saver collection based on intent.
+
+    Fetches articles from web-saver collection, then runs intent-based analysis.
     """
 ```
 
@@ -403,8 +441,9 @@ Add intent-based UI:
 ### New MCP Tools (Visualizer)
 | Tool | Purpose |
 |------|---------|
-| `analyze_with_intent()` | High-level intent-based analysis |
-| `get_document_affordances()` | Diagnostic: see what document supports |
+| `analyze_collection_with_intent()` | High-level intent-based analysis of document collection |
+| `analyze_websaver_collection_with_intent()` | Same, but fetches from web-saver collection |
+| `get_collection_affordances()` | Diagnostic: see what analyses a collection supports |
 
 ### Unchanged (Backward Compatible)
 - All existing `/api/analyzer/*` endpoints

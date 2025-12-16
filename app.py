@@ -6941,6 +6941,39 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (output.image_url) {
                     imageOutputs.push(resultData);
                 } else if (output.html_content && output.html_content.includes('<table')) {
+                    // Check if this contains multiple smart-table-sections that need splitting
+                    var htmlContent = output.html_content;
+                    if (htmlContent.includes('smart-table-section')) {
+                        // Parse and split into separate table outputs
+                        var tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = htmlContent;
+                        var sections = tempDiv.querySelectorAll('.smart-table-section');
+                        if (sections.length > 1) {
+                            // Extract shared style block
+                            var styleMatch = htmlContent.match(/<style[^>]*>[\s\S]*?<\/style>/i);
+                            var styleBlock = styleMatch ? styleMatch[0] : '';
+
+                            sections.forEach(function(section, idx) {
+                                var tableName = section.getAttribute('data-table-name') || 'Data Table ' + (idx + 1);
+                                var sectionHtml = styleBlock + '<div class="smart-table-container">' + section.outerHTML + '</div>';
+                                tableOutputs.push({
+                                    key: displayKey + ' - ' + tableName,
+                                    title: tableName,
+                                    job_id: currentJobId,
+                                    output: output,
+                                    metadata: metadata,
+                                    extended_info: extInfo,
+                                    isImage: false,
+                                    imageUrl: null,
+                                    content: sectionHtml,
+                                    data: null,
+                                    isInteractive: true,
+                                    modeKey: modeKey || output.mode || ''
+                                });
+                            });
+                            return; // Don't add the original - we've split it
+                        }
+                    }
                     tableOutputs.push(resultData);
                 } else if (output.content) {
                     textOutputs.push(resultData);
@@ -6980,7 +7013,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             countEl.textContent = count + ' output' + (count !== 1 ? 's' : '') +
-                ' (' + imageOutputs.length + ' images, ' + tableOutputs.length + ' tables, ' + textOutputs.length + ' memos)';
+                ' (' + imageOutputs.length + ' images, ' + tableOutputs.length + ' tables, ' + textOutputs.length + ' reports)';
         }
 
         // Create collapsible image panel
@@ -7081,7 +7114,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             var panel = document.createElement('div');
             panel.className = 'output-panel';
             panel.innerHTML = '<div class="output-panel-header">' +
-                '<div class="output-panel-title"><span class="output-panel-icon">📝</span> Analysis Memos <span class="output-panel-count">(' + texts.length + ')</span></div>' +
+                '<div class="output-panel-title"><span class="output-panel-icon">📝</span> Analysis Reports <span class="output-panel-count">(' + texts.length + ')</span></div>' +
                 '<span class="output-panel-toggle">▼</span></div>' +
                 '<div class="output-panel-content"><div class="text-panel-content"></div></div>';
             panel.querySelector('.output-panel-header').onclick = function() { panel.classList.toggle('collapsed'); };

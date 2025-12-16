@@ -6577,10 +6577,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         function createImagePanel(images) {
             var panel = document.createElement('div');
             panel.className = 'output-panel';
-            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(' + "'collapsed'" + ')">' +
+            panel.innerHTML = '<div class="output-panel-header">' +
                 '<div class="output-panel-title"><span class="output-panel-icon">🖼️</span> Visualizations <span class="output-panel-count">(' + images.length + ')</span></div>' +
                 '<span class="output-panel-toggle">▼</span></div>' +
                 '<div class="output-panel-content"><div class="image-panel-grid"></div></div>';
+            panel.querySelector('.output-panel-header').onclick = function() { panel.classList.toggle('collapsed'); };
 
             var gridEl = panel.querySelector('.image-panel-grid');
             images.forEach(function(img, idx) {
@@ -6598,10 +6599,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         function createTablePanel(tables) {
             var panel = document.createElement('div');
             panel.className = 'output-panel';
-            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(' + "'collapsed'" + ')">' +
+            panel.innerHTML = '<div class="output-panel-header">' +
                 '<div class="output-panel-title"><span class="output-panel-icon">📊</span> Data Tables <span class="output-panel-count">(' + tables.length + ')</span></div>' +
                 '<span class="output-panel-toggle">▼</span></div>' +
                 '<div class="output-panel-content"><div class="table-panel-content"></div></div>';
+            panel.querySelector('.output-panel-header').onclick = function() { panel.classList.toggle('collapsed'); };
 
             var contentEl = panel.querySelector('.table-panel-content');
 
@@ -6663,10 +6665,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         function createTextPanel(texts) {
             var panel = document.createElement('div');
             panel.className = 'output-panel';
-            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(' + "'collapsed'" + ')">' +
+            panel.innerHTML = '<div class="output-panel-header">' +
                 '<div class="output-panel-title"><span class="output-panel-icon">📝</span> Analysis Memos <span class="output-panel-count">(' + texts.length + ')</span></div>' +
                 '<span class="output-panel-toggle">▼</span></div>' +
                 '<div class="output-panel-content"><div class="text-panel-content"></div></div>';
+            panel.querySelector('.output-panel-header').onclick = function() { panel.classList.toggle('collapsed'); };
 
             var contentEl = panel.querySelector('.text-panel-content');
 

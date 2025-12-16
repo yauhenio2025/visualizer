@@ -1592,13 +1592,18 @@ def submit_intent_analysis():
 
         top_engine = recommendations[0]
         engine_key = top_engine.get("engine_key")
+
+        # Get recommended outputs from curator (with focus)
+        recommended_outputs = top_engine.get("recommended_outputs", [])
+
         result["selected_engine"] = {
             "engine_key": engine_key,
             "engine_name": top_engine.get("engine_name"),
             "confidence": top_engine.get("confidence"),
             "rationale": top_engine.get("rationale"),
+            "recommended_outputs": recommended_outputs,
         }
-        print(f"[INTENT] Selected engine: {engine_key}")
+        print(f"[INTENT] Selected engine: {engine_key}, recommended outputs: {len(recommended_outputs)}")
 
     except Exception as e:
         return jsonify({
@@ -1609,7 +1614,16 @@ def submit_intent_analysis():
 
     try:
         # Step 3: Submit analysis with multi-output
-        primary_output_mode = output_modes[0] if output_modes else "gemini_image"
+        # Use curator's recommended outputs if available (with focus), otherwise fall back to user selection
+        if recommended_outputs:
+            # Use curator's smart recommendations (dicts with type, focus, purpose)
+            flexible_output_modes = recommended_outputs
+            primary_output_mode = recommended_outputs[0].get("type", "gemini_image")
+            print(f"[INTENT] Using curator recommended outputs: {[o.get('type') + ':' + o.get('focus', '')[:20] for o in recommended_outputs]}")
+        else:
+            # Fall back to user-selected modes (backward compatible - strings)
+            flexible_output_modes = output_modes
+            primary_output_mode = output_modes[0] if output_modes else "gemini_image"
 
         analyze_response = httpx.post(
             f"{ANALYZER_API_URL}/v1/analyze",
@@ -1617,7 +1631,7 @@ def submit_intent_analysis():
                 "documents": documents,
                 "engine": engine_key,
                 "output_mode": primary_output_mode,
-                "output_modes": output_modes,  # Multi-output support
+                "output_modes": flexible_output_modes,  # Now supports dicts with focus
             },
             headers=headers,
             timeout=30.0,

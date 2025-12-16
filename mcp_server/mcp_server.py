@@ -1063,6 +1063,327 @@ def submit_pipeline_analysis(
     return json.dumps(output, indent=2)
 
 
+# =============================================================================
+# Phase 6: Intent-Based Analysis Tools
+# =============================================================================
+
+@mcp.tool()
+def get_collection_affordances(
+    document_paths: Annotated[List[str], Field(description="List of document paths to analyze for affordances")],
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None
+) -> str:
+    """
+    Detect what types of analysis a document collection supports.
+
+    This is a diagnostic tool that samples your documents and determines:
+    - Domain (policy, finance, philosophy, technology, etc.)
+    - Entity density (high/medium/low)
+    - Temporal content (high/medium/low)
+    - Quantitative content (high/medium/low)
+    - Which engine categories are suitable vs unsuitable
+
+    Use this to understand what analyses make sense for your collection
+    before running analyze_collection_with_intent().
+
+    Returns: JSON with affordances and suitable/unsuitable engine categories.
+    """
+    # Build document list from paths
+    documents = []
+    for path in document_paths[:20]:  # Limit to 20 docs
+        doc = prepare_document(path)
+        if doc:
+            documents.append({
+                "id": str(Path(path).stem),
+                "title": doc.get("title", Path(path).stem),
+                "content": doc.get("content", "")[:2000],  # First 2000 chars
+                "source": doc.get("source"),
+                "date": doc.get("date"),
+            })
+
+    if not documents:
+        return json.dumps({"error": "No valid documents found"}, indent=2)
+
+    # Build headers with API keys
+    llm_keys = get_llm_keys(anthropic_api_key=anthropic_api_key)
+    headers = build_llm_headers(llm_keys)
+
+    # Call the affordances endpoint
+    try:
+        response = api_request(
+            ANALYZER_API_URL,
+            'POST',
+            '/v1/curator/affordances',
+            data={
+                "documents": documents,
+                "sample_chars_per_doc": 500,
+                "max_docs_to_sample": 10,
+            },
+            headers=headers,
+            timeout=60,
+        )
+
+        logger.info(f"Affordances detected for {len(documents)} documents")
+        return json.dumps(response, indent=2)
+
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to detect affordances: {str(e)}",
+            "documents_submitted": len(documents),
+        }, indent=2)
+
+
+@mcp.tool()
+def classify_intent(
+    user_request: Annotated[str, Field(description="Natural language description of what you want to understand")],
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None
+) -> str:
+    """
+    Classify a natural language intent into verb+noun taxonomy.
+
+    Instead of specifying engine names, describe what you want to understand:
+    - "Map the key players and their relationships"
+    - "Trace how this concept evolved over time"
+    - "Compare approaches across different jurisdictions"
+    - "Find gaps in the current research"
+    - "Track the money flows"
+
+    Returns: JSON with primary_verb, primary_noun, and confidence.
+    """
+    # Build headers with API keys
+    llm_keys = get_llm_keys(anthropic_api_key=anthropic_api_key)
+    headers = build_llm_headers(llm_keys)
+
+    try:
+        response = api_request(
+            ANALYZER_API_URL,
+            'POST',
+            '/v1/curator/classify-intent',
+            data={"user_request": user_request},
+            headers=headers,
+            timeout=30,
+        )
+
+        logger.info(f"Intent classified: {response.get('primary_verb')} + {response.get('primary_noun')}")
+        return json.dumps(response, indent=2)
+
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to classify intent: {str(e)}",
+        }, indent=2)
+
+
+@mcp.tool()
+def analyze_collection_with_intent(
+    document_paths: Annotated[List[str], Field(description="List of document paths to analyze")],
+    intent: Annotated[str, Field(description="What you want to understand (e.g., 'Map the key players')")],
+    output_modes: Annotated[Optional[List[str]], Field(description="Output formats: ['gemini_image', 'smart_table', 'text']. Default: all three.")] = None,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key for visual output")] = None
+) -> str:
+    """
+    Analyze a collection of documents based on what you want to understand.
+
+    Instead of selecting engines, describe your intent:
+    - "Map the key players and their relationships"
+    - "Trace how this concept evolved over time"
+    - "Compare approaches across different jurisdictions"
+    - "Find gaps in the current research"
+    - "Track the money flows"
+    - "Evaluate the strength of the arguments"
+    - "Synthesize the main themes"
+
+    The AI will:
+    1. Sample the collection to detect what analyses it supports
+    2. Classify your intent into verb+noun taxonomy
+    3. Select the best engine for your intent
+    4. Extract from each document, synthesize across collection
+    5. Generate outputs in multiple formats (image, table, text)
+
+    Returns: Job ID for tracking. Results auto-download when complete.
+    """
+    # Default output modes
+    if output_modes is None:
+        output_modes = ["gemini_image", "smart_table", "text"]
+
+    # Build headers with API keys
+    llm_keys = get_llm_keys(anthropic_api_key=anthropic_api_key, gemini_api_key=gemini_api_key)
+    headers = build_llm_headers(llm_keys)
+
+    output = {
+        "intent": intent,
+        "document_count": len(document_paths),
+        "output_modes": output_modes,
+    }
+
+    # Step 1: Prepare documents
+    documents = []
+    for path in document_paths:
+        doc = prepare_document(path)
+        if doc:
+            documents.append(doc)
+
+    if not documents:
+        return json.dumps({"error": "No valid documents found"}, indent=2)
+
+    output["prepared_documents"] = len(documents)
+
+    # Step 2: Classify intent
+    try:
+        intent_response = api_request(
+            ANALYZER_API_URL,
+            'POST',
+            '/v1/curator/classify-intent',
+            data={"user_request": intent},
+            headers=headers,
+            timeout=30,
+        )
+        output["classified_intent"] = {
+            "verb": intent_response.get("primary_verb"),
+            "noun": intent_response.get("primary_noun"),
+            "confidence": intent_response.get("confidence"),
+        }
+        logger.info(f"Intent: {intent_response.get('primary_verb')} + {intent_response.get('primary_noun')}")
+    except Exception as e:
+        logger.warning(f"Intent classification failed: {e}")
+        output["classified_intent"] = {"error": str(e)}
+        # Continue without intent classification
+
+    # Step 3: Get AI recommendations with intent
+    sample_text = "\n\n---\n\n".join([
+        f"[{d['title']}]\n{d['content'][:500]}"
+        for d in documents[:5]
+    ])
+
+    try:
+        recommend_data = {
+            "sample_text": sample_text,
+            "analysis_goal": intent,
+            "max_recommendations": 3,
+        }
+
+        # Add intent if we have it
+        if output.get("classified_intent") and not output["classified_intent"].get("error"):
+            recommend_data["intent"] = {
+                "verb": output["classified_intent"]["verb"],
+                "noun": output["classified_intent"]["noun"],
+            }
+
+        recommend_response = api_request(
+            ANALYZER_API_URL,
+            'POST',
+            '/v1/curator/recommend',
+            data=recommend_data,
+            headers=headers,
+            timeout=60,
+        )
+
+        # Get top engine recommendation
+        recommendations = recommend_response.get("primary_recommendations", [])
+        if not recommendations:
+            return json.dumps({"error": "No engine recommendations returned"}, indent=2)
+
+        top_engine = recommendations[0]
+        engine_key = top_engine.get("engine_key")
+        output["selected_engine"] = {
+            "engine_key": engine_key,
+            "engine_name": top_engine.get("engine_name"),
+            "confidence": top_engine.get("confidence"),
+            "rationale": top_engine.get("rationale"),
+            "recommended_outputs": top_engine.get("recommended_outputs", []),
+        }
+        logger.info(f"Selected engine: {engine_key}")
+
+    except Exception as e:
+        return json.dumps({
+            "error": f"Engine recommendation failed: {str(e)}",
+            **output,
+        }, indent=2)
+
+    # Step 4: Submit analysis with multi-output
+    primary_output_mode = output_modes[0] if output_modes else "gemini_image"
+
+    try:
+        submit_response = api_request(
+            ANALYZER_API_URL,
+            'POST',
+            '/v1/analyze',
+            data={
+                "documents": documents,
+                "engine": engine_key,
+                "output_mode": primary_output_mode,
+                "output_modes": output_modes,  # Phase 4: Multi-output
+            },
+            headers=headers,
+            timeout=30,
+        )
+
+        job_id = submit_response.get("job_id")
+        output["job_id"] = job_id
+        output["status"] = "submitted"
+        output["message"] = f"Analysis job submitted with {len(output_modes)} output modes"
+
+        # Spawn background poller for auto-download
+        spawn_job_poller([job_id])
+        output["message"] += ". Results will auto-download when complete."
+        output["auto_monitor"] = True
+
+        logger.info(f"Intent-based analysis submitted: {job_id}")
+
+    except Exception as e:
+        return json.dumps({
+            "error": f"Analysis submission failed: {str(e)}",
+            **output,
+        }, indent=2)
+
+    return json.dumps(output, indent=2)
+
+
+@mcp.tool()
+def analyze_folder_with_intent(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents")],
+    intent: Annotated[str, Field(description="What you want to understand")],
+    file_types: Annotated[str, Field(description="Comma-separated extensions (default: 'pdf,txt,md')")] = "pdf,txt,md",
+    max_documents: Annotated[int, Field(description="Maximum documents to process (default: 20)")] = 20,
+    output_modes: Annotated[Optional[List[str]], Field(description="Output formats")] = None,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key")] = None
+) -> str:
+    """
+    Analyze a folder of documents with natural language intent.
+
+    Convenience wrapper around analyze_collection_with_intent() that
+    scans a folder for documents first.
+
+    Returns: Job ID for tracking.
+    """
+    # Scan folder for documents
+    folder = Path(folder_path).expanduser().resolve()
+    if not folder.exists():
+        return json.dumps({"error": f"Folder not found: {folder_path}"}, indent=2)
+
+    extensions = set(f".{ext.strip().lower()}" for ext in file_types.split(","))
+
+    document_paths = []
+    for ext in extensions:
+        document_paths.extend(folder.glob(f"*{ext}"))
+
+    document_paths = sorted(document_paths)[:max_documents]
+
+    if not document_paths:
+        return json.dumps({
+            "error": f"No documents found in {folder_path} with extensions {file_types}",
+        }, indent=2)
+
+    # Call the main intent analysis function
+    return analyze_collection_with_intent(
+        document_paths=[str(p) for p in document_paths],
+        intent=intent,
+        output_modes=output_modes,
+        anthropic_api_key=anthropic_api_key,
+        gemini_api_key=gemini_api_key,
+    )
+
+
 if __name__ == "__main__":
     # Run the MCP server
     mcp.run()

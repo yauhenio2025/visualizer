@@ -3118,6 +3118,161 @@ HTML_PAGE = '''<!DOCTYPE html>
             margin-top: 2rem;
         }
 
+        /* Output Type Panels - Collapsible Sections */
+        .output-panel {
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .output-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .output-panel-header:hover {
+            background: var(--bg-input);
+        }
+        .output-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .output-panel-icon {
+            font-size: 1.2rem;
+        }
+        .output-panel-count {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+        .output-panel-toggle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .output-panel.collapsed .output-panel-toggle {
+            transform: rotate(-90deg);
+        }
+        .output-panel-content {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+        }
+        .output-panel.collapsed .output-panel-content {
+            display: none;
+        }
+
+        /* Image Panel Content */
+        .image-panel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 1rem;
+        }
+        .image-panel-item {
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .image-panel-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: pointer;
+        }
+        .image-panel-item-footer {
+            padding: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .image-panel-item-title {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Table Panel Content */
+        .table-panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .table-section {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .table-section-header {
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+        .table-section-body {
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        .table-section-body table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table-section-body th,
+        .table-section-body td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.85rem;
+        }
+        .table-section-body th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Text/Memo Panel Content */
+        .text-panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .text-section {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+        }
+        .text-section-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .text-section-content {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+        .text-section-content h1, .text-section-content h2, .text-section-content h3 {
+            color: var(--text);
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .text-section-content h1 { font-size: 1.3rem; }
+        .text-section-content h2 { font-size: 1.1rem; }
+        .text-section-content h3 { font-size: 1rem; }
+
         /* Job Info Header */
         .job-info-header {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -6293,7 +6448,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
-        // Display Result
+        // Display Result - Groups outputs by type into collapsible panels
         function displayResult(result, title) {
             console.log('displayResult called with:', result);
 
@@ -6302,102 +6457,220 @@ HTML_PAGE = '''<!DOCTYPE html>
             var countEl = $('results-count');
 
             gallery.style.display = 'block';
+            grid.innerHTML = '';  // Clear existing
 
             var outputs = result.outputs || {};
             var metadata = result.metadata || {};
             var extInfo = result.extended_info || {};
             var isMultiOutput = result.multi_output || false;
-            var count = 0;
 
-            // Display job info header if we have extended info
+            // Display job info header
             displayJobInfoHeader(extInfo);
-
-            // Display process details at bottom
             displayProcessDetails(metadata, extInfo);
 
-            console.log('Outputs:', Object.keys(outputs), 'multi_output:', isMultiOutput);
+            // Group outputs by type
+            var imageOutputs = [];
+            var tableOutputs = [];
+            var textOutputs = [];
+            var count = 0;
 
-            // Helper to process a single output
-            function processOutput(engineKey, modeKey, output) {
+            // Collect all outputs
+            function collectOutput(engineKey, modeKey, output) {
                 count++;
                 var displayKey = modeKey ? engineKey + ' - ' + modeKey : engineKey;
-
-                console.log('Processing output:', displayKey, 'has image_url:', !!output.image_url, 'url length:', output.image_url ? output.image_url.length : 0);
-
                 var resultData = {
                     key: displayKey,
-                    title: (title ? title + ' - ' : '') + displayKey.replace(/_/g, ' '),
-                    job_id: currentJobId,  // Include job_id for library grouping
+                    title: displayKey.replace(/_/g, ' '),
+                    job_id: currentJobId,
                     output: output,
                     metadata: metadata,
-                    extended_info: extInfo,  // Include extended info for library display
+                    extended_info: extInfo,
                     isImage: !!output.image_url,
                     imageUrl: output.image_url || null,
                     content: output.content || output.html_content || '',
                     data: output.data || null,
-                    isInteractive: !!output.html_content
+                    isInteractive: !!output.html_content,
+                    modeKey: modeKey || output.mode || ''
                 };
                 allResults.push(resultData);
+                try { addToLibrary(resultData); } catch (e) {}
 
-                // Try to add to library but don't let failures block display
-                try {
-                    addToLibrary(resultData);
-                } catch (e) {
-                    console.warn('Failed to add to library:', e);
+                // Categorize by type
+                if (output.image_url) {
+                    imageOutputs.push(resultData);
+                } else if (output.html_content && output.html_content.includes('<table')) {
+                    tableOutputs.push(resultData);
+                } else if (output.content) {
+                    textOutputs.push(resultData);
                 }
-
-                var card = createGalleryCard(resultData, allResults.length - 1);
-                grid.appendChild(card);
             }
 
             for (var engineKey in outputs) {
                 var engineOutput = outputs[engineKey];
-
                 if (isMultiOutput && typeof engineOutput === 'object' && engineOutput !== null) {
-                    // Multi-output: engineOutput is {mode_key: OutputResult, ...}
-                    // Check if this looks like a nested structure (has mode keys, not direct output props)
-                    var hasDirectOutputProps = engineOutput.image_url !== undefined ||
-                                               engineOutput.content !== undefined ||
-                                               engineOutput.html_content !== undefined ||
-                                               engineOutput.mode !== undefined;
-
-                    if (!hasDirectOutputProps) {
-                        // Iterate through output modes
+                    var hasDirectProps = engineOutput.image_url !== undefined ||
+                                         engineOutput.content !== undefined ||
+                                         engineOutput.html_content !== undefined;
+                    if (!hasDirectProps) {
                         for (var modeKey in engineOutput) {
                             var modeOutput = engineOutput[modeKey];
                             if (typeof modeOutput === 'object' && modeOutput !== null) {
-                                processOutput(engineKey, modeKey, modeOutput);
+                                collectOutput(engineKey, modeKey, modeOutput);
                             }
                         }
                     } else {
-                        // Has direct props - treat as single output
-                        processOutput(engineKey, null, engineOutput);
+                        collectOutput(engineKey, null, engineOutput);
                     }
                 } else {
-                    // Single output or non-object
-                    processOutput(engineKey, null, engineOutput);
+                    collectOutput(engineKey, null, engineOutput);
                 }
             }
 
-            if (count === 0 && result.canonical_data) {
-                var canonicalData = {
-                    key: 'canonical_data',
-                    title: 'Canonical Data',
-                    output: { data: result.canonical_data },
-                    metadata: metadata,
-                    isImage: false,
-                    imageUrl: null,
-                    content: '',
-                    data: result.canonical_data
-                };
-                allResults.push(canonicalData);
-                addToLibrary(canonicalData);
-                var card = createGalleryCard(canonicalData, allResults.length - 1);
-                grid.appendChild(card);
-                count++;
+            // Create collapsible panels for each type
+            if (imageOutputs.length > 0) {
+                grid.appendChild(createImagePanel(imageOutputs));
+            }
+            if (tableOutputs.length > 0) {
+                grid.appendChild(createTablePanel(tableOutputs));
+            }
+            if (textOutputs.length > 0) {
+                grid.appendChild(createTextPanel(textOutputs));
             }
 
-            countEl.textContent = count + ' result' + (count !== 1 ? 's' : '');
+            countEl.textContent = count + ' output' + (count !== 1 ? 's' : '') +
+                ' (' + imageOutputs.length + ' images, ' + tableOutputs.length + ' tables, ' + textOutputs.length + ' memos)';
+        }
+
+        // Create collapsible image panel
+        function createImagePanel(images) {
+            var panel = document.createElement('div');
+            panel.className = 'output-panel';
+            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+                '<div class="output-panel-title"><span class="output-panel-icon">🖼️</span> Visualizations <span class="output-panel-count">(' + images.length + ')</span></div>' +
+                '<span class="output-panel-toggle">▼</span></div>' +
+                '<div class="output-panel-content"><div class="image-panel-grid"></div></div>';
+
+            var gridEl = panel.querySelector('.image-panel-grid');
+            images.forEach(function(img, idx) {
+                var item = document.createElement('div');
+                item.className = 'image-panel-item';
+                item.innerHTML = '<img src="' + img.imageUrl + '" alt="' + img.title + '" onclick="openLightbox(' + (allResults.indexOf(img)) + ')">' +
+                    '<div class="image-panel-item-footer"><span class="image-panel-item-title">' + img.title + '</span>' +
+                    '<button class="btn btn-sm" onclick="downloadImage(\'' + img.imageUrl + '\', \'' + img.key + '\')">Download</button></div>';
+                gridEl.appendChild(item);
+            });
+            return panel;
+        }
+
+        // Create collapsible table panel - splits HTML into separate tables
+        function createTablePanel(tables) {
+            var panel = document.createElement('div');
+            panel.className = 'output-panel';
+            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+                '<div class="output-panel-title"><span class="output-panel-icon">📊</span> Data Tables <span class="output-panel-count">(' + tables.length + ')</span></div>' +
+                '<span class="output-panel-toggle">▼</span></div>' +
+                '<div class="output-panel-content"><div class="table-panel-content"></div></div>';
+
+            var contentEl = panel.querySelector('.table-panel-content');
+
+            tables.forEach(function(tbl) {
+                // Parse HTML content and split into individual tables
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = tbl.content;
+
+                // Find all h2/h3 headers followed by tables
+                var headers = tempDiv.querySelectorAll('h2, h3');
+                var tableEls = tempDiv.querySelectorAll('table');
+
+                if (headers.length > 0 && tableEls.length > 0) {
+                    // Multiple tables with headers
+                    headers.forEach(function(header, idx) {
+                        var section = document.createElement('div');
+                        section.className = 'table-section';
+
+                        var sectionHeader = document.createElement('div');
+                        sectionHeader.className = 'table-section-header';
+                        sectionHeader.textContent = header.textContent;
+                        section.appendChild(sectionHeader);
+
+                        var sectionBody = document.createElement('div');
+                        sectionBody.className = 'table-section-body';
+                        if (tableEls[idx]) {
+                            sectionBody.appendChild(tableEls[idx].cloneNode(true));
+                        }
+                        section.appendChild(sectionBody);
+                        contentEl.appendChild(section);
+                    });
+                } else if (tableEls.length > 0) {
+                    // Just tables, no headers
+                    tableEls.forEach(function(tableEl, idx) {
+                        var section = document.createElement('div');
+                        section.className = 'table-section';
+                        var sectionBody = document.createElement('div');
+                        sectionBody.className = 'table-section-body';
+                        sectionBody.appendChild(tableEl.cloneNode(true));
+                        section.appendChild(sectionBody);
+                        contentEl.appendChild(section);
+                    });
+                } else {
+                    // Fallback - just render all content
+                    var section = document.createElement('div');
+                    section.className = 'table-section';
+                    var sectionBody = document.createElement('div');
+                    sectionBody.className = 'table-section-body';
+                    sectionBody.innerHTML = tbl.content;
+                    section.appendChild(sectionBody);
+                    contentEl.appendChild(section);
+                }
+            });
+
+            return panel;
+        }
+
+        // Create collapsible text/memo panel
+        function createTextPanel(texts) {
+            var panel = document.createElement('div');
+            panel.className = 'output-panel';
+            panel.innerHTML = '<div class="output-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+                '<div class="output-panel-title"><span class="output-panel-icon">📝</span> Analysis Memos <span class="output-panel-count">(' + texts.length + ')</span></div>' +
+                '<span class="output-panel-toggle">▼</span></div>' +
+                '<div class="output-panel-content"><div class="text-panel-content"></div></div>';
+
+            var contentEl = panel.querySelector('.text-panel-content');
+
+            texts.forEach(function(txt) {
+                var section = document.createElement('div');
+                section.className = 'text-section';
+
+                var title = document.createElement('div');
+                title.className = 'text-section-title';
+                title.textContent = txt.title;
+                section.appendChild(title);
+
+                var content = document.createElement('div');
+                content.className = 'text-section-content';
+                // Convert markdown to HTML (basic)
+                content.innerHTML = simpleMarkdownToHtml(txt.content);
+                section.appendChild(content);
+
+                contentEl.appendChild(section);
+            });
+
+            return panel;
+        }
+
+        // Simple markdown to HTML converter
+        function simpleMarkdownToHtml(md) {
+            if (!md) return '';
+            return md
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^/, '<p>')
+                .replace(/$/, '</p>');
         }
 
         // Display job info header (pipeline, documents)

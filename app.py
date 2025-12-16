@@ -6306,6 +6306,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             var outputs = result.outputs || {};
             var metadata = result.metadata || {};
             var extInfo = result.extended_info || {};
+            var isMultiOutput = result.multi_output || false;
             var count = 0;
 
             // Display job info header if we have extended info
@@ -6314,17 +6315,18 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Display process details at bottom
             displayProcessDetails(metadata, extInfo);
 
-            console.log('Outputs:', Object.keys(outputs));
+            console.log('Outputs:', Object.keys(outputs), 'multi_output:', isMultiOutput);
 
-            for (var key in outputs) {
-                var output = outputs[key];
+            // Helper to process a single output
+            function processOutput(engineKey, modeKey, output) {
                 count++;
+                var displayKey = modeKey ? engineKey + ' - ' + modeKey : engineKey;
 
-                console.log('Processing output:', key, 'has image_url:', !!output.image_url, 'url length:', output.image_url ? output.image_url.length : 0);
+                console.log('Processing output:', displayKey, 'has image_url:', !!output.image_url, 'url length:', output.image_url ? output.image_url.length : 0);
 
                 var resultData = {
-                    key: key,
-                    title: (title ? title + ' - ' : '') + key.replace(/_/g, ' '),
+                    key: displayKey,
+                    title: (title ? title + ' - ' : '') + displayKey.replace(/_/g, ' '),
                     job_id: currentJobId,  // Include job_id for library grouping
                     output: output,
                     metadata: metadata,
@@ -6346,6 +6348,35 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 var card = createGalleryCard(resultData, allResults.length - 1);
                 grid.appendChild(card);
+            }
+
+            for (var engineKey in outputs) {
+                var engineOutput = outputs[engineKey];
+
+                if (isMultiOutput && typeof engineOutput === 'object' && engineOutput !== null) {
+                    // Multi-output: engineOutput is {mode_key: OutputResult, ...}
+                    // Check if this looks like a nested structure (has mode keys, not direct output props)
+                    var hasDirectOutputProps = engineOutput.image_url !== undefined ||
+                                               engineOutput.content !== undefined ||
+                                               engineOutput.html_content !== undefined ||
+                                               engineOutput.mode !== undefined;
+
+                    if (!hasDirectOutputProps) {
+                        // Iterate through output modes
+                        for (var modeKey in engineOutput) {
+                            var modeOutput = engineOutput[modeKey];
+                            if (typeof modeOutput === 'object' && modeOutput !== null) {
+                                processOutput(engineKey, modeKey, modeOutput);
+                            }
+                        }
+                    } else {
+                        // Has direct props - treat as single output
+                        processOutput(engineKey, null, engineOutput);
+                    }
+                } else {
+                    // Single output or non-object
+                    processOutput(engineKey, null, engineOutput);
+                }
             }
 
             if (count === 0 && result.canonical_data) {

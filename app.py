@@ -3219,6 +3219,10 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-weight: 500;
             color: white;
         }
+        .image-panel-item-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
         .image-panel-item-footer .btn {
             background: rgba(255,255,255,0.15);
             color: white;
@@ -3247,6 +3251,19 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: white;
             font-weight: 600;
             font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-expand-btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.75rem;
+            padding: 0.35rem 0.75rem;
+        }
+        .section-expand-btn:hover {
+            background: rgba(255,255,255,0.25);
         }
         .table-section-body {
             padding: 0;
@@ -3297,6 +3314,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: white;
             padding: 1rem 1.5rem;
             background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .text-section-content {
             padding: 2rem;
@@ -4640,6 +4660,86 @@ HTML_PAGE = '''<!DOCTYPE html>
         .lightbox-actions .btn:hover {
             background: rgba(255,255,255,0.25);
         }
+
+        /* Content Expand Modal */
+        .content-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        .content-modal.active {
+            display: flex;
+        }
+        .content-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            z-index: 10001;
+        }
+        .content-modal-close:hover {
+            opacity: 1;
+        }
+        .content-modal-container {
+            background: white;
+            border-radius: 12px;
+            max-width: 90vw;
+            max-height: 90vh;
+            width: 1200px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .content-modal-header {
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        .content-modal-body {
+            padding: 2rem;
+            overflow: auto;
+            flex: 1;
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+        .content-modal-body table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .content-modal-body th,
+        .content-modal-body td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .content-modal-body th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+        }
+        .content-modal-body h1, .content-modal-body h2, .content-modal-body h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .content-modal-body p {
+            margin-bottom: 1rem;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -5043,12 +5143,41 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Keyboard navigation for lightbox
         document.addEventListener('keydown', function(e) {
             var modal = document.getElementById('lightbox-modal');
-            if (!modal || !modal.classList.contains('active')) return;
+            var contentModal = document.getElementById('content-modal');
 
-            if (e.key === 'Escape') closeLightbox();
-            if (e.key === 'ArrowLeft') navigateLightbox(-1);
-            if (e.key === 'ArrowRight') navigateLightbox(1);
+            if (modal && modal.classList.contains('active')) {
+                if (e.key === 'Escape') closeLightbox();
+                if (e.key === 'ArrowLeft') navigateLightbox(-1);
+                if (e.key === 'ArrowRight') navigateLightbox(1);
+            } else if (contentModal && contentModal.classList.contains('active')) {
+                if (e.key === 'Escape') closeContentModal();
+            }
         });
+
+        // Content modal functions (for tables and memos)
+        function openContentModal(title, content, type) {
+            var modal = document.getElementById('content-modal');
+            var titleEl = document.getElementById('content-modal-title');
+            var bodyEl = document.getElementById('content-modal-body');
+
+            titleEl.textContent = title || 'Content';
+
+            if (type === 'text') {
+                bodyEl.innerHTML = simpleMarkdownToHtml(content);
+            } else {
+                bodyEl.innerHTML = content;
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeContentModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            var modal = document.getElementById('content-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
 
         // Progress tracking
         let currentDocCount = 0;
@@ -6881,13 +7010,23 @@ HTML_PAGE = '''<!DOCTYPE html>
                 titleSpan.className = 'image-panel-item-title';
                 titleSpan.textContent = img.title;
 
+                var btnGroup = document.createElement('div');
+                btnGroup.className = 'image-panel-item-buttons';
+
+                var expandBtn = document.createElement('button');
+                expandBtn.className = 'btn btn-sm';
+                expandBtn.innerHTML = '⛶ Expand';
+                expandBtn.onclick = function() { openLightbox(allResults.indexOf(img)); };
+
                 var downloadBtn = document.createElement('button');
                 downloadBtn.className = 'btn btn-sm';
                 downloadBtn.textContent = 'Download';
                 downloadBtn.onclick = function() { downloadImage(img.imageUrl, img.key); };
 
+                btnGroup.appendChild(expandBtn);
+                btnGroup.appendChild(downloadBtn);
                 footer.appendChild(titleSpan);
-                footer.appendChild(downloadBtn);
+                footer.appendChild(btnGroup);
                 item.appendChild(imgEl);
                 item.appendChild(footer);
                 gridEl.appendChild(item);
@@ -6907,55 +7046,31 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var contentEl = panel.querySelector('.table-panel-content');
 
-            tables.forEach(function(tbl) {
-                // Parse HTML content and split into individual tables
-                var tempDiv = document.createElement('div');
-                tempDiv.innerHTML = tbl.content;
+            tables.forEach(function(tbl, tblIdx) {
+                // Create section for each table output
+                var section = document.createElement('div');
+                section.className = 'table-section';
 
-                // Find all h2/h3 headers followed by tables
-                var headers = tempDiv.querySelectorAll('h2, h3');
-                var tableEls = tempDiv.querySelectorAll('table');
+                var sectionHeader = document.createElement('div');
+                sectionHeader.className = 'table-section-header';
 
-                if (headers.length > 0 && tableEls.length > 0) {
-                    // Multiple tables with headers
-                    headers.forEach(function(header, idx) {
-                        var section = document.createElement('div');
-                        section.className = 'table-section';
+                var headerTitle = document.createElement('span');
+                headerTitle.textContent = tbl.title || 'Data Table';
 
-                        var sectionHeader = document.createElement('div');
-                        sectionHeader.className = 'table-section-header';
-                        sectionHeader.textContent = header.textContent;
-                        section.appendChild(sectionHeader);
+                var expandBtn = document.createElement('button');
+                expandBtn.className = 'btn btn-sm section-expand-btn';
+                expandBtn.innerHTML = '⛶ Expand';
+                expandBtn.onclick = function() { openContentModal(tbl.title, tbl.content, 'table'); };
 
-                        var sectionBody = document.createElement('div');
-                        sectionBody.className = 'table-section-body';
-                        if (tableEls[idx]) {
-                            sectionBody.appendChild(tableEls[idx].cloneNode(true));
-                        }
-                        section.appendChild(sectionBody);
-                        contentEl.appendChild(section);
-                    });
-                } else if (tableEls.length > 0) {
-                    // Just tables, no headers
-                    tableEls.forEach(function(tableEl, idx) {
-                        var section = document.createElement('div');
-                        section.className = 'table-section';
-                        var sectionBody = document.createElement('div');
-                        sectionBody.className = 'table-section-body';
-                        sectionBody.appendChild(tableEl.cloneNode(true));
-                        section.appendChild(sectionBody);
-                        contentEl.appendChild(section);
-                    });
-                } else {
-                    // Fallback - just render all content
-                    var section = document.createElement('div');
-                    section.className = 'table-section';
-                    var sectionBody = document.createElement('div');
-                    sectionBody.className = 'table-section-body';
-                    sectionBody.innerHTML = tbl.content;
-                    section.appendChild(sectionBody);
-                    contentEl.appendChild(section);
-                }
+                sectionHeader.appendChild(headerTitle);
+                sectionHeader.appendChild(expandBtn);
+                section.appendChild(sectionHeader);
+
+                var sectionBody = document.createElement('div');
+                sectionBody.className = 'table-section-body';
+                sectionBody.innerHTML = tbl.content;
+                section.appendChild(sectionBody);
+                contentEl.appendChild(section);
             });
 
             return panel;
@@ -6977,10 +7092,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var section = document.createElement('div');
                 section.className = 'text-section';
 
-                var title = document.createElement('div');
-                title.className = 'text-section-title';
-                title.textContent = txt.title;
-                section.appendChild(title);
+                var titleBar = document.createElement('div');
+                titleBar.className = 'text-section-title';
+
+                var titleSpan = document.createElement('span');
+                titleSpan.textContent = txt.title;
+
+                var expandBtn = document.createElement('button');
+                expandBtn.className = 'btn btn-sm section-expand-btn';
+                expandBtn.innerHTML = '⛶ Expand';
+                expandBtn.onclick = function() { openContentModal(txt.title, txt.content, 'text'); };
+
+                titleBar.appendChild(titleSpan);
+                titleBar.appendChild(expandBtn);
+                section.appendChild(titleBar);
 
                 var content = document.createElement('div');
                 content.className = 'text-section-content';
@@ -8944,6 +9069,15 @@ HTML_PAGE = '''<!DOCTYPE html>
     <div class="citation-preview" id="citation-preview">
         <div class="citation-preview-title" id="preview-title"></div>
         <div class="citation-preview-meta" id="preview-meta"></div>
+    </div>
+
+    <!-- Content Expand Modal (for tables and memos) -->
+    <div id="content-modal" class="content-modal" onclick="closeContentModal(event)">
+        <button class="content-modal-close" onclick="closeContentModal()">&times;</button>
+        <div class="content-modal-container" onclick="event.stopPropagation()">
+            <div class="content-modal-header" id="content-modal-title"></div>
+            <div class="content-modal-body" id="content-modal-body"></div>
+        </div>
     </div>
 
     <!-- Image Lightbox Modal -->

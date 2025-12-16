@@ -5223,22 +5223,40 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
         }
 
-        // Check API Status
+        // Check API Status with retry for cold starts
         async function checkAnalyzerStatus() {
             const statusEl = $('api-status');
             const textEl = $('api-status-text');
+            const maxRetries = 3;
+            const retryDelays = [2000, 4000, 8000]; // exponential backoff
 
-            try {
-                const res = await fetch('/api/analyzer/engines');
-                if (res.ok) {
-                    statusEl.className = 'api-status connected';
-                    textEl.textContent = 'API Connected';
-                    return true;
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    textEl.textContent = attempt === 0 ? 'Checking connection...' : 'Waking up services... (' + attempt + '/' + maxRetries + ')';
+
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(function() { controller.abort(); }, 30000); // 30s timeout
+
+                    const res = await fetch('/api/analyzer/engines', { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    if (res.ok) {
+                        statusEl.className = 'api-status connected';
+                        textEl.textContent = 'API Connected';
+                        return true;
+                    }
+                } catch (e) {
+                    console.log('Connection attempt ' + (attempt + 1) + ' failed:', e.message);
+                    if (attempt < maxRetries) {
+                        await new Promise(function(resolve) { setTimeout(resolve, retryDelays[attempt]); });
+                    }
                 }
-            } catch (e) {}
+            }
 
             statusEl.className = 'api-status disconnected';
-            textEl.textContent = 'API Not Available';
+            textEl.textContent = 'API Not Available - Click to retry';
+            statusEl.style.cursor = 'pointer';
+            statusEl.onclick = function() { loadAnalyzerData(); };
             return false;
         }
 

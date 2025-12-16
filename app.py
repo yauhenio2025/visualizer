@@ -1580,7 +1580,7 @@ def submit_intent_analysis():
             f"{ANALYZER_API_URL}/v1/curator/recommend",
             json=recommend_data,
             headers=headers,
-            timeout=120.0,  # Extended thinking needs longer timeout
+            timeout=300.0,  # Extended thinking with 64k tokens needs longer timeout
         )
         recommend_response.raise_for_status()
         recommend_result = recommend_response.json()

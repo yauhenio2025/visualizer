@@ -3187,30 +3187,38 @@ HTML_PAGE = '''<!DOCTYPE html>
         /* Image Panel Content */
         .image-panel-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+            gap: 1.5rem;
         }
         .image-panel-item {
             background: var(--bg-card);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
         .image-panel-item img {
             width: 100%;
             height: auto;
             display: block;
             cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .image-panel-item:hover img {
+            transform: scale(1.02);
         }
         .image-panel-item-footer {
-            padding: 0.75rem;
+            padding: 1rem 1.25rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
         }
         .image-panel-item-title {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text);
         }
 
         /* Table Panel Content */
@@ -3221,71 +3229,86 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
         .table-section {
             background: var(--bg-card);
-            border-radius: 8px;
+            border-radius: 12px;
             border: 1px solid var(--border);
             overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .table-section-header {
-            padding: 0.75rem 1rem;
-            background: var(--bg-input);
-            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
             font-weight: 600;
-            color: var(--text);
-            font-size: 0.9rem;
+            font-size: 1rem;
         }
         .table-section-body {
-            padding: 1rem;
+            padding: 0;
             overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
         }
         .table-section-body table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px;
         }
         .table-section-body th,
         .table-section-body td {
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             text-align: left;
             border-bottom: 1px solid var(--border-light);
-            font-size: 0.85rem;
+            font-size: 0.875rem;
         }
         .table-section-body th {
             background: var(--bg-secondary);
             font-weight: 600;
-            color: var(--text-secondary);
+            color: var(--text);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .table-section-body tr:hover {
+            background: var(--bg-input);
         }
 
         /* Text/Memo Panel Content */
         .text-panel-content {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+            gap: 1.5rem;
         }
         .text-section {
             background: var(--bg-card);
-            border-radius: 8px;
+            border-radius: 12px;
             border: 1px solid var(--border);
-            padding: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .text-section-title {
             font-weight: 600;
-            color: var(--text);
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-light);
+            color: white;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
         }
         .text-section-content {
-            font-size: 0.9rem;
-            line-height: 1.7;
-            color: var(--text-secondary);
+            padding: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text);
+            max-height: 500px;
+            overflow-y: auto;
         }
         .text-section-content h1, .text-section-content h2, .text-section-content h3 {
             color: var(--text);
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
+            margin-top: 1.25rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
         }
-        .text-section-content h1 { font-size: 1.3rem; }
-        .text-section-content h2 { font-size: 1.1rem; }
-        .text-section-content h3 { font-size: 1rem; }
+        .text-section-content h1 { font-size: 1.4rem; }
+        .text-section-content h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem; }
+        .text-section-content h3 { font-size: 1.05rem; }
+        .text-section-content p { margin-bottom: 1rem; }
+        .text-section-content strong { color: var(--text); }
 
         /* Job Info Header */
         .job-info-header {
@@ -3424,8 +3447,8 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            display: flex;
+            flex-direction: column;
             gap: 1.5rem;
         }
 
@@ -3767,6 +3790,11 @@ HTML_PAGE = '''<!DOCTYPE html>
         .job-group-delete:hover {
             background: #fee2e2;
             color: #dc2626;
+        }
+        .job-group-view {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
         .job-group-collection {
             display: flex;
@@ -7725,6 +7753,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<div class="job-group-meta">' +
                     '<span class="job-group-count">' + uniqueItems.length + ' outputs</span>' +
                     '<span class="job-group-date">' + dateStr + '</span>' +
+                    '<button class="job-group-view btn btn-primary btn-sm" onclick="event.stopPropagation(); navigateToJob(&apos;' + jobId + '&apos;)" title="View full job">View</button>' +
                     '<button class="job-group-delete" onclick="event.stopPropagation(); deleteJob(&apos;' + jobId + '&apos;)" title="Delete job">&times;</button>' +
                 '</div>' +
             '</div>';
@@ -7758,6 +7787,11 @@ HTML_PAGE = '''<!DOCTYPE html>
             groupEl.appendChild(itemsContainer);
 
             return groupEl;
+        }
+
+        // Navigate to full job view
+        function navigateToJob(jobId) {
+            window.location.href = '/job/' + jobId;
         }
 
         // Delete entire job from library

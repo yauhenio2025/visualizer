@@ -5947,8 +5947,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     // Get selected output modes
                     const outputModes = [];
                     if ($('output-image').checked) outputModes.push('gemini_image');
-                    if ($('output-table').checked) outputModes.push('smart_table');
-                    if ($('output-text').checked) outputModes.push('text');
+                    if ($('output-table').checked) outputModes.push('comparative_matrix_table');
+                    if ($('output-text').checked) outputModes.push('structured_text_report');
 
                     const payload = {
                         intent: intentText,

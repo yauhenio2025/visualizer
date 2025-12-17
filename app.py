@@ -5226,33 +5226,46 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <!-- Quick Start Section (shows when docs uploaded) -->
                         <div id="quick-start-section" class="quick-start-section hidden">
                             <div class="quick-start-header">
-                                <h4>⚡ Quick Start</h4>
+                                <h4>⚡ Quick Analysis</h4>
                                 <button class="btn btn-sm btn-ghost" onclick="toggleQuickStart()">Hide</button>
                             </div>
                             <div class="quick-picks-grid">
-                                <button class="quick-pick-card" onclick="quickPick('stakeholder_power_interest')">
+                                <button class="quick-pick-card" onclick="executeQuickAction('map_actors')">
                                     <div class="pick-icon">🎯</div>
-                                    <div class="pick-title">Map Key Players</div>
-                                    <div class="pick-desc">Power & relationships</div>
+                                    <div class="pick-title">Map Actors & Networks</div>
+                                    <div class="pick-desc">Who connects to whom?</div>
                                 </button>
-                                <button class="quick-pick-card" onclick="quickPick('argument_architecture')">
+                                <button class="quick-pick-card" onclick="executeQuickAction('evaluate_arguments')">
                                     <div class="pick-icon">⚖️</div>
                                     <div class="pick-title">Evaluate Arguments</div>
-                                    <div class="pick-desc">Logic & evidence</div>
+                                    <div class="pick-desc">How strong are the claims?</div>
                                 </button>
-                                <button class="quick-pick-card" onclick="quickPick('event_timeline_causal')">
+                                <button class="quick-pick-card" onclick="executeQuickAction('trace_evolution')">
                                     <div class="pick-icon">📈</div>
-                                    <div class="pick-title">Build Timeline</div>
-                                    <div class="pick-desc">Sequence & causation</div>
+                                    <div class="pick-title">Trace Evolution</div>
+                                    <div class="pick-desc">How did this develop?</div>
                                 </button>
-                                <button class="quick-pick-card" onclick="quickPick('thematic_synthesis')">
+                                <button class="quick-pick-card" onclick="executeQuickAction('find_patterns')">
                                     <div class="pick-icon">🔍</div>
-                                    <div class="pick-title">Find Themes</div>
-                                    <div class="pick-desc">Patterns & synthesis</div>
+                                    <div class="pick-title">Find Patterns</div>
+                                    <div class="pick-desc">What themes & gaps?</div>
+                                </button>
+                                <button class="quick-pick-card" onclick="executeQuickAction('assess_credibility')">
+                                    <div class="pick-icon">🔬</div>
+                                    <div class="pick-title">Assess Credibility</div>
+                                    <div class="pick-desc">How reliable is this?</div>
+                                </button>
+                                <button class="quick-pick-card" onclick="executeQuickAction('compare_positions')">
+                                    <div class="pick-icon">⚔️</div>
+                                    <div class="pick-title">Compare & Contrast</div>
+                                    <div class="pick-desc">How do views differ?</div>
                                 </button>
                             </div>
+                            <div class="quick-action-note" style="font-size:0.7rem; color:var(--text-muted); margin-top:0.5rem; text-align:center;">
+                                Each action runs 5 engines with visual + table + report outputs
+                            </div>
                             <div id="recent-engines-container" class="recent-engines" style="display:none;">
-                                <div class="recent-engines-label">Recently Used</div>
+                                <div class="recent-engines-label">Recently Used (Single Engine)</div>
                                 <div id="recent-engine-chips" class="recent-engine-chips"></div>
                             </div>
                         </div>
@@ -6421,14 +6434,149 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // ============================================================
-        // Quick Start & Recent Engines
+        // Quick Start & Multi-Engine Quick Actions
         // ============================================================
 
-        // Quick pick - select engine and prepare for analysis
+        // Quick Action Mappings: Each action maps to multiple engines + output modes
+        var quickActionMappings = {
+            'map_actors': {
+                name: 'Map Actors & Networks',
+                icon: '🎯',
+                description: 'Who are the key players and how do they connect?',
+                intent: 'Map the key actors, their relationships, power dynamics, and influence networks',
+                engines: [
+                    'stakeholder_power_interest',
+                    'relational_topology',
+                    'rational_actor_modeling',
+                    'quote_attribution_voice',
+                    'resource_flow_asymmetry'
+                ],
+                outputs: ['gemini_network_graph', 'table', 'structured_text_report'],
+                primaryVisual: 'gemini_network_graph'
+            },
+            'evaluate_arguments': {
+                name: 'Evaluate Arguments',
+                icon: '⚖️',
+                description: 'How strong are the claims and evidence?',
+                intent: 'Evaluate the logical structure, evidence quality, and strength of arguments presented',
+                engines: [
+                    'argument_architecture',
+                    'hypothesis_tournament',
+                    'steelman_generator',
+                    'assumption_excavator',
+                    'evidence_quality_assessment'
+                ],
+                outputs: ['gemini_argument_map', 'table', 'structured_text_report'],
+                primaryVisual: 'gemini_argument_map'
+            },
+            'trace_evolution': {
+                name: 'Trace Evolution',
+                icon: '📈',
+                description: 'How did this develop over time?',
+                intent: 'Trace how concepts, positions, or situations evolved over time with key turning points',
+                engines: [
+                    'event_timeline_causal',
+                    'temporal_discontinuity_finder',
+                    'concept_evolution',
+                    'signal_sentinel',
+                    'escalation_trajectory_analysis'
+                ],
+                outputs: ['gemini_timeline', 'table', 'structured_text_report'],
+                primaryVisual: 'gemini_timeline'
+            },
+            'find_patterns': {
+                name: 'Find Patterns & Themes',
+                icon: '🔍',
+                description: 'What are the recurring patterns and gaps?',
+                intent: 'Identify recurring themes, structural patterns, anomalies, and significant gaps',
+                engines: [
+                    'thematic_synthesis',
+                    'structural_pattern_detector',
+                    'anomaly_detector',
+                    'terra_incognita_mapper',
+                    'comparative_framework'
+                ],
+                outputs: ['gemini_concept_tree', 'table', 'structured_text_report'],
+                primaryVisual: 'gemini_concept_tree'
+            },
+            'assess_credibility': {
+                name: 'Assess Sources & Claims',
+                icon: '🔬',
+                description: 'How reliable is this information?',
+                intent: 'Assess source credibility, claim confidence levels, and potential manipulation',
+                engines: [
+                    'provenance_audit',
+                    'epistemic_calibration',
+                    'authenticity_forensics',
+                    'evidence_quality_assessment',
+                    'surely_alarm'
+                ],
+                outputs: ['gemini_evidence_radar', 'table', 'structured_text_report'],
+                primaryVisual: 'gemini_evidence_radar'
+            },
+            'compare_positions': {
+                name: 'Compare & Contrast',
+                icon: '⚔️',
+                description: 'How do different views stack up?',
+                intent: 'Compare different positions, frameworks, or approaches across sources',
+                engines: [
+                    'comparative_framework',
+                    'dialectical_structure',
+                    'scholarly_debate_map',
+                    'steelman_generator',
+                    'hypothesis_tournament'
+                ],
+                outputs: ['gemini_quadrant_matrix', 'comparative_matrix_table', 'structured_text_report'],
+                primaryVisual: 'gemini_quadrant_matrix'
+            }
+        };
+
+        // Execute a Quick Action - runs multiple engines with appropriate outputs
+        function executeQuickAction(actionKey) {
+            var action = quickActionMappings[actionKey];
+            if (!action) {
+                console.error('Unknown quick action:', actionKey);
+                return;
+            }
+
+            // Switch to Intent mode and populate
+            setEngineMode('intent');
+
+            // Set the intent text
+            var intentInput = $('intent-input');
+            if (intentInput) {
+                intentInput.value = action.intent;
+            }
+
+            // Check the appropriate output checkboxes
+            var outputImage = $('output-image');
+            var outputTable = $('output-table');
+            var outputText = $('output-text');
+
+            if (outputImage) outputImage.checked = action.outputs.includes('gemini_network_graph') ||
+                                                    action.outputs.includes('gemini_timeline') ||
+                                                    action.outputs.includes('gemini_concept_tree') ||
+                                                    action.outputs.includes('gemini_argument_map') ||
+                                                    action.outputs.includes('gemini_evidence_radar') ||
+                                                    action.outputs.includes('gemini_quadrant_matrix') ||
+                                                    action.primaryVisual;
+            if (outputTable) outputTable.checked = action.outputs.includes('table') || action.outputs.includes('comparative_matrix_table');
+            if (outputText) outputText.checked = action.outputs.includes('structured_text_report');
+
+            // Store the action for when we submit
+            window.currentQuickAction = action;
+
+            // Scroll to the intent section
+            $('intent-selection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Update the button
+            updateAnalyzeButton();
+        }
+
+        // Legacy single-engine quick pick (for recent engines)
         function quickPick(engineKey) {
             setEngineMode('engine');
             selectEngine(engineKey);
-            // Scroll to output mode section
             $('output-mode-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
@@ -6444,8 +6592,6 @@ HTML_PAGE = '''<!DOCTYPE html>
             var section = $('quick-start-section');
             var hasDocsSelected = selectedDocs.size > 0;
             section.classList.toggle('hidden', !hasDocsSelected || quickStartHidden);
-
-            // Render recent engines
             renderRecentEngines();
         }
 
@@ -6471,7 +6617,6 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Track engine usage (call when analysis is submitted)
         function trackEngineUsage(engineKey) {
             if (!engineKey) return;
-            // Remove if already exists, add to front
             recentEngines = recentEngines.filter(function(k) { return k !== engineKey; });
             recentEngines.unshift(engineKey);
             recentEngines = recentEngines.slice(0, 5);

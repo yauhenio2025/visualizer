@@ -10,16 +10,16 @@
 │  ✅ COMPLETE - All 10 engines implemented                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  LAYER 1: CIA TRADECRAFT (Analytical Rigor) - REBRANDED        │
-│  ⚠️ ONLY 2 OF 15 ENGINES DONE - THIS IS THE PRIORITY NOW       │
+│  ✅ TIER 1 COMPLETE (5/5) - 10 of 15 engines done               │
 ├─────────────────────────────────────────────────────────────────┤
 │  FOUNDATION: Existing 47 Engines (Document Intelligence)       │
-│  ✅ EXISTS                                                      │
+│  ✅ EXISTS - Now 60 total engines                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**The Problem:** We got enchanted by Dennett and completed all 10 Intuition Pump engines, but only 2 of the 15 CIA tradecraft engines (rebranded to academic terms). The CIA layer provides the analytical RIGOR that the Dennett layer CRITIQUES.
+**Session 4 Achievement:** Completed CIA TIER 1 — the mission-critical tradecraft layer. All five core intelligence analysis engines are now operational.
 
-**The Fix:** Next sessions must prioritize CIA tradecraft engines BEFORE UI work.
+**Next Priority:** TIER 2 engines (5 remaining), then TIER 3 (5 remaining).
 
 ---
 
@@ -51,8 +51,8 @@ visualizer/                     analyzer/
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-17 11:30 UTC
-**Last Session:** Session 3 - Completed all 10 Dennett engines + epistemic_stress_test pipeline
+**Last Updated:** 2025-12-17 12:30 UTC
+**Last Session:** Session 4 - Completed CIA TIER 1 (3 engines + 1 bundle + 1 pipeline)
 
 ### LAYER 2: Dennett Intuition Pumps ✅ COMPLETE
 
@@ -71,17 +71,17 @@ All 10 engines implemented and registered:
 | `provenance_audit` | ✅ | **`source_credibility_assessment`** | Heterophenomenology + source mapping |
 | `epistemic_calibration` | ✅ | **`analytic_confidence_levels`** | Certainty gradient |
 
-### LAYER 1: CIA Tradecraft (Rebranded) ⚠️ INCOMPLETE
+### LAYER 1: CIA Tradecraft (Rebranded)
 
-**TIER 1 - MISSION CRITICAL (2 of 5 done):**
+**TIER 1 - MISSION CRITICAL (5 of 5 done) ✅ COMPLETE:**
 
-| CIA Original | Dennett Rebrand | Status | Priority |
-|--------------|-----------------|--------|----------|
-| `source_credibility_assessment` | `provenance_audit` | ✅ DONE | — |
-| `analytic_confidence_levels` | `epistemic_calibration` | ✅ DONE | — |
-| `competing_hypotheses_analysis` | `hypothesis_tournament` | 🔴 **NOT DONE** | **#1 PRIORITY** |
-| `deception_indicator_detection` | `authenticity_forensics` | 🔴 NOT DONE | #2 PRIORITY |
-| `information_gaps_analysis` | `terra_incognita_mapper` | 🔴 NOT DONE | #3 PRIORITY |
+| CIA Original | Dennett Rebrand | Status | Notes |
+|--------------|-----------------|--------|-------|
+| `source_credibility_assessment` | `provenance_audit` | ✅ DONE | Session 3 |
+| `analytic_confidence_levels` | `epistemic_calibration` | ✅ DONE | Session 3 |
+| `competing_hypotheses_analysis` | `hypothesis_tournament` | ✅ DONE | **Session 4** - ACH methodology |
+| `deception_indicator_detection` | `authenticity_forensics` | ✅ DONE | **Session 4** - Manipulation detection |
+| `information_gaps_analysis` | `terra_incognita_mapper` | ✅ DONE | **Session 4** - Collection requirements |
 
 **TIER 2 - HIGH PRIORITY (0 of 5 done):**
 
@@ -108,7 +108,7 @@ All 10 engines implemented and registered:
 | Bundle | Status | Member Engines |
 |--------|--------|----------------|
 | `dennett_toolkit` | ✅ COMPLETE | surely_alarm, occams_broom, boom_crutch_finder, deepity_detector |
-| `epistemic_rigor_suite` | 🔴 NOT DONE | provenance_audit + epistemic_calibration + hypothesis_tournament + steelman_generator |
+| `epistemic_rigor_suite` | ✅ COMPLETE | provenance_audit, epistemic_calibration, hypothesis_tournament, steelman_generator |
 | `persuasion_archaeology` | 🔴 NOT DONE | surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics |
 | `strategic_warning` | 🔴 NOT DONE | signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder |
 | `network_intelligence` | 🔴 NOT DONE | stakeholder_power_interest + relational_topology + rational_actor_modeling |
@@ -119,49 +119,49 @@ All 10 engines implemented and registered:
 |----------|--------|--------|
 | `dennett_diagnostic` | ✅ COMPLETE | surely_alarm → boom_crutch → deepity → occams_broom |
 | `epistemic_stress_test` | ✅ COMPLETE | argument_architecture → steelman → philosophers_syndrome → epistemic_calibration |
-| `source_to_confidence` | 🔴 NOT DONE | provenance_audit → epistemic_calibration → terra_incognita_mapper |
+| `source_to_confidence` | ✅ COMPLETE | provenance_audit → epistemic_calibration → terra_incognita_mapper |
 | `analytic_rigor_pipeline` | 🔴 NOT DONE | argument_architecture → hypothesis_tournament → steelman_stress_test → epistemic_calibration |
 | `complete_epistemic_audit` | 🔴 NOT DONE | 7-stage comprehensive |
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Session 4+)
+## 🎯 IMMEDIATE NEXT STEPS (Session 5+)
 
-### Priority Order: Complete CIA Tradecraft Layer
+### Priority Order: Complete TIER 2
 
-**Session 4 should implement these 3 engines (completes TIER 1):**
+**Session 5 should implement these engines:**
 
-1. **`hypothesis_tournament`** (was `competing_hypotheses_analysis`)
-   - ACH is THE gold standard intelligence methodology
-   - Category: ARGUMENT
-   - See CIA audit Section VII for schema
-   - ~350 lines estimated
-
-2. **`authenticity_forensics`** (was `deception_indicator_detection`)
-   - Manipulation/disinfo detection
-   - Category: RHETORIC
-   - See CIA audit for manipulation indicators
+1. **`signal_sentinel`** (was `indicators_warnings_tracker`)
+   - I&W tracking — signposts that would indicate change
+   - Category: TEMPORAL
+   - Key for early warning systems
    - ~300 lines estimated
 
-3. **`terra_incognita_mapper`** (was `information_gaps_analysis`)
-   - What we DON'T know - critical for collection tasking
-   - Category: EPISTEMOLOGY
-   - ~280 lines estimated
+2. **`possibility_space_explorer`** (was `scenario_futures_matrix`)
+   - Scenario planning — multiple future paths
+   - Category: SYNTHESIS
+   - Pairs with I&W tracking
+   - ~350 lines estimated
+
+3. **`relational_topology`** (was `network_centrality_analysis`)
+   - Graph-theoretic actor analysis
+   - Category: POWER
+   - Extends stakeholder_power_interest
+   - ~320 lines estimated
 
 **Then create:**
-4. `epistemic_rigor_suite` bundle
-5. `source_to_confidence` pipeline
+- `strategic_warning` bundle (signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder)
 
-### After TIER 1 Complete: TIER 2 Engines
+### After TIER 2: TIER 3 Engines
 
-Session 5-6:
-- `signal_sentinel` (indicators & warnings)
-- `possibility_space_explorer` (scenario futures)
-- `relational_topology` (network centrality)
+Session 6-7:
+- `rational_actor_modeling` (decision maker profiling)
+- `temporal_discontinuity_finder` (timeline anomalies)
+- `steelman_stress_test` (enhanced red team)
 
 ### UI Work Comes AFTER Tradecraft Layer
 
-Do NOT start UI overhaul until at least TIER 1 + TIER 2 engines are complete.
+Do NOT start UI overhaul until at least TIER 2 engines are complete.
 
 ---
 
@@ -209,7 +209,7 @@ Then add import to `/home/evgeny/projects/analyzer/src/engines/__init__.py`
 
 ## Key Schemas from CIA Audit
 
-### `hypothesis_tournament` (ACH) Schema
+### `hypothesis_tournament` (ACH) Schema ✅ IMPLEMENTED
 
 ```json
 {
@@ -287,29 +287,37 @@ F: Cannot Be Judged
 | 2025-12-17 | Session 2 | steelman_generator + jootsing_analyzer + dennett_diagnostic pipeline + Dennett headers on 4 engines |
 | 2025-12-17 | Session 3 | philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration + epistemic_stress_test pipeline. **All 10 Dennett engines complete.** |
 | 2025-12-17 | Session 3 (end) | **CRITICAL INSIGHT:** Identified that CIA tradecraft layer (13 of 15 engines) still missing. Reprioritized roadmap. |
+| 2025-12-17 | Session 4 | **hypothesis_tournament, authenticity_forensics, terra_incognita_mapper + epistemic_rigor_suite bundle + source_to_confidence pipeline. TIER 1 COMPLETE.** |
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Verify all 10 Dennett engines registered
+# Verify all engines registered
 cd /home/evgeny/projects/analyzer
 python -c "
 from src.engines import EngineRegistry
-dennett = ['surely_alarm', 'occams_broom', 'boom_crutch_finder', 'deepity_detector',
-           'steelman_generator', 'jootsing_analyzer', 'philosophers_syndrome_detector',
-           'boundary_probe', 'provenance_audit', 'epistemic_calibration']
-registered = [e.engine_key for e in EngineRegistry.list_engines()]
-for d in dennett:
-    print(f'{d}: {\"✅\" if d in registered else \"❌\"}')"
+engines = [e.engine_key for e in EngineRegistry.list_engines()]
+print(f'Total engines: {len(engines)}')
+
+# Check CIA TIER 1
+tier1 = ['provenance_audit', 'epistemic_calibration', 'hypothesis_tournament',
+         'authenticity_forensics', 'terra_incognita_mapper']
+for e in tier1:
+    print(f'{e}: {\"✅\" if e in engines else \"❌\"}')"
+
+# Verify bundles
+python -c "
+from src.bundles import BundleRegistry
+bundles = [b.bundle_key for b in BundleRegistry.list_bundles()]
+print(f'epistemic_rigor_suite: {\"✅\" if \"epistemic_rigor_suite\" in bundles else \"❌\"}')"
 
 # Verify pipelines
 python -c "
 from src.pipelines import MetaEngineRegistry
-for p in MetaEngineRegistry.list_pipelines():
-    if 'dennett' in p.pipeline_key or 'epistemic' in p.pipeline_key:
-        print(f'{p.pipeline_key}: {len(p.stages)} stages')"
+pipelines = [p.pipeline_key for p in MetaEngineRegistry.list_pipelines()]
+print(f'source_to_confidence: {\"✅\" if \"source_to_confidence\" in pipelines else \"❌\"}')"
 ```
 
 ---
@@ -329,20 +337,26 @@ for p in MetaEngineRegistry.list_pipelines():
 - `philosophers_syndrome_detector.py`, `boundary_probe.py`, `provenance_audit.py`, `epistemic_calibration.py`
 - `epistemic_stress_test.py` (pipeline)
 
+### Session 4
+- `hypothesis_tournament.py` (ACH methodology)
+- `authenticity_forensics.py` (deception/manipulation detection)
+- `terra_incognita_mapper.py` (information gaps + collection requirements)
+- `epistemic_rigor_suite.py` (bundle)
+- `source_to_confidence.py` (pipeline)
+
 ---
 
-## Session 4 Checklist
+## Session 5 Checklist
 
-When starting Session 4:
+When starting Session 5:
 
 - [ ] Read this file
-- [ ] Read `STRATEGIC_AUDIT_CIA_PERSPECTIVE.md` Section VII for schemas
-- [ ] Implement `hypothesis_tournament` engine
-- [ ] Implement `authenticity_forensics` engine
-- [ ] Implement `terra_incognita_mapper` engine
-- [ ] Create `epistemic_rigor_suite` bundle
-- [ ] Create `source_to_confidence` pipeline
+- [ ] Review progress: TIER 1 complete, TIER 2 next
+- [ ] Implement `signal_sentinel` engine
+- [ ] Implement `possibility_space_explorer` engine
+- [ ] Implement `relational_topology` engine
+- [ ] Create `strategic_warning` bundle
 - [ ] Update this progress file
 - [ ] Commit to both repos
 
-**DO NOT start UI work until CIA TIER 1 + TIER 2 engines are complete.**
+**After TIER 2: Consider `analytic_rigor_pipeline` creation**

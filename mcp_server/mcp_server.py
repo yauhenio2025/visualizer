@@ -47,6 +47,14 @@ except ImportError:
     PDF_SUPPORT = False
     logging.warning("pymupdf not installed - PDF text extraction disabled")
 
+# DOCX support
+try:
+    from docx import Document as DocxDocument
+    DOCX_SUPPORT = True
+except ImportError:
+    DOCX_SUPPORT = False
+    logging.warning("python-docx not installed - DOCX text extraction disabled")
+
 # Configure logging to stderr (stdout is reserved for JSON-RPC)
 logging.basicConfig(
     level=logging.INFO,
@@ -102,7 +110,7 @@ POLL_INTERVAL = 5  # seconds
 MAX_POLL_ATTEMPTS = 600  # 30 minutes max
 
 # Supported file extensions for batch processing
-SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.markdown', '.rst', '.tex'}
+SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.markdown', '.rst', '.tex', '.docx'}
 
 
 def sanitize_api_key(key: Optional[str]) -> Optional[str]:
@@ -188,6 +196,31 @@ def extract_pdf_text(file_path: Path) -> str:
         return f"[Error extracting PDF text: {str(e)}]"
 
 
+def extract_docx_text(file_path: Path) -> str:
+    """Extract text from a DOCX file using python-docx."""
+    if not DOCX_SUPPORT:
+        return "[DOCX text extraction not available - install python-docx]"
+
+    try:
+        doc = DocxDocument(str(file_path))
+        text_parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text_parts.append(para.text)
+        # Also extract text from tables
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = []
+                for cell in row.cells:
+                    if cell.text.strip():
+                        row_text.append(cell.text.strip())
+                if row_text:
+                    text_parts.append(" | ".join(row_text))
+        return "\n\n".join(text_parts) if text_parts else "[No text extracted from DOCX]"
+    except Exception as e:
+        return f"[Error extracting DOCX text: {str(e)}]"
+
+
 def read_document(file_path: str) -> Dict[str, Any]:
     """Read a document from file path and return structured document object."""
     path = Path(file_path).expanduser().resolve()
@@ -211,14 +244,24 @@ def read_document(file_path: str) -> Dict[str, Any]:
             extracted_text = extract_pdf_text(path)
         except Exception as e:
             return {"error": f"Cannot read PDF: {str(e)}"}
+    # For DOCX, read as base64 AND extract text
+    elif suffix == '.docx':
+        try:
+            with open(path, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('utf-8')
+            encoding = 'base64'
+            # Also extract text for sample_text usage
+            extracted_text = extract_docx_text(path)
+        except Exception as e:
+            return {"error": f"Cannot read DOCX: {str(e)}"}
     else:
-        # For text files, read as text
+        # For text files (txt, md, markdown, rst, tex), read as text
         try:
             content = path.read_text(encoding='utf-8')
             encoding = 'text'
             extracted_text = content  # Same as content for text files
         except UnicodeDecodeError:
-            return {"error": f"Cannot read file as text (try PDF format): {file_path}"}
+            return {"error": f"Cannot read file as text (not a supported format): {file_path}"}
         except Exception as e:
             return {"error": f"Cannot read file: {str(e)}"}
 

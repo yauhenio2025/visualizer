@@ -582,11 +582,18 @@ Implemented UI optimizations for 70+ engines scale:
 
 **Purpose:** Audit all 70 engines for schema/type consistency.
 
-**Deliverables:**
+**Part 1 - Audit:**
 - [x] Comprehensive audit of all 70 engines
 - [x] Identified 25 engines with custom types (by design)
 - [x] Added runtime curation validation
 - [x] Created audit report with recommendations
+
+**Part 2 - Fixes (all recommendations implemented):**
+- [x] Fixed entity_extraction: `location` → `place`
+- [x] Extended core enums: +4 EntityType, +11 RelationType
+- [x] Created `src/core/extended_types.py` with 16 domain-specific enums
+- [x] Created `scripts/validate_schemas.py` for CI validation
+- [x] Updated audit report with all fixes
 
 **Key Findings:**
 - Engine canonical schemas use domain-specific types (intentional)
@@ -597,7 +604,17 @@ Implemented UI optimizations for 70+ engines scale:
 **Files Created (in analyzer repo):**
 - `audit_schemas.py` — Script to audit all engines
 - `schema_audit_results.json` — Complete audit data
-- `docs/SCHEMA_AUDIT_REPORT.md` — Full findings
-- Modified `src/core/curation.py` — Added validation functions
+- `docs/SCHEMA_AUDIT_REPORT.md` — Full findings + fixes
+- `src/core/curation.py` — Added validation functions
+- `src/core/schemas.py` — Extended EntityType, RelationType
+- `src/core/extended_types.py` — 16 domain-specific enum classes
+- `scripts/validate_schemas.py` — CI validation script
+
+**Validation Results:**
+```
+Validated: 70 engines, 18 bundles, 21 pipelines
+All validations passed!
+Warnings: 15 engines with custom types (expected)
+```
 
 **Next Session Priority:** Additional UI work or engine improvements as needed.

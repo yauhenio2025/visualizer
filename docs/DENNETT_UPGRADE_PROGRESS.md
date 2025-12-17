@@ -1,25 +1,39 @@
-# Dennett Upgrade Implementation Progress
+# Dennett + CIA Tradecraft Upgrade Progress
 
-## Quick Start for New Sessions
+## ⚠️ CRITICAL CONTEXT FOR NEW SESSIONS
 
-**IMPORTANT:** If you're a new Claude session continuing this work, read this file FIRST.
+**READ THIS FIRST.** We are building a TWO-LAYER analytical enhancement:
 
-### What This Project Is
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 2: DENNETT INTUITION PUMPS (Epistemological Critique)   │
+│  ✅ COMPLETE - All 10 engines implemented                       │
+├─────────────────────────────────────────────────────────────────┤
+│  LAYER 1: CIA TRADECRAFT (Analytical Rigor) - REBRANDED        │
+│  ⚠️ ONLY 2 OF 15 ENGINES DONE - THIS IS THE PRIORITY NOW       │
+├─────────────────────────────────────────────────────────────────┤
+│  FOUNDATION: Existing 47 Engines (Document Intelligence)       │
+│  ✅ EXISTS                                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-We're upgrading the Visualizer/Analyzer document intelligence platform to incorporate Daniel Dennett's "Intuition Pumps" as analytical tools. This involves:
+**The Problem:** We got enchanted by Dennett and completed all 10 Intuition Pump engines, but only 2 of the 15 CIA tradecraft engines (rebranded to academic terms). The CIA layer provides the analytical RIGOR that the Dennett layer CRITIQUES.
 
-1. **New Engines** - 10 Dennett-inspired analysis engines
-2. **Prompt Enhancements** - Adding Dennett tools to all existing engines
-3. **UI Overhaul** - Radical new "Analytical Canvas" paradigm
-4. **Renaming** - Academic framing instead of intelligence/spycraft language
+**The Fix:** Next sessions must prioritize CIA tradecraft engines BEFORE UI work.
 
-### Key Files to Read
+---
 
-1. **This file** - `docs/DENNETT_UPGRADE_PROGRESS.md` - Current progress and next steps
-2. **Main plan** - `docs/IMPLEMENTATION_PLAN_DENNETT_UPGRADE.md` - Full design specification
-3. **Original audit** - `docs/STRATEGIC_AUDIT_CIA_PERSPECTIVE.md` - Initial gap analysis
+## Quick Reference: What We're Building
 
-### Architecture Overview
+### Source Documents (READ THESE)
+
+| Document | Purpose | Priority |
+|----------|---------|----------|
+| `docs/STRATEGIC_AUDIT_CIA_PERSPECTIVE.md` | Original gap analysis - lists ALL missing tradecraft engines | **READ FIRST** |
+| `docs/IMPLEMENTATION_PLAN_DENNETT_UPGRADE.md` | Dennett tools + renaming scheme | Reference |
+| This file | Current progress and next steps | Working doc |
+
+### Architecture
 
 ```
 VISUALIZER (Frontend/Proxy)     ANALYZER (Backend/Engines)
@@ -31,90 +45,127 @@ visualizer/                     analyzer/
                                 └── src/core/schemas.py (Data models)
 ```
 
-**Engines live in Analyzer, not Visualizer.** To add an engine:
-1. Create `/home/evgeny/projects/analyzer/src/engines/{engine_key}.py`
-2. Register it in the engine registry
-3. Define extraction_prompt, curation_prompt, canonical_schema
+**Engines live in Analyzer, not Visualizer.**
 
 ---
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-17 11:00 UTC
-**Last Session:** Implemented 4 new Dennett engines (philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration) + epistemic_stress_test pipeline
+**Last Updated:** 2025-12-17 11:30 UTC
+**Last Session:** Session 3 - Completed all 10 Dennett engines + epistemic_stress_test pipeline
 
-### Phase 1: Dennett Core Engines
+### LAYER 2: Dennett Intuition Pumps ✅ COMPLETE
 
-| Engine | Status | File | Notes |
-|--------|--------|------|-------|
-| `surely_alarm` | ✅ COMPLETE | `/analyzer/src/engines/surely_alarm.py` | Detects rhetorical confidence markers |
-| `occams_broom` | ✅ COMPLETE | `/analyzer/src/engines/occams_broom.py` | Detects strategic omissions |
-| `boom_crutch_finder` | ✅ COMPLETE | `/analyzer/src/engines/boom_crutch_finder.py` | Finds "then magic happens" gaps |
-| `deepity_detector` | ✅ COMPLETE | `/analyzer/src/engines/deepity_detector.py` | Pseudo-profundity scanner |
-| `steelman_generator` | ✅ COMPLETE | `/analyzer/src/engines/steelman_generator.py` | Rapoport's Rules: strongest argument version |
-| `jootsing_analyzer` | ✅ COMPLETE | `/analyzer/src/engines/jootsing_analyzer.py` | System boundary explorer - jumping out of the system |
-| `philosophers_syndrome_detector` | ✅ COMPLETE | `/analyzer/src/engines/philosophers_syndrome_detector.py` | Imagination failure detector |
-| `boundary_probe` | ✅ COMPLETE | `/analyzer/src/engines/boundary_probe.py` | Sortes paradox analysis |
-| `provenance_audit` | ✅ COMPLETE | `/analyzer/src/engines/provenance_audit.py` | Source quality mapping with heterophenomenology |
-| `epistemic_calibration` | ✅ COMPLETE | `/analyzer/src/engines/epistemic_calibration.py` | Certainty gradient with uncertainty types |
+All 10 engines implemented and registered:
 
-### Phase 2: Existing Engine Enhancements
+| Engine | Status | CIA Equivalent | Notes |
+|--------|--------|----------------|-------|
+| `surely_alarm` | ✅ | — | Rhetorical confidence markers |
+| `occams_broom` | ✅ | — | Strategic omissions |
+| `boom_crutch_finder` | ✅ | — | "Then magic happens" gaps |
+| `deepity_detector` | ✅ | — | Pseudo-profundity scanner |
+| `steelman_generator` | ✅ | `red_team_challenge` (partial) | Rapoport's Rules |
+| `jootsing_analyzer` | ✅ | — | System boundary explorer |
+| `philosophers_syndrome_detector` | ✅ | — | Imagination failure detector |
+| `boundary_probe` | ✅ | — | Sortes paradox analysis |
+| `provenance_audit` | ✅ | **`source_credibility_assessment`** | Heterophenomenology + source mapping |
+| `epistemic_calibration` | ✅ | **`analytic_confidence_levels`** | Certainty gradient |
 
-| Engine | Dennett Header Added | Enhanced Prompt | Notes |
-|--------|---------------------|-----------------|-------|
-| `argument_architecture` | ✅ YES | ✅ YES | Toulmin + Dennett toolkit |
-| `assumption_excavation` | ✅ YES | ✅ YES | Dennett archaeological probes |
-| `rhetorical_strategy` | ✅ YES | ✅ YES | Rhetorical + Dennett fairness checks |
-| `evidence_quality_assessment` | ✅ YES | ✅ YES | Epistemic rigor + provenance |
-| `absent_center` | 🔴 NO | 🔴 NO | Related to occams_broom |
-| `contrarian_concept_generation` | 🔴 NO | 🔴 NO | Related to steelman |
-| [Other 41 engines] | 🔴 NO | 🔴 NO | Phase 2 |
+### LAYER 1: CIA Tradecraft (Rebranded) ⚠️ INCOMPLETE
 
-### Phase 3: Bundles
+**TIER 1 - MISSION CRITICAL (2 of 5 done):**
 
-| Bundle | Status | File | Notes |
-|--------|--------|------|-------|
-| `dennett_toolkit` | ✅ COMPLETE | `/analyzer/src/bundles/dennett_toolkit.py` | Core 4 Dennett engines |
-| `epistemic_rigor_suite` | 🔴 NOT STARTED | — | Renamed from intelligence_tradecraft |
-| `persuasion_archaeology` | 🔴 NOT STARTED | — | Rhetoric analysis |
+| CIA Original | Dennett Rebrand | Status | Priority |
+|--------------|-----------------|--------|----------|
+| `source_credibility_assessment` | `provenance_audit` | ✅ DONE | — |
+| `analytic_confidence_levels` | `epistemic_calibration` | ✅ DONE | — |
+| `competing_hypotheses_analysis` | `hypothesis_tournament` | 🔴 **NOT DONE** | **#1 PRIORITY** |
+| `deception_indicator_detection` | `authenticity_forensics` | 🔴 NOT DONE | #2 PRIORITY |
+| `information_gaps_analysis` | `terra_incognita_mapper` | 🔴 NOT DONE | #3 PRIORITY |
 
-### Phase 4: Pipelines
+**TIER 2 - HIGH PRIORITY (0 of 5 done):**
 
-| Pipeline | Status | Notes |
-|----------|--------|-------|
-| `dennett_diagnostic` | ✅ COMPLETE | 4-stage Dennett sweep: surely_alarm → boom_crutch → deepity → occams_broom |
-| `epistemic_stress_test` | ✅ COMPLETE | 4-stage: argument_architecture → steelman → philosophers_syndrome → epistemic_calibration |
-| `complete_epistemic_audit` | 🔴 NOT STARTED | 7-stage comprehensive |
+| CIA Original | Dennett Rebrand | Status | Notes |
+|--------------|-----------------|--------|-------|
+| `indicators_warnings_tracker` | `signal_sentinel` | 🔴 NOT DONE | I&W tracking |
+| `scenario_futures_matrix` | `possibility_space_explorer` | 🔴 NOT DONE | Scenario planning |
+| `network_centrality_analysis` | `relational_topology` | 🔴 NOT DONE | Graph-theoretic analysis |
+| `decision_maker_profiling` | `rational_actor_modeling` | 🔴 NOT DONE | Leader psychology |
+| `timeline_anomaly_detection` | `temporal_discontinuity_finder` | 🔴 NOT DONE | Pattern breaks |
 
-### Phase 5: UI Overhaul
+**TIER 3 - ENHANCED CAPABILITY (0 of 5 done):**
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Canvas architecture | 🔴 NOT STARTED | Infinite canvas base |
-| Node/edge system | 🔴 NOT STARTED | Document/analysis nodes |
-| Lens system | 🔴 NOT STARTED | Analytical overlays |
-| Hypothesis workspace | 🔴 NOT STARTED | ACH-style matrix |
-| Certainty dashboard | 🔴 NOT STARTED | Confidence visualization |
+| CIA Original | Dennett Rebrand | Status | Notes |
+|--------------|-----------------|--------|-------|
+| `red_team_challenge` | `steelman_stress_test` | 🟡 PARTIAL | `steelman_generator` covers some |
+| `escalation_trajectory_analysis` | — | 🔴 NOT DONE | Crisis progression |
+| `opportunity_vulnerability_matrix` | — | 🔴 NOT DONE | Exploitable gaps |
+| `influence_attribution_analysis` | — | 🔴 NOT DONE | Campaign attribution |
+| `key_intelligence_questions_mapper` | — | 🔴 NOT DONE | KIQ/EEI alignment |
+
+### Bundles Status
+
+| Bundle | Status | Member Engines |
+|--------|--------|----------------|
+| `dennett_toolkit` | ✅ COMPLETE | surely_alarm, occams_broom, boom_crutch_finder, deepity_detector |
+| `epistemic_rigor_suite` | 🔴 NOT DONE | provenance_audit + epistemic_calibration + hypothesis_tournament + steelman_generator |
+| `persuasion_archaeology` | 🔴 NOT DONE | surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics |
+| `strategic_warning` | 🔴 NOT DONE | signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder |
+| `network_intelligence` | 🔴 NOT DONE | stakeholder_power_interest + relational_topology + rational_actor_modeling |
+
+### Pipelines Status
+
+| Pipeline | Status | Stages |
+|----------|--------|--------|
+| `dennett_diagnostic` | ✅ COMPLETE | surely_alarm → boom_crutch → deepity → occams_broom |
+| `epistemic_stress_test` | ✅ COMPLETE | argument_architecture → steelman → philosophers_syndrome → epistemic_calibration |
+| `source_to_confidence` | 🔴 NOT DONE | provenance_audit → epistemic_calibration → terra_incognita_mapper |
+| `analytic_rigor_pipeline` | 🔴 NOT DONE | argument_architecture → hypothesis_tournament → steelman_stress_test → epistemic_calibration |
+| `complete_epistemic_audit` | 🔴 NOT DONE | 7-stage comprehensive |
 
 ---
 
-## Implementation Order
+## 🎯 IMMEDIATE NEXT STEPS (Session 4+)
 
-### Current Sprint: Phase 1.1 - First 4 Dennett Engines
+### Priority Order: Complete CIA Tradecraft Layer
 
-**IMMEDIATE NEXT STEPS:**
+**Session 4 should implement these 3 engines (completes TIER 1):**
 
-1. ✅ Read this progress file
-2. ⏳ Implement `surely_alarm` engine
-3. ⏳ Implement `occams_broom` engine
-4. ⏳ Implement `boom_crutch_finder` engine
-5. ⏳ Implement `deepity_detector` engine
-6. ⏳ Create `dennett_toolkit` bundle
-7. ⏳ Update this progress file
+1. **`hypothesis_tournament`** (was `competing_hypotheses_analysis`)
+   - ACH is THE gold standard intelligence methodology
+   - Category: ARGUMENT
+   - See CIA audit Section VII for schema
+   - ~350 lines estimated
 
-### Implementation Pattern for Each Engine
+2. **`authenticity_forensics`** (was `deception_indicator_detection`)
+   - Manipulation/disinfo detection
+   - Category: RHETORIC
+   - See CIA audit for manipulation indicators
+   - ~300 lines estimated
 
-Each engine needs:
+3. **`terra_incognita_mapper`** (was `information_gaps_analysis`)
+   - What we DON'T know - critical for collection tasking
+   - Category: EPISTEMOLOGY
+   - ~280 lines estimated
+
+**Then create:**
+4. `epistemic_rigor_suite` bundle
+5. `source_to_confidence` pipeline
+
+### After TIER 1 Complete: TIER 2 Engines
+
+Session 5-6:
+- `signal_sentinel` (indicators & warnings)
+- `possibility_space_explorer` (scenario futures)
+- `relational_topology` (network centrality)
+
+### UI Work Comes AFTER Tradecraft Layer
+
+Do NOT start UI overhaul until at least TIER 1 + TIER 2 engines are complete.
+
+---
+
+## Engine Implementation Pattern
 
 ```python
 # /home/evgeny/projects/analyzer/src/engines/{engine_key}.py
@@ -127,8 +178,8 @@ class {ClassName}Engine(BaseEngine):
     engine_key = "{engine_key}"
     engine_name = "{Human Name}"
     description = "..."
-    kind = EngineKind.SYNTHESIS  # or RELATIONAL, etc.
-    category = EngineCategory.RHETORIC  # or ARGUMENT, EPISTEMOLOGY, etc.
+    kind = EngineKind.SYNTHESIS
+    category = EngineCategory.{CATEGORY}
     reasoning_domain = "..."
     researcher_question = "..."
     version = 1
@@ -156,83 +207,74 @@ Then add import to `/home/evgeny/projects/analyzer/src/engines/__init__.py`
 
 ---
 
-## Session Handoff Checklist
+## Key Schemas from CIA Audit
 
-When ending a session, ensure:
+### `hypothesis_tournament` (ACH) Schema
 
-- [ ] This PROGRESS.md is updated with exact status
-- [ ] Any partially-written files are noted
-- [ ] Next immediate step is clearly stated
-- [ ] Any blockers or issues are documented
-
-When starting a new session:
-
-1. Read `docs/DENNETT_UPGRADE_PROGRESS.md` (this file)
-2. Check "Current Implementation Status" table
-3. Find the first 🔴 NOT STARTED item
-4. Read relevant section in `docs/IMPLEMENTATION_PLAN_DENNETT_UPGRADE.md`
-5. Implement following the pattern above
-6. Update this file before ending session
-
----
-
-## Technical Context
-
-### EngineCategory Enum
-
-Located at `/home/evgeny/projects/analyzer/src/core/schemas.py`:
-
-```python
-class EngineCategory(str, Enum):
-    ARGUMENT = "argument"
-    CONCEPTS = "concepts"
-    TEMPORAL = "temporal"
-    POWER = "power"
-    EVIDENCE = "evidence"
-    RHETORIC = "rhetoric"
-    EPISTEMOLOGY = "epistemology"
-    SCHOLARLY = "scholarly"
-    MARKET = "market"
+```json
+{
+  "hypotheses": [
+    {
+      "id": "string",
+      "description": "string",
+      "initial_likelihood": "string"
+    }
+  ],
+  "evidence_items": [
+    {
+      "id": "string",
+      "description": "string",
+      "source": "string",
+      "evaluations": {
+        "H1": "CONSISTENT | INCONSISTENT | NEUTRAL",
+        "H2": "CONSISTENT | INCONSISTENT | NEUTRAL"
+      },
+      "diagnosticity": "HIGH | MEDIUM | LOW"
+    }
+  ],
+  "analysis": {
+    "most_supported_hypothesis": "string",
+    "confidence": "string",
+    "key_discriminating_evidence": ["string"],
+    "critical_uncertainties": ["string"],
+    "collection_priorities": ["string"]
+  }
+}
 ```
 
-### EngineKind Enum
+### Source Reliability Scale (IC Standard)
 
-```python
-class EngineKind(str, Enum):
-    PRIMITIVE = "primitive"      # Single-purpose extraction
-    RELATIONAL = "relational"    # Maps relationships
-    SYNTHESIS = "synthesis"      # Aggregates/synthesizes
+```
+A: Reliable (no doubt of authenticity, trustworthiness, competency)
+B: Usually Reliable (minor doubt)
+C: Fairly Reliable (doubt in some instances)
+D: Not Usually Reliable (significant doubt)
+E: Unreliable (lacking authenticity, trustworthiness, competency)
+F: Cannot Be Judged
 ```
 
-### Output Modes Available
+### Information Validity Scale (1-6)
 
-- `structured_text_report` - Markdown narrative
-- `table` / `comparative_matrix_table` - HTML tables
-- `gemini_*` - Various 4K visualizations
-- `mermaid` - Diagram code
+```
+1: Confirmed by independent sources
+2: Probably true (consistent with other information)
+3: Possibly true (not confirmed, not contradicted)
+4: Doubtfully true (inconsistent with other information)
+5: Improbable (contradicted by other information)
+6: Cannot be judged
+```
 
----
+### Confidence Language (IC Standard)
 
-## Notes and Decisions
-
-### Design Decisions Made
-
-1. **Dennett engines are SYNTHESIS type** - They analyze/judge, not just extract
-2. **Category assignment:**
-   - `surely_alarm` → RHETORIC (analyzes language use)
-   - `occams_broom` → EPISTEMOLOGY (analyzes knowledge gaps)
-   - `boom_crutch_finder` → ARGUMENT (analyzes reasoning)
-   - `deepity_detector` → RHETORIC (analyzes language)
-3. **Primary outputs:** Most Dennett engines output `structured_text_report` + `table`
-
-### Open Questions
-
-- [ ] Should Dennett engines have Gemini visualizations? (Probably later)
-- [ ] Exact scoring scales for vulnerability/severity ratings
-
-### Known Issues
-
-(None yet - just starting implementation)
+```
+"almost certain" = 95%+ probability
+"highly likely" = 80-95% probability
+"likely" = 60-80% probability
+"roughly even chance" = 40-60% probability
+"unlikely" = 20-40% probability
+"highly unlikely" = 5-20% probability
+"remote" = <5% probability
+```
 
 ---
 
@@ -240,80 +282,67 @@ class EngineKind(str, Enum):
 
 | Date | Session | Changes |
 |------|---------|---------|
-| 2025-12-17 | Initial | Created implementation plan, progress tracker, began implementation |
-| 2025-12-17 | Session 1 | Implemented 4 core Dennett engines: surely_alarm, occams_broom, boom_crutch_finder, deepity_detector. Created dennett_toolkit bundle. All registered in __init__.py files. |
-| 2025-12-17 | Session 2 | Implemented steelman_generator + jootsing_analyzer engines. Created dennett_diagnostic pipeline. Added Dennett headers to 4 priority engines (argument_architecture, assumption_excavation, rhetorical_strategy, evidence_quality_assessment). |
-| 2025-12-17 | Session 3 | Implemented philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration engines. Created epistemic_stress_test pipeline. All 10 core Dennett engines now complete! |
+| 2025-12-17 | Initial | Created implementation plan, progress tracker |
+| 2025-12-17 | Session 1 | 4 core Dennett engines + dennett_toolkit bundle |
+| 2025-12-17 | Session 2 | steelman_generator + jootsing_analyzer + dennett_diagnostic pipeline + Dennett headers on 4 engines |
+| 2025-12-17 | Session 3 | philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration + epistemic_stress_test pipeline. **All 10 Dennett engines complete.** |
+| 2025-12-17 | Session 3 (end) | **CRITICAL INSIGHT:** Identified that CIA tradecraft layer (13 of 15 engines) still missing. Reprioritized roadmap. |
 
 ---
 
-**NEXT SESSION: Phase 2 - Enhance existing engines with Dennett headers + create remaining bundles**
-
-## Immediate Next Steps (for next session)
-
-### All 10 Core Dennett Engines are COMPLETE! 🎉
-
-1. ✅ Read this progress file
-2. ⏳ Add Dennett headers to remaining priority engines:
-   - `absent_center` (related to occams_broom)
-   - `contrarian_concept_generation` (related to steelman)
-   - Other high-value engines
-3. ⏳ Create `epistemic_rigor_suite` bundle (provenance_audit + epistemic_calibration + steelman_generator)
-4. ⏳ Create `persuasion_archaeology` bundle (surely_alarm + deepity_detector + rhetorical_strategy)
-5. ⏳ Create `complete_epistemic_audit` pipeline (7-stage comprehensive)
-6. ⏳ Begin Phase 5: UI Overhaul planning
-
-## Files Created/Modified This Session (Session 3)
-
-**New Engines (in /home/evgeny/projects/analyzer/src/engines/):**
-- `philosophers_syndrome_detector.py` - ~280 lines, Imagination failure vs impossibility detection
-- `boundary_probe.py` - ~300 lines, Sortes paradox analysis for concept boundaries
-- `provenance_audit.py` - ~320 lines, Source quality mapping with heterophenomenology
-- `epistemic_calibration.py` - ~340 lines, Certainty gradient with uncertainty type classification
-
-**New Pipelines (in /home/evgeny/projects/analyzer/src/pipelines/):**
-- `epistemic_stress_test.py` - 4-stage pipeline: argument_architecture → steelman_generator → philosophers_syndrome_detector → epistemic_calibration
-
-**Updated:**
-- `/analyzer/src/engines/__init__.py` - Added 4 new Dennett engines
-- `/analyzer/src/pipelines/__init__.py` - Added epistemic_stress_test pipeline
-
-## Previous Session Files (Session 2)
-
-**New Engines (in /home/evgeny/projects/analyzer/src/engines/):**
-- `steelman_generator.py` - ~280 lines, Rapoport's Rules for steelmanning arguments
-- `jootsing_analyzer.py` - ~300 lines, System boundary explorer
-
-**New Pipelines (in /home/evgeny/projects/analyzer/src/pipelines/):**
-- `dennett_diagnostic.py` - 4-stage pipeline: surely_alarm → boom_crutch_finder → deepity_detector → occams_broom
-
-**Modified Engines (Dennett headers added):**
-- `argument_architecture.py` - Enhanced with Dennett toolkit integration
-- `assumption_excavation.py` - Enhanced with Dennett archaeological probes
-- `rhetorical_strategy.py` - Enhanced with Dennett fairness checks
-- `evidence_quality_assessment.py` - Enhanced with epistemic rigor tools
-
-## Previous Session Files
-
-**Engines (in /home/evgeny/projects/analyzer/src/engines/):**
-- `surely_alarm.py` - ~250 lines, fully functional
-- `occams_broom.py` - ~280 lines, fully functional
-- `boom_crutch_finder.py` - ~300 lines, fully functional
-- `deepity_detector.py` - ~290 lines, fully functional
-
-**Bundles (in /home/evgeny/projects/analyzer/src/bundles/):**
-- `dennett_toolkit.py` - ~150 lines, bundles all 4 core engines
-
 ## Verification Commands
 
-To verify engines are registered correctly:
 ```bash
+# Verify all 10 Dennett engines registered
 cd /home/evgeny/projects/analyzer
-python -c "from src.engines import EngineRegistry; print([e.engine_key for e in EngineRegistry.list_engines() if 'surely' in e.engine_key or 'occam' in e.engine_key or 'boom' in e.engine_key or 'deepity' in e.engine_key])"
+python -c "
+from src.engines import EngineRegistry
+dennett = ['surely_alarm', 'occams_broom', 'boom_crutch_finder', 'deepity_detector',
+           'steelman_generator', 'jootsing_analyzer', 'philosophers_syndrome_detector',
+           'boundary_probe', 'provenance_audit', 'epistemic_calibration']
+registered = [e.engine_key for e in EngineRegistry.list_engines()]
+for d in dennett:
+    print(f'{d}: {\"✅\" if d in registered else \"❌\"}')"
+
+# Verify pipelines
+python -c "
+from src.pipelines import MetaEngineRegistry
+for p in MetaEngineRegistry.list_pipelines():
+    if 'dennett' in p.pipeline_key or 'epistemic' in p.pipeline_key:
+        print(f'{p.pipeline_key}: {len(p.stages)} stages')"
 ```
 
-To verify bundle is registered:
-```bash
-cd /home/evgeny/projects/analyzer
-python -c "from src.bundles import BundleRegistry; print([b.bundle_key for b in BundleRegistry.list_bundles() if 'dennett' in b.bundle_key])"
-```
+---
+
+## Files Created Across All Sessions
+
+### Session 1
+- `surely_alarm.py`, `occams_broom.py`, `boom_crutch_finder.py`, `deepity_detector.py`
+- `dennett_toolkit.py` (bundle)
+
+### Session 2
+- `steelman_generator.py`, `jootsing_analyzer.py`
+- `dennett_diagnostic.py` (pipeline)
+- Enhanced: argument_architecture, assumption_excavation, rhetorical_strategy, evidence_quality_assessment
+
+### Session 3
+- `philosophers_syndrome_detector.py`, `boundary_probe.py`, `provenance_audit.py`, `epistemic_calibration.py`
+- `epistemic_stress_test.py` (pipeline)
+
+---
+
+## Session 4 Checklist
+
+When starting Session 4:
+
+- [ ] Read this file
+- [ ] Read `STRATEGIC_AUDIT_CIA_PERSPECTIVE.md` Section VII for schemas
+- [ ] Implement `hypothesis_tournament` engine
+- [ ] Implement `authenticity_forensics` engine
+- [ ] Implement `terra_incognita_mapper` engine
+- [ ] Create `epistemic_rigor_suite` bundle
+- [ ] Create `source_to_confidence` pipeline
+- [ ] Update this progress file
+- [ ] Commit to both repos
+
+**DO NOT start UI work until CIA TIER 1 + TIER 2 engines are complete.**

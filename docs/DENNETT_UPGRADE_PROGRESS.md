@@ -40,8 +40,8 @@ visualizer/                     analyzer/
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-17 10:00 UTC
-**Last Session:** Implemented steelman_generator, jootsing_analyzer + dennett_diagnostic pipeline + Dennett headers on 4 priority engines
+**Last Updated:** 2025-12-17 11:00 UTC
+**Last Session:** Implemented 4 new Dennett engines (philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration) + epistemic_stress_test pipeline
 
 ### Phase 1: Dennett Core Engines
 
@@ -53,10 +53,10 @@ visualizer/                     analyzer/
 | `deepity_detector` | ✅ COMPLETE | `/analyzer/src/engines/deepity_detector.py` | Pseudo-profundity scanner |
 | `steelman_generator` | ✅ COMPLETE | `/analyzer/src/engines/steelman_generator.py` | Rapoport's Rules: strongest argument version |
 | `jootsing_analyzer` | ✅ COMPLETE | `/analyzer/src/engines/jootsing_analyzer.py` | System boundary explorer - jumping out of the system |
-| `philosophers_syndrome_detector` | 🔴 NOT STARTED | — | Imagination vs necessity |
-| `boundary_probe` | 🔴 NOT STARTED | — | Sortes paradox analysis |
-| `provenance_audit` | 🔴 NOT STARTED | — | Source quality mapping |
-| `epistemic_calibration` | 🔴 NOT STARTED | — | Certainty gradient |
+| `philosophers_syndrome_detector` | ✅ COMPLETE | `/analyzer/src/engines/philosophers_syndrome_detector.py` | Imagination failure detector |
+| `boundary_probe` | ✅ COMPLETE | `/analyzer/src/engines/boundary_probe.py` | Sortes paradox analysis |
+| `provenance_audit` | ✅ COMPLETE | `/analyzer/src/engines/provenance_audit.py` | Source quality mapping with heterophenomenology |
+| `epistemic_calibration` | ✅ COMPLETE | `/analyzer/src/engines/epistemic_calibration.py` | Certainty gradient with uncertainty types |
 
 ### Phase 2: Existing Engine Enhancements
 
@@ -83,7 +83,7 @@ visualizer/                     analyzer/
 | Pipeline | Status | Notes |
 |----------|--------|-------|
 | `dennett_diagnostic` | ✅ COMPLETE | 4-stage Dennett sweep: surely_alarm → boom_crutch → deepity → occams_broom |
-| `epistemic_stress_test` | 🔴 NOT STARTED | Arguments → confidence |
+| `epistemic_stress_test` | ✅ COMPLETE | 4-stage: argument_architecture → steelman → philosophers_syndrome → epistemic_calibration |
 | `complete_epistemic_audit` | 🔴 NOT STARTED | 7-stage comprehensive |
 
 ### Phase 5: UI Overhaul
@@ -243,22 +243,42 @@ class EngineKind(str, Enum):
 | 2025-12-17 | Initial | Created implementation plan, progress tracker, began implementation |
 | 2025-12-17 | Session 1 | Implemented 4 core Dennett engines: surely_alarm, occams_broom, boom_crutch_finder, deepity_detector. Created dennett_toolkit bundle. All registered in __init__.py files. |
 | 2025-12-17 | Session 2 | Implemented steelman_generator + jootsing_analyzer engines. Created dennett_diagnostic pipeline. Added Dennett headers to 4 priority engines (argument_architecture, assumption_excavation, rhetorical_strategy, evidence_quality_assessment). |
+| 2025-12-17 | Session 3 | Implemented philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration engines. Created epistemic_stress_test pipeline. All 10 core Dennett engines now complete! |
 
 ---
 
-**NEXT SESSION: Continue with remaining Dennett engines**
+**NEXT SESSION: Phase 2 - Enhance existing engines with Dennett headers + create remaining bundles**
 
 ## Immediate Next Steps (for next session)
 
-1. ✅ Read this progress file
-2. ⏳ Implement `philosophers_syndrome_detector` engine (Imagination vs necessity)
-3. ⏳ Implement `boundary_probe` engine (Sortes paradox analysis)
-4. ⏳ Implement `provenance_audit` engine (Source quality mapping)
-5. ⏳ Implement `epistemic_calibration` engine (Certainty gradient)
-6. ⏳ Create `epistemic_stress_test` pipeline
-7. ⏳ Add Dennett headers to remaining engines (absent_center, contrarian_concept_generation, etc.)
+### All 10 Core Dennett Engines are COMPLETE! 🎉
 
-## Files Created/Modified This Session (Session 2)
+1. ✅ Read this progress file
+2. ⏳ Add Dennett headers to remaining priority engines:
+   - `absent_center` (related to occams_broom)
+   - `contrarian_concept_generation` (related to steelman)
+   - Other high-value engines
+3. ⏳ Create `epistemic_rigor_suite` bundle (provenance_audit + epistemic_calibration + steelman_generator)
+4. ⏳ Create `persuasion_archaeology` bundle (surely_alarm + deepity_detector + rhetorical_strategy)
+5. ⏳ Create `complete_epistemic_audit` pipeline (7-stage comprehensive)
+6. ⏳ Begin Phase 5: UI Overhaul planning
+
+## Files Created/Modified This Session (Session 3)
+
+**New Engines (in /home/evgeny/projects/analyzer/src/engines/):**
+- `philosophers_syndrome_detector.py` - ~280 lines, Imagination failure vs impossibility detection
+- `boundary_probe.py` - ~300 lines, Sortes paradox analysis for concept boundaries
+- `provenance_audit.py` - ~320 lines, Source quality mapping with heterophenomenology
+- `epistemic_calibration.py` - ~340 lines, Certainty gradient with uncertainty type classification
+
+**New Pipelines (in /home/evgeny/projects/analyzer/src/pipelines/):**
+- `epistemic_stress_test.py` - 4-stage pipeline: argument_architecture → steelman_generator → philosophers_syndrome_detector → epistemic_calibration
+
+**Updated:**
+- `/analyzer/src/engines/__init__.py` - Added 4 new Dennett engines
+- `/analyzer/src/pipelines/__init__.py` - Added epistemic_stress_test pipeline
+
+## Previous Session Files (Session 2)
 
 **New Engines (in /home/evgeny/projects/analyzer/src/engines/):**
 - `steelman_generator.py` - ~280 lines, Rapoport's Rules for steelmanning arguments
@@ -272,10 +292,6 @@ class EngineKind(str, Enum):
 - `assumption_excavation.py` - Enhanced with Dennett archaeological probes
 - `rhetorical_strategy.py` - Enhanced with Dennett fairness checks
 - `evidence_quality_assessment.py` - Enhanced with epistemic rigor tools
-
-**Updated:**
-- `/analyzer/src/engines/__init__.py` - Added steelman_generator, jootsing_analyzer
-- `/analyzer/src/pipelines/__init__.py` - Added dennett_diagnostic pipeline
 
 ## Previous Session Files
 

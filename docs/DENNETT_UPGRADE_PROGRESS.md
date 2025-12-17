@@ -127,41 +127,216 @@ All 10 engines implemented and registered:
 
 ## 🎯 IMMEDIATE NEXT STEPS (Session 5+)
 
-### Priority Order: Complete TIER 2
+### Priority Order: Complete TIER 2 (5 engines)
 
-**Session 5 should implement these engines:**
+**Session 5 Target: All 5 TIER 2 engines + strategic_warning bundle**
 
-1. **`signal_sentinel`** (was `indicators_warnings_tracker`)
-   - I&W tracking — signposts that would indicate change
-   - Category: TEMPORAL
-   - Key for early warning systems
-   - ~300 lines estimated
+---
 
-2. **`possibility_space_explorer`** (was `scenario_futures_matrix`)
-   - Scenario planning — multiple future paths
-   - Category: SYNTHESIS
-   - Pairs with I&W tracking
-   - ~350 lines estimated
+### ENGINE 1: `signal_sentinel` (was `indicators_warnings_tracker`)
 
-3. **`relational_topology`** (was `network_centrality_analysis`)
-   - Graph-theoretic actor analysis
-   - Category: POWER
-   - Extends stakeholder_power_interest
-   - ~320 lines estimated
+**Purpose:** Track early warning indicators against established signposts. What observable changes would signal that a scenario is unfolding?
 
-**Then create:**
-- `strategic_warning` bundle (signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder)
+**Category:** TEMPORAL
 
-### After TIER 2: TIER 3 Engines
+**Core Concept:** I&W (Indications & Warnings) methodology
+- Define SIGNPOSTS: Observable events that would indicate change
+- Track INDICATORS: Current evidence for/against each signpost
+- Assess TRAJECTORY: Direction of change
+- Flag THRESHOLD CROSSINGS: When indicators suggest action needed
 
-Session 6-7:
-- `rational_actor_modeling` (decision maker profiling)
-- `temporal_discontinuity_finder` (timeline anomalies)
-- `steelman_stress_test` (enhanced red team)
+**Key Schema Elements:**
+```
+signposts: [
+  {id, description, scenario_it_signals, observable_indicators[], threshold_for_action}
+]
+indicators: [
+  {id, signpost_id, current_status, trend, last_observed, evidence}
+]
+warning_assessment: {
+  overall_posture: NORMAL | ELEVATED | HIGH | CRITICAL,
+  most_active_signposts: [],
+  trajectory: STABLE | ESCALATING | DE-ESCALATING
+}
+```
+
+**Use Case:** "What signs should we watch for? What do current indicators tell us?"
+
+---
+
+### ENGINE 2: `possibility_space_explorer` (was `scenario_futures_matrix`)
+
+**Purpose:** Map multiple plausible futures and their drivers. Cone of plausibility analysis.
+
+**Category:** SYNTHESIS (or ARGUMENT)
+
+**Core Concept:** Scenario planning methodology
+- Identify KEY DRIVERS: Forces that shape the future
+- Define SCENARIOS: Plausible future states (not predictions)
+- Map PATHWAYS: How we get from here to each scenario
+- Assess PROBABILITIES: Relative likelihood (without false precision)
+
+**Key Schema Elements:**
+```
+drivers: [
+  {id, name, description, current_state, range_of_outcomes, uncertainty_level}
+]
+scenarios: [
+  {id, name, description, driver_configuration, probability_assessment,
+   implications, indicators_this_is_happening}
+]
+scenario_matrix: {
+  axes: [driver1, driver2],  # Usually 2x2 or 2x3 matrix
+  quadrants: [{scenario_id, position}]
+}
+pathways: [
+  {from_current, to_scenario, key_events, branch_points}
+]
+```
+
+**Use Case:** "What futures are possible? How would we get there? What should we watch?"
+
+---
+
+### ENGINE 3: `relational_topology` (was `network_centrality_analysis`)
+
+**Purpose:** Graph-theoretic analysis of actor networks. Find key nodes, structural holes, influence pathways.
+
+**Category:** POWER
+
+**Core Concept:** Social network analysis + graph theory
+- Calculate CENTRALITY: Degree, betweenness, eigenvector, closeness
+- Find STRUCTURAL HOLES: Bridges between clusters
+- Identify GATEKEEPERS: Who controls information/resource flow
+- Map INFLUENCE PATHWAYS: How does influence propagate?
+
+**Key Schema Elements:**
+```
+nodes: [
+  {id, label, node_type, attributes,
+   centrality_scores: {degree, betweenness, eigenvector, closeness}}
+]
+edges: [
+  {source, target, relationship_type, weight, direction}
+]
+clusters: [
+  {id, members[], internal_density, label}
+]
+structural_analysis: {
+  key_brokers: [],  # High betweenness
+  influencers: [],  # High eigenvector
+  gatekeepers: [],  # Control flow between clusters
+  vulnerabilities: []  # Single points of failure
+}
+```
+
+**Use Case:** "Who are the key players? Who bridges groups? Where are vulnerabilities?"
+
+**Note:** Extends existing `stakeholder_power_interest` with formal graph metrics.
+
+---
+
+### ENGINE 4: `rational_actor_modeling` (was `decision_maker_profiling`)
+
+**Purpose:** Model how key decision-makers think and decide. Cognitive profiling for prediction.
+
+**Category:** POWER
+
+**Core Concept:** Decision-maker psychology + rational actor theory
+- Map WORLDVIEW: How do they see the situation?
+- Identify DECISION STYLE: Risk tolerance, time horizon, information preferences
+- Model CONSTRAINTS: What limits their options?
+- Predict RESPONSES: How would they react to scenarios?
+
+**Key Schema Elements:**
+```
+actors: [
+  {id, name, role,
+   worldview: {core_beliefs[], threat_perception, opportunity_perception},
+   decision_style: {risk_tolerance, time_horizon, information_preference,
+                    consensus_vs_decisive, ideological_vs_pragmatic},
+   constraints: {institutional, political, resource, domestic},
+   track_record: [{decision, context, outcome, what_it_reveals}],
+   predicted_responses: [{scenario, likely_action, confidence, rationale}]
+  }
+]
+interaction_dynamics: [
+  {actor1, actor2, relationship, influence_direction, trust_level}
+]
+```
+
+**Use Case:** "How does this leader think? How would they respond to X?"
+
+---
+
+### ENGINE 5: `temporal_discontinuity_finder` (was `timeline_anomaly_detection`)
+
+**Purpose:** Detect suspicious timing, unusual gaps, pattern breaks in timelines.
+
+**Category:** TEMPORAL
+
+**Core Concept:** Anomaly detection in temporal sequences
+- Find GAPS: Missing time periods, unexplained silences
+- Detect CLUSTERING: Suspicious bunching of events
+- Flag PATTERN BREAKS: Deviations from established rhythms
+- Identify ANACHRONISMS: Things that don't fit their supposed time
+
+**Key Schema Elements:**
+```
+timeline: [
+  {timestamp, event, source, confidence}
+]
+anomalies: [
+  {anomaly_type: GAP | CLUSTER | PATTERN_BREAK | ANACHRONISM | SUSPICIOUS_TIMING,
+   description, location_in_timeline, severity, possible_explanations[]}
+]
+patterns: [
+  {pattern_type, description, instances[], breaks[]}
+]
+assessment: {
+  timeline_integrity: HIGH | MEDIUM | LOW,
+  most_suspicious_anomalies: [],
+  investigation_priorities: []
+}
+```
+
+**Use Case:** "Is this timeline consistent? Are there suspicious patterns or gaps?"
+
+---
+
+### BUNDLE: `strategic_warning`
+
+**Members:** signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder
+
+**Purpose:** Complete early warning and futures analysis package.
+
+**Unified Extraction Focus:**
+- Indicators and signposts
+- Future scenarios and drivers
+- Timeline events and patterns
+- Warning thresholds and trajectories
+
+---
+
+### PIPELINE: `warning_assessment_complete`
+
+**Stages:** signal_sentinel → temporal_discontinuity_finder → possibility_space_explorer
+
+**Synergy:** "Track indicators, flag timeline anomalies, project futures"
+
+---
+
+### After TIER 2: TIER 3 Engines (Session 6+)
+
+- `steelman_stress_test` (enhanced red team — builds on steelman_generator)
+- `escalation_trajectory_analysis` (crisis progression modeling)
+- `opportunity_vulnerability_matrix` (exploitable gaps)
+- `influence_attribution_analysis` (campaign attribution)
+- `key_intelligence_questions_mapper` (KIQ/EEI alignment)
 
 ### UI Work Comes AFTER Tradecraft Layer
 
-Do NOT start UI overhaul until at least TIER 2 engines are complete.
+Do NOT start UI overhaul until TIER 2 is complete.
 
 ---
 
@@ -350,13 +525,28 @@ print(f'source_to_confidence: {\"✅\" if \"source_to_confidence\" in pipelines 
 
 When starting Session 5:
 
-- [ ] Read this file
-- [ ] Review progress: TIER 1 complete, TIER 2 next
-- [ ] Implement `signal_sentinel` engine
-- [ ] Implement `possibility_space_explorer` engine
-- [ ] Implement `relational_topology` engine
-- [ ] Create `strategic_warning` bundle
+- [ ] Read this file (especially the detailed TIER 2 specs above)
+- [ ] Review: TIER 1 ✅ complete, TIER 2 is the target
+
+**Implement 5 engines (in order):**
+- [ ] `signal_sentinel` — I&W tracking (Category: TEMPORAL)
+- [ ] `possibility_space_explorer` — scenario futures (Category: SYNTHESIS)
+- [ ] `relational_topology` — network centrality (Category: POWER)
+- [ ] `rational_actor_modeling` — decision maker profiling (Category: POWER)
+- [ ] `temporal_discontinuity_finder` — timeline anomalies (Category: TEMPORAL)
+
+**Create bundle + pipeline:**
+- [ ] `strategic_warning` bundle (signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder)
+- [ ] `warning_assessment_complete` pipeline (signal_sentinel → temporal_discontinuity_finder → possibility_space_explorer)
+
+**Finalize:**
+- [ ] Update `__init__.py` files in engines, bundles, pipelines
+- [ ] Run verification commands
 - [ ] Update this progress file
 - [ ] Commit to both repos
 
-**After TIER 2: Consider `analytic_rigor_pipeline` creation**
+**Implementation Pattern:** See "Engine Implementation Pattern" section above.
+
+**Reference Example:** Look at `hypothesis_tournament.py` or `terra_incognita_mapper.py` for full engine structure.
+
+**After Session 5:** If TIER 2 complete, can start TIER 3 or consider UI work.

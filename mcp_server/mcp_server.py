@@ -78,10 +78,10 @@ mcp = FastMCP(
     ## Features
 
     - AI-powered engine recommendations using Claude/Gemini
-    - Support for 47+ analysis engines across 8 categories
+    - 70 analysis engines across 9 categories (Argument, Concepts, Temporal, Power, Evidence, Rhetoric, Epistemology, Scholarly, Market)
+    - 18 engine bundles for thematic analysis
+    - 21 multi-stage pipelines that chain engines sequentially
     - Multiple output modes: visual (4K images) and textual (reports, diagrams)
-    - Bundle analysis: Run multiple engines in parallel
-    - Pipeline analysis: Chain engines sequentially
     - Batch analysis: Process entire folders of documents
     - Automatic notifications with sound alerts when jobs complete
     """

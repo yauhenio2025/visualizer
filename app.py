@@ -2786,6 +2786,359 @@ HTML_PAGE = '''<!DOCTYPE html>
             align-self: flex-start;
         }
 
+        /* ============================================================
+           COLLAPSIBLE CATEGORY SECTIONS (for 70+ engines)
+           ============================================================ */
+        .category-section {
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-card);
+        }
+
+        .category-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .category-section-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .category-section-header .cat-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .category-section-header .cat-icon {
+            font-size: 1.1rem;
+        }
+
+        .category-section-header .cat-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .category-section-header .expand-icon {
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .category-section.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .category-section-body {
+            padding: 0.75rem;
+        }
+
+        .category-section:not(.expanded) .category-section-body {
+            display: none;
+        }
+
+        .category-engine-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 0.75rem;
+        }
+
+        /* Compact engine cards for category view */
+        .engine-card-compact {
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .engine-card-compact:hover {
+            border-color: var(--accent-muted);
+            background: var(--bg-card);
+        }
+
+        .engine-card-compact.selected {
+            border-color: var(--accent);
+            background: var(--bg-card);
+            box-shadow: var(--shadow);
+        }
+
+        .engine-card-compact.recommended {
+            border-color: var(--success);
+            background: linear-gradient(135deg, rgba(45,125,70,0.05) 0%, var(--bg-input) 100%);
+        }
+
+        .engine-card-compact .name {
+            font-weight: 500;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .engine-card-compact .desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .engine-card-compact .rec-badge {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .show-more-btn {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            background: transparent;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .show-more-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-muted);
+            color: var(--text);
+        }
+
+        /* ============================================================
+           QUICK START SECTION
+           ============================================================ */
+        .quick-start-section {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(45,125,70,0.05) 0%, var(--bg-input) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .quick-start-section.hidden {
+            display: none;
+        }
+
+        .quick-start-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .quick-start-header h4 {
+            font-family: 'Libre Baskerville', Georgia, serif;
+            font-size: 1rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .quick-picks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quick-pick-card {
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: left;
+        }
+
+        .quick-pick-card:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow);
+        }
+
+        .quick-pick-card .pick-icon {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .quick-pick-card .pick-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .quick-pick-card .pick-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .recent-engines {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .recent-engines-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .recent-engine-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .recent-chip {
+            padding: 0.3rem 0.6rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .recent-chip:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        /* ============================================================
+           OUTPUT MODE CARDS (replacing dropdown)
+           ============================================================ */
+        .output-mode-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+        }
+
+        .output-mode-card {
+            padding: 0.6rem 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .output-mode-card:hover {
+            border-color: var(--accent-muted);
+            background: var(--bg-card);
+        }
+
+        .output-mode-card.selected {
+            border-color: var(--accent);
+            background: var(--bg-card);
+            box-shadow: var(--shadow);
+        }
+
+        .output-mode-card.visual {
+            border-left: 3px solid #9b59b6;
+        }
+
+        .output-mode-card .mode-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .output-mode-card .mode-name {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .output-mode-card .mode-tag {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .output-mode-card .gemini-badge {
+            display: inline-block;
+            font-size: 0.55rem;
+            padding: 0.1rem 0.35rem;
+            background: linear-gradient(135deg, #9b59b6 0%, #3498db 100%);
+            color: white;
+            border-radius: 3px;
+            margin-top: 0.2rem;
+        }
+
+        /* View mode toggle for category vs flat */
+        .view-mode-toggle {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: auto;
+        }
+
+        .view-mode-btn {
+            padding: 0.35rem 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .view-mode-btn:hover {
+            background: var(--bg-card);
+        }
+
+        .view-mode-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* Engine search box */
+        .engine-search-container {
+            margin-bottom: 1rem;
+        }
+
+        .engine-search-input {
+            width: 100%;
+            padding: 0.6rem 1rem 0.6rem 2.25rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23999' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 0.75rem center;
+        }
+
+        .engine-search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(26,26,26,0.1);
+        }
+
         /* Buttons */
         .btn {
             display: inline-flex;
@@ -4870,6 +5223,40 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <div id="curator-result" class="curator-result"></div>
                         </div>
 
+                        <!-- Quick Start Section (shows when docs uploaded) -->
+                        <div id="quick-start-section" class="quick-start-section hidden">
+                            <div class="quick-start-header">
+                                <h4>⚡ Quick Start</h4>
+                                <button class="btn btn-sm btn-ghost" onclick="toggleQuickStart()">Hide</button>
+                            </div>
+                            <div class="quick-picks-grid">
+                                <button class="quick-pick-card" onclick="quickPick('stakeholder_power_interest')">
+                                    <div class="pick-icon">🎯</div>
+                                    <div class="pick-title">Map Key Players</div>
+                                    <div class="pick-desc">Power & relationships</div>
+                                </button>
+                                <button class="quick-pick-card" onclick="quickPick('argument_architecture')">
+                                    <div class="pick-icon">⚖️</div>
+                                    <div class="pick-title">Evaluate Arguments</div>
+                                    <div class="pick-desc">Logic & evidence</div>
+                                </button>
+                                <button class="quick-pick-card" onclick="quickPick('event_timeline_causal')">
+                                    <div class="pick-icon">📈</div>
+                                    <div class="pick-title">Build Timeline</div>
+                                    <div class="pick-desc">Sequence & causation</div>
+                                </button>
+                                <button class="quick-pick-card" onclick="quickPick('thematic_synthesis')">
+                                    <div class="pick-icon">🔍</div>
+                                    <div class="pick-title">Find Themes</div>
+                                    <div class="pick-desc">Patterns & synthesis</div>
+                                </button>
+                            </div>
+                            <div id="recent-engines-container" class="recent-engines" style="display:none;">
+                                <div class="recent-engines-label">Recently Used</div>
+                                <div id="recent-engine-chips" class="recent-engine-chips"></div>
+                            </div>
+                        </div>
+
                         <!-- Category Filter Tabs -->
                         <div id="category-tabs" class="category-tabs"></div>
 
@@ -4932,8 +5319,20 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                         <!-- Single Engine Selection -->
                         <div id="engine-selection">
-                            <span class="section-label">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
-                            <div id="engine-grid" class="engine-grid"></div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+                                <span class="section-label" style="margin-bottom:0;">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
+                                <div class="view-mode-toggle">
+                                    <button class="view-mode-btn active" onclick="setEngineViewMode('category')" id="view-mode-category" title="Group by category">📁</button>
+                                    <button class="view-mode-btn" onclick="setEngineViewMode('flat')" id="view-mode-flat" title="Flat list">☰</button>
+                                </div>
+                            </div>
+                            <div class="engine-search-container">
+                                <input type="text" id="engine-search" class="engine-search-input" placeholder="Search engines..." oninput="filterEnginesBySearch(this.value)">
+                            </div>
+                            <!-- Category-based view (default) -->
+                            <div id="engine-categories" style="display:block;"></div>
+                            <!-- Flat grid view (hidden by default) -->
+                            <div id="engine-grid" class="engine-grid" style="display:none;"></div>
                         </div>
 
                         <!-- Bundle Selection -->
@@ -4952,7 +5351,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <!-- Output Mode (hidden for intent mode) -->
                         <div class="output-select" id="output-mode-section">
                             <span class="section-label">Output Format <span id="output-mode-count" style="color: #666; font-size: 11px;"></span></span>
-                            <select id="output-mode">
+                            <!-- Visual output mode cards -->
+                            <div id="output-mode-cards" class="output-mode-cards"></div>
+                            <!-- Fallback dropdown (hidden, used for submission) -->
+                            <select id="output-mode" style="display:none;">
                                 <option value="">Loading output modes...</option>
                             </select>
                         </div>
@@ -5096,6 +5498,14 @@ HTML_PAGE = '''<!DOCTYPE html>
         let currentJobId = null;
         let allResults = [];
         let currentCollectionName = null;  // Track imported collection name
+
+        // New UI state for scalable engine display
+        let engineViewMode = 'category';  // 'category' or 'flat'
+        let engineSearchTerm = '';
+        let expandedCategories = new Set();  // Track which categories are expanded
+        let recentEngines = JSON.parse(localStorage.getItem('recentEngines') || '[]');  // Last 5 used
+        let selectedOutputMode = null;  // Track selected output mode card
+        let quickStartHidden = false;
         let libraryItems = [];
         let currentLightboxIndex = 0;
 
@@ -5694,7 +6104,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const enginesRes = await fetch('/api/analyzer/engines');
                 if (enginesRes.ok) {
                     engines = await enginesRes.json();
-                    renderEngines();
+                    // Use category view by default, hide flat category tabs
+                    $('category-tabs').style.display = 'none';
+                    renderEnginesByCategory();
                 }
 
                 const bundlesRes = await fetch('/api/analyzer/bundles');
@@ -5835,6 +6247,349 @@ HTML_PAGE = '''<!DOCTYPE html>
                 '<div class="desc">' + shortDesc + '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // ============================================================
+        // NEW: Category-Based Engine Display (for 70+ engines scale)
+        // ============================================================
+
+        // Render engines grouped by category with collapse/expand
+        function renderEnginesByCategory() {
+            var container = $('engine-categories');
+            if (!container) return;
+
+            // Get recommended engine keys
+            var recommendedKeys = new Set();
+            if (curatorRecommendations && curatorRecommendations.primary_recommendations) {
+                curatorRecommendations.primary_recommendations.forEach(function(r) {
+                    recommendedKeys.add(r.engine_key);
+                });
+            }
+
+            // Filter by search term
+            var filteredEngines = engines;
+            if (engineSearchTerm) {
+                var term = engineSearchTerm.toLowerCase();
+                filteredEngines = engines.filter(function(e) {
+                    return (e.engine_name || '').toLowerCase().includes(term) ||
+                           (e.description || '').toLowerCase().includes(term) ||
+                           (e.engine_key || '').toLowerCase().includes(term);
+                });
+            }
+
+            // Group engines by category
+            var byCategory = {};
+            filteredEngines.forEach(function(e) {
+                var cat = e.category || 'other';
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(e);
+            });
+
+            // Update engine count
+            $('engine-count').textContent = '(' + filteredEngines.length + ' engines)';
+
+            // Sort categories by engine count (most first)
+            var sortedCats = Object.keys(byCategory).sort(function(a, b) {
+                return byCategory[b].length - byCategory[a].length;
+            });
+
+            var html = '';
+
+            // If search is active and few results, show flat
+            if (engineSearchTerm && filteredEngines.length <= 12) {
+                html = '<div class="category-engine-grid">';
+                filteredEngines.forEach(function(e) {
+                    html += renderCompactEngineCard(e, recommendedKeys);
+                });
+                html += '</div>';
+            } else {
+                // Render each category as a collapsible section
+                sortedCats.forEach(function(catKey) {
+                    var catEngines = byCategory[catKey];
+                    var catInfo = categories.find(function(c) { return c.category_key === catKey; }) || { name: formatEngineName(catKey) };
+                    var icon = categoryIcons[catKey] || '📂';
+                    var isExpanded = expandedCategories.has(catKey);
+                    var hasRecommended = catEngines.some(function(e) { return recommendedKeys.has(e.engine_key); });
+
+                    // Sort: recommended first, then alphabetically
+                    catEngines = catEngines.slice().sort(function(a, b) {
+                        var aRec = recommendedKeys.has(a.engine_key) ? 0 : 1;
+                        var bRec = recommendedKeys.has(b.engine_key) ? 0 : 1;
+                        if (aRec !== bRec) return aRec - bRec;
+                        return (a.engine_name || a.engine_key).localeCompare(b.engine_name || b.engine_key);
+                    });
+
+                    // Show first 4 engines when collapsed
+                    var visibleCount = isExpanded ? catEngines.length : Math.min(4, catEngines.length);
+                    var hiddenCount = catEngines.length - visibleCount;
+
+                    html += '<div class="category-section ' + (isExpanded ? 'expanded' : '') + '" data-category="' + catKey + '">';
+                    html += '<div class="category-section-header" onclick="toggleCategory(\\'' + catKey + '\\')">';
+                    html += '<div class="cat-title">';
+                    html += '<span class="cat-icon">' + icon + '</span>';
+                    html += '<span>' + (catInfo.name || catKey) + '</span>';
+                    html += '<span class="cat-count">(' + catEngines.length + ')</span>';
+                    if (hasRecommended) html += '<span style="color:var(--success); margin-left:0.5rem; font-size:0.7rem;">✨ Recommended</span>';
+                    html += '</div>';
+                    html += '<span class="expand-icon">' + (isExpanded ? '▲' : '▼') + '</span>';
+                    html += '</div>';
+
+                    html += '<div class="category-section-body">';
+                    html += '<div class="category-engine-grid">';
+                    for (var i = 0; i < visibleCount; i++) {
+                        html += renderCompactEngineCard(catEngines[i], recommendedKeys);
+                    }
+                    html += '</div>';
+
+                    if (hiddenCount > 0) {
+                        html += '<button class="show-more-btn" onclick="event.stopPropagation(); expandCategory(\\'' + catKey + '\\')">Show ' + hiddenCount + ' more engines</button>';
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                });
+            }
+
+            container.innerHTML = html || '<div style="padding:1rem; color:var(--text-muted); text-align:center;">No engines match your search</div>';
+        }
+
+        // Render a compact engine card
+        function renderCompactEngineCard(e, recommendedKeys) {
+            var displayName = e.engine_name || formatEngineName(e.engine_key);
+            var shortDesc = truncateDesc(e.description || '', 80);
+            var isRecommended = recommendedKeys.has(e.engine_key);
+            var isSelected = selectedEngine === e.engine_key;
+
+            var recBadge = '';
+            if (isRecommended) {
+                var rec = curatorRecommendations.primary_recommendations.find(function(r) { return r.engine_key === e.engine_key; });
+                recBadge = '<div class="rec-badge" title="' + (rec ? rec.rationale : '') + '">AI (' + (rec ? Math.round(rec.confidence * 100) : '') + '%)</div>';
+            }
+
+            return '<div class="engine-card-compact ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
+                   'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
+                   recBadge +
+                   '<div class="name">' + displayName + '</div>' +
+                   '<div class="desc">' + shortDesc + '</div>' +
+                   '</div>';
+        }
+
+        // Toggle category expand/collapse
+        function toggleCategory(catKey) {
+            if (expandedCategories.has(catKey)) {
+                expandedCategories.delete(catKey);
+            } else {
+                expandedCategories.add(catKey);
+            }
+            renderEnginesByCategory();
+        }
+
+        // Expand a category (from "show more" button)
+        function expandCategory(catKey) {
+            expandedCategories.add(catKey);
+            renderEnginesByCategory();
+        }
+
+        // Switch between category and flat view
+        function setEngineViewMode(mode) {
+            engineViewMode = mode;
+            $('view-mode-category').classList.toggle('active', mode === 'category');
+            $('view-mode-flat').classList.toggle('active', mode === 'flat');
+
+            // Hide category tabs in category view mode (they're built in)
+            $('category-tabs').style.display = mode === 'category' ? 'none' : 'flex';
+
+            $('engine-categories').style.display = mode === 'category' ? 'block' : 'none';
+            $('engine-grid').style.display = mode === 'flat' ? 'grid' : 'none';
+
+            if (mode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                renderCategoryTabs();
+                renderEngines();
+            }
+        }
+
+        // Filter engines by search input
+        function filterEnginesBySearch(term) {
+            engineSearchTerm = term;
+            if (engineViewMode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                // For flat mode, filter the standard grid
+                renderEngines();
+            }
+        }
+
+        // ============================================================
+        // Quick Start & Recent Engines
+        // ============================================================
+
+        // Quick pick - select engine and prepare for analysis
+        function quickPick(engineKey) {
+            setEngineMode('engine');
+            selectEngine(engineKey);
+            // Scroll to output mode section
+            $('output-mode-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Toggle quick start visibility
+        function toggleQuickStart() {
+            quickStartHidden = !quickStartHidden;
+            var section = $('quick-start-section');
+            section.classList.toggle('hidden', quickStartHidden);
+        }
+
+        // Show quick start when docs are selected
+        function updateQuickStart() {
+            var section = $('quick-start-section');
+            var hasDocsSelected = selectedDocs.size > 0;
+            section.classList.toggle('hidden', !hasDocsSelected || quickStartHidden);
+
+            // Render recent engines
+            renderRecentEngines();
+        }
+
+        // Render recent engines chips
+        function renderRecentEngines() {
+            var container = $('recent-engines-container');
+            var chips = $('recent-engine-chips');
+            if (!container || !chips) return;
+
+            if (recentEngines.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            chips.innerHTML = recentEngines.slice(0, 5).map(function(key) {
+                var eng = engines.find(function(e) { return e.engine_key === key; });
+                var name = eng ? (eng.engine_name || formatEngineName(key)) : formatEngineName(key);
+                return '<button class="recent-chip" onclick="quickPick(\\'' + key + '\\')">' + name + '</button>';
+            }).join('');
+        }
+
+        // Track engine usage (call when analysis is submitted)
+        function trackEngineUsage(engineKey) {
+            if (!engineKey) return;
+            // Remove if already exists, add to front
+            recentEngines = recentEngines.filter(function(k) { return k !== engineKey; });
+            recentEngines.unshift(engineKey);
+            recentEngines = recentEngines.slice(0, 5);
+            localStorage.setItem('recentEngines', JSON.stringify(recentEngines));
+        }
+
+        // ============================================================
+        // Output Mode Cards (instead of dropdown)
+        // ============================================================
+
+        // Output mode icons mapping
+        var outputModeIcons = {
+            'structured_text_report': '📝',
+            'table': '📊',
+            'comparative_matrix_table': '📋',
+            'gemini_network_graph': '🕸️',
+            'gemini_timeline': '📅',
+            'gemini_concept_tree': '🌳',
+            'gemini_evidence_radar': '🎯',
+            'gemini_argument_map': '🗺️',
+            'gemini_flow_diagram': '📈',
+            'gemini_quadrant_matrix': '⬛',
+            'gemini_venn_diagram': '⭕',
+            'gemini_sankey': '🔀',
+            'gemini_heatmap': '🔥'
+        };
+
+        // Human-readable names
+        var outputModeNames = {
+            'structured_text_report': 'Text Report',
+            'table': 'Data Table',
+            'comparative_matrix_table': 'Matrix Table',
+            'gemini_network_graph': 'Network Graph',
+            'gemini_timeline': 'Timeline',
+            'gemini_concept_tree': 'Concept Tree',
+            'gemini_evidence_radar': 'Evidence Radar',
+            'gemini_argument_map': 'Argument Map',
+            'gemini_flow_diagram': 'Flow Diagram',
+            'gemini_quadrant_matrix': 'Quadrant Matrix',
+            'gemini_venn_diagram': 'Venn Diagram',
+            'gemini_sankey': 'Sankey Flow',
+            'gemini_heatmap': 'Heat Map'
+        };
+
+        // Render output modes as visual cards
+        function renderOutputModeCards() {
+            var container = $('output-mode-cards');
+            var dropdown = $('output-mode');
+            if (!container) return;
+
+            // Filter compatible modes
+            var compatibleModes = outputModes;
+            if (selectedEngine) {
+                compatibleModes = outputModes.filter(function(m) {
+                    if (!m.compatible_engines) return true;
+                    return m.compatible_engines.includes(selectedEngine);
+                });
+            }
+
+            // Separate visual (Gemini) from textual modes
+            var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
+            var textModes = compatibleModes.filter(function(m) { return !m.mode_key.startsWith('gemini_'); });
+
+            // Update count
+            var countEl = $('output-mode-count');
+            if (countEl) {
+                countEl.textContent = compatibleModes.length < outputModes.length ?
+                    '(' + compatibleModes.length + ' compatible)' : '';
+            }
+
+            // Auto-select best default if nothing selected
+            if (!selectedOutputMode || !compatibleModes.some(function(m) { return m.mode_key === selectedOutputMode; })) {
+                // Prefer text report as default
+                var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
+                if (!defaultMode) defaultMode = compatibleModes[0];
+                selectedOutputMode = defaultMode ? defaultMode.mode_key : null;
+            }
+
+            // Sync to hidden dropdown
+            if (dropdown && selectedOutputMode) {
+                dropdown.value = selectedOutputMode;
+            }
+
+            var html = '';
+
+            // Text modes first
+            textModes.forEach(function(m) {
+                var icon = outputModeIcons[m.mode_key] || '📄';
+                var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
+                var isSelected = selectedOutputMode === m.mode_key;
+                html += '<div class="output-mode-card ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
+                html += '<div class="mode-icon">' + icon + '</div>';
+                html += '<div class="mode-name">' + name + '</div>';
+                html += '</div>';
+            });
+
+            // Visual modes with Gemini badge
+            visualModes.forEach(function(m) {
+                var icon = outputModeIcons[m.mode_key] || '🖼️';
+                var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
+                var isSelected = selectedOutputMode === m.mode_key;
+                html += '<div class="output-mode-card visual ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
+                html += '<div class="mode-icon">' + icon + '</div>';
+                html += '<div class="mode-name">' + name + '</div>';
+                html += '<div class="gemini-badge">4K Visual</div>';
+                html += '</div>';
+            });
+
+            container.innerHTML = html || '<div style="padding:0.5rem; color:var(--text-muted);">No output modes available</div>';
+        }
+
+        // Select output mode card
+        function selectOutputMode(modeKey) {
+            selectedOutputMode = modeKey;
+            var dropdown = $('output-mode');
+            if (dropdown) dropdown.value = modeKey;
+            renderOutputModeCards();
+            updateAnalyzeButton();
         }
 
         // Render Bundles
@@ -6178,13 +6933,21 @@ HTML_PAGE = '''<!DOCTYPE html>
                     select.value = firstCompatible.mode_key;
                 }
             }
+
+            // Also render the visual output mode cards
+            renderOutputModeCards();
         }
 
         // Select Engine
         function selectEngine(key) {
             selectedEngine = key;
             selectedBundle = null;
-            renderEngines();
+            // Re-render both views to update selection
+            if (engineViewMode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                renderEngines();
+            }
             renderOutputModes();  // Update output modes based on engine compatibility
             updateAnalyzeButton();
         }
@@ -6274,6 +7037,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             $('doc-count').textContent = selectedDocs.size + ' of ' + scannedDocs.length + ' documents selected';
             updateAnalyzeButton();
+            updateQuickStart();  // Show/hide quick start based on doc selection
         }
 
         // Toggle Document
@@ -6315,10 +7079,16 @@ HTML_PAGE = '''<!DOCTYPE html>
             $('engine-selection').style.display = mode === 'engine' ? 'block' : 'none';
             $('bundle-selection').style.display = mode === 'bundle' ? 'block' : 'none';
             $('pipeline-selection').style.display = mode === 'pipeline' ? 'block' : 'none';
-            // Show/hide category tabs (only for single engine mode)
-            $('category-tabs').style.display = mode === 'engine' ? 'flex' : 'none';
+            // Show/hide category tabs (only in flat view mode for single engine)
+            $('category-tabs').style.display = (mode === 'engine' && engineViewMode === 'flat') ? 'flex' : 'none';
             // Show/hide curator (only for single engine mode)
             $('curator-section').style.display = mode === 'engine' ? 'block' : 'none';
+            // Ensure correct engine view is shown
+            if (mode === 'engine') {
+                if (engineViewMode === 'category') {
+                    renderEnginesByCategory();
+                }
+            }
             // Show/hide output mode section (hidden for intent mode which has its own)
             $('output-mode-section').style.display = mode === 'intent' ? 'none' : 'block';
             updateAnalyzeButton();
@@ -6503,6 +7273,9 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 let response;
                 if (engineMode === 'engine') {
+                    // Track this engine for recent engines list
+                    trackEngineUsage(selectedEngine);
+
                     const payload = {
                         engine: selectedEngine,
                         output_mode: outputMode,

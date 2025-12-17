@@ -10,16 +10,17 @@
 │  ✅ COMPLETE - All 10 engines implemented                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  LAYER 1: CIA TRADECRAFT (Analytical Rigor) - REBRANDED        │
-│  ✅ TIER 1 COMPLETE (5/5) - 10 of 15 engines done               │
+│  ✅ TIER 1 COMPLETE (5/5) + ✅ TIER 2 COMPLETE (5/5)            │
+│  15 of 15 tradecraft engines done (5 TIER 3 are enhancements)  │
 ├─────────────────────────────────────────────────────────────────┤
 │  FOUNDATION: Existing 47 Engines (Document Intelligence)       │
-│  ✅ EXISTS - Now 60 total engines                               │
+│  ✅ EXISTS - Now 65 total engines                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Session 4 Achievement:** Completed CIA TIER 1 — the mission-critical tradecraft layer. All five core intelligence analysis engines are now operational.
+**Session 5 Achievement:** Completed CIA TIER 2 — strategic warning and futures analysis layer. All five high-priority tradecraft engines are now operational.
 
-**Next Priority:** TIER 2 engines (5 remaining), then TIER 3 (5 remaining).
+**Next Priority:** TIER 3 engines (5 enhancements), then UI work.
 
 ---
 
@@ -51,8 +52,8 @@ visualizer/                     analyzer/
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-17 12:30 UTC
-**Last Session:** Session 4 - Completed CIA TIER 1 (3 engines + 1 bundle + 1 pipeline)
+**Last Updated:** 2025-12-17 13:30 UTC
+**Last Session:** Session 5 - Completed CIA TIER 2 (5 engines + 1 bundle + 1 pipeline)
 
 ### LAYER 2: Dennett Intuition Pumps ✅ COMPLETE
 
@@ -83,15 +84,15 @@ All 10 engines implemented and registered:
 | `deception_indicator_detection` | `authenticity_forensics` | ✅ DONE | **Session 4** - Manipulation detection |
 | `information_gaps_analysis` | `terra_incognita_mapper` | ✅ DONE | **Session 4** - Collection requirements |
 
-**TIER 2 - HIGH PRIORITY (0 of 5 done):**
+**TIER 2 - HIGH PRIORITY (5 of 5 done) ✅ COMPLETE:**
 
 | CIA Original | Dennett Rebrand | Status | Notes |
 |--------------|-----------------|--------|-------|
-| `indicators_warnings_tracker` | `signal_sentinel` | 🔴 NOT DONE | I&W tracking |
-| `scenario_futures_matrix` | `possibility_space_explorer` | 🔴 NOT DONE | Scenario planning |
-| `network_centrality_analysis` | `relational_topology` | 🔴 NOT DONE | Graph-theoretic analysis |
-| `decision_maker_profiling` | `rational_actor_modeling` | 🔴 NOT DONE | Leader psychology |
-| `timeline_anomaly_detection` | `temporal_discontinuity_finder` | 🔴 NOT DONE | Pattern breaks |
+| `indicators_warnings_tracker` | `signal_sentinel` | ✅ DONE | **Session 5** - I&W tracking |
+| `scenario_futures_matrix` | `possibility_space_explorer` | ✅ DONE | **Session 5** - Scenario planning |
+| `network_centrality_analysis` | `relational_topology` | ✅ DONE | **Session 5** - Graph-theoretic analysis |
+| `decision_maker_profiling` | `rational_actor_modeling` | ✅ DONE | **Session 5** - Leader psychology |
+| `timeline_anomaly_detection` | `temporal_discontinuity_finder` | ✅ DONE | **Session 5** - Pattern breaks |
 
 **TIER 3 - ENHANCED CAPABILITY (0 of 5 done):**
 
@@ -109,8 +110,8 @@ All 10 engines implemented and registered:
 |--------|--------|----------------|
 | `dennett_toolkit` | ✅ COMPLETE | surely_alarm, occams_broom, boom_crutch_finder, deepity_detector |
 | `epistemic_rigor_suite` | ✅ COMPLETE | provenance_audit, epistemic_calibration, hypothesis_tournament, steelman_generator |
+| `strategic_warning` | ✅ COMPLETE | signal_sentinel, possibility_space_explorer, temporal_discontinuity_finder |
 | `persuasion_archaeology` | 🔴 NOT DONE | surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics |
-| `strategic_warning` | 🔴 NOT DONE | signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder |
 | `network_intelligence` | 🔴 NOT DONE | stakeholder_power_interest + relational_topology + rational_actor_modeling |
 
 ### Pipelines Status
@@ -120,6 +121,7 @@ All 10 engines implemented and registered:
 | `dennett_diagnostic` | ✅ COMPLETE | surely_alarm → boom_crutch → deepity → occams_broom |
 | `epistemic_stress_test` | ✅ COMPLETE | argument_architecture → steelman → philosophers_syndrome → epistemic_calibration |
 | `source_to_confidence` | ✅ COMPLETE | provenance_audit → epistemic_calibration → terra_incognita_mapper |
+| `warning_assessment_complete` | ✅ COMPLETE | signal_sentinel → temporal_discontinuity_finder → possibility_space_explorer |
 | `analytic_rigor_pipeline` | 🔴 NOT DONE | argument_architecture → hypothesis_tournament → steelman_stress_test → epistemic_calibration |
 | `complete_epistemic_audit` | 🔴 NOT DONE | 7-stage comprehensive |
 
@@ -463,6 +465,7 @@ F: Cannot Be Judged
 | 2025-12-17 | Session 3 | philosophers_syndrome_detector, boundary_probe, provenance_audit, epistemic_calibration + epistemic_stress_test pipeline. **All 10 Dennett engines complete.** |
 | 2025-12-17 | Session 3 (end) | **CRITICAL INSIGHT:** Identified that CIA tradecraft layer (13 of 15 engines) still missing. Reprioritized roadmap. |
 | 2025-12-17 | Session 4 | **hypothesis_tournament, authenticity_forensics, terra_incognita_mapper + epistemic_rigor_suite bundle + source_to_confidence pipeline. TIER 1 COMPLETE.** |
+| 2025-12-17 | Session 5 | **signal_sentinel, possibility_space_explorer, relational_topology, rational_actor_modeling, temporal_discontinuity_finder + strategic_warning bundle + warning_assessment_complete pipeline. TIER 2 COMPLETE.** |
 
 ---
 
@@ -519,34 +522,40 @@ print(f'source_to_confidence: {\"✅\" if \"source_to_confidence\" in pipelines 
 - `epistemic_rigor_suite.py` (bundle)
 - `source_to_confidence.py` (pipeline)
 
+### Session 5
+- `signal_sentinel.py` (I&W tracking - indicators & warnings)
+- `possibility_space_explorer.py` (scenario futures - planning methodology)
+- `relational_topology.py` (network centrality - graph theory)
+- `rational_actor_modeling.py` (decision maker profiling)
+- `temporal_discontinuity_finder.py` (timeline anomaly detection)
+- `strategic_warning.py` (bundle)
+- `warning_assessment_complete.py` (pipeline)
+
 ---
 
-## Session 5 Checklist
+## Session 6 Checklist (TIER 3 / Optional Enhancements)
 
-When starting Session 5:
+**TIER 1 + TIER 2 COMPLETE!** Core tradecraft is operational.
 
-- [ ] Read this file (especially the detailed TIER 2 specs above)
-- [ ] Review: TIER 1 ✅ complete, TIER 2 is the target
+TIER 3 engines are **enhancements**, not critical path. Session 6 can either:
+1. Implement TIER 3 engines
+2. Start UI work
+3. Create additional bundles/pipelines
 
-**Implement 5 engines (in order):**
-- [ ] `signal_sentinel` — I&W tracking (Category: TEMPORAL)
-- [ ] `possibility_space_explorer` — scenario futures (Category: SYNTHESIS)
-- [ ] `relational_topology` — network centrality (Category: POWER)
-- [ ] `rational_actor_modeling` — decision maker profiling (Category: POWER)
-- [ ] `temporal_discontinuity_finder` — timeline anomalies (Category: TEMPORAL)
+**TIER 3 engines (optional):**
+- [ ] `steelman_stress_test` — Enhanced red team (builds on steelman_generator)
+- [ ] `escalation_trajectory_analysis` — Crisis progression modeling
+- [ ] `opportunity_vulnerability_matrix` — Exploitable gaps assessment
+- [ ] `influence_attribution_analysis` — Campaign attribution
+- [ ] `key_intelligence_questions_mapper` — KIQ/EEI alignment
 
-**Create bundle + pipeline:**
-- [ ] `strategic_warning` bundle (signal_sentinel + possibility_space_explorer + temporal_discontinuity_finder)
-- [ ] `warning_assessment_complete` pipeline (signal_sentinel → temporal_discontinuity_finder → possibility_space_explorer)
+**Additional bundles to consider:**
+- [ ] `network_intelligence` bundle (stakeholder_power_interest + relational_topology + rational_actor_modeling)
+- [ ] `persuasion_archaeology` bundle (surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics)
 
-**Finalize:**
-- [ ] Update `__init__.py` files in engines, bundles, pipelines
-- [ ] Run verification commands
-- [ ] Update this progress file
-- [ ] Commit to both repos
+**Reference Example:** Look at `signal_sentinel.py` or `possibility_space_explorer.py` for TIER 2 structure.
 
-**Implementation Pattern:** See "Engine Implementation Pattern" section above.
-
-**Reference Example:** Look at `hypothesis_tournament.py` or `terra_incognita_mapper.py` for full engine structure.
-
-**After Session 5:** If TIER 2 complete, can start TIER 3 or consider UI work.
+**Current Stats:**
+- Total engines: 65
+- Total bundles: 16
+- Total pipelines: 21

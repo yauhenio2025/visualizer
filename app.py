@@ -1909,6 +1909,14 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: var(--text-muted);
         }
 
+        header a {
+            cursor: pointer;
+        }
+
+        header a:hover h1 {
+            color: var(--primary);
+        }
+
         /* KEYS Button */
         .btn-keys {
             display: flex;
@@ -4747,10 +4755,10 @@ HTML_PAGE = '''<!DOCTYPE html>
     <div class="app">
         <header>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
+                <a href="/" style="text-decoration: none; color: inherit;">
                     <h1>The Visualizer</h1>
                     <p class="tagline">Document Intelligence & Visual Analysis</p>
-                </div>
+                </a>
                 <button class="btn btn-keys" onclick="openKeysModal()">
                     <span class="keys-icon">&#128273;</span> KEYS
                 </button>

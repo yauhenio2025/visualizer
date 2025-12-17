@@ -11,16 +11,16 @@
 ├─────────────────────────────────────────────────────────────────┤
 │  LAYER 1: CIA TRADECRAFT (Analytical Rigor) - REBRANDED        │
 │  ✅ TIER 1 COMPLETE (5/5) + ✅ TIER 2 COMPLETE (5/5)            │
-│  15 of 15 tradecraft engines done (5 TIER 3 are enhancements)  │
+│  ✅ TIER 3 COMPLETE (5/5) - All 15 tradecraft engines done     │
 ├─────────────────────────────────────────────────────────────────┤
 │  FOUNDATION: Existing 47 Engines (Document Intelligence)       │
-│  ✅ EXISTS - Now 65 total engines                               │
+│  ✅ EXISTS - Now 70 total engines                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Session 5 Achievement:** Completed CIA TIER 2 — strategic warning and futures analysis layer. All five high-priority tradecraft engines are now operational.
+**Session 6 Achievement:** Completed CIA TIER 3 — all 5 optional enhancement engines + 2 additional bundles. Full tradecraft layer is now operational.
 
-**Next Priority:** TIER 3 engines (5 enhancements), then UI work.
+**Next Priority:** UI work (keyboard shortcuts, information density, workflow optimization).
 
 ---
 
@@ -94,15 +94,15 @@ All 10 engines implemented and registered:
 | `decision_maker_profiling` | `rational_actor_modeling` | ✅ DONE | **Session 5** - Leader psychology |
 | `timeline_anomaly_detection` | `temporal_discontinuity_finder` | ✅ DONE | **Session 5** - Pattern breaks |
 
-**TIER 3 - ENHANCED CAPABILITY (0 of 5 done):**
+**TIER 3 - ENHANCED CAPABILITY (5 of 5 done) ✅ COMPLETE:**
 
 | CIA Original | Dennett Rebrand | Status | Notes |
 |--------------|-----------------|--------|-------|
-| `red_team_challenge` | `steelman_stress_test` | 🟡 PARTIAL | `steelman_generator` covers some |
-| `escalation_trajectory_analysis` | — | 🔴 NOT DONE | Crisis progression |
-| `opportunity_vulnerability_matrix` | — | 🔴 NOT DONE | Exploitable gaps |
-| `influence_attribution_analysis` | — | 🔴 NOT DONE | Campaign attribution |
-| `key_intelligence_questions_mapper` | — | 🔴 NOT DONE | KIQ/EEI alignment |
+| `red_team_challenge` | `steelman_stress_test` | ✅ DONE | **Session 6** - Enhanced adversarial testing |
+| `escalation_trajectory_analysis` | `escalation_trajectory_analysis` | ✅ DONE | **Session 6** - Crisis progression modeling |
+| `opportunity_vulnerability_matrix` | `opportunity_vulnerability_matrix` | ✅ DONE | **Session 6** - Exploitable gaps assessment |
+| `influence_attribution_analysis` | `influence_attribution_analysis` | ✅ DONE | **Session 6** - Campaign attribution |
+| `key_intelligence_questions_mapper` | `key_intelligence_questions_mapper` | ✅ DONE | **Session 6** - KIQ/EEI alignment |
 
 ### Bundles Status
 
@@ -111,8 +111,8 @@ All 10 engines implemented and registered:
 | `dennett_toolkit` | ✅ COMPLETE | surely_alarm, occams_broom, boom_crutch_finder, deepity_detector |
 | `epistemic_rigor_suite` | ✅ COMPLETE | provenance_audit, epistemic_calibration, hypothesis_tournament, steelman_generator |
 | `strategic_warning` | ✅ COMPLETE | signal_sentinel, possibility_space_explorer, temporal_discontinuity_finder |
-| `persuasion_archaeology` | 🔴 NOT DONE | surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics |
-| `network_intelligence` | 🔴 NOT DONE | stakeholder_power_interest + relational_topology + rational_actor_modeling |
+| `persuasion_archaeology` | ✅ COMPLETE | surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics |
+| `network_intelligence` | ✅ COMPLETE | stakeholder_power_interest + relational_topology + rational_actor_modeling |
 
 ### Pipelines Status
 
@@ -466,6 +466,7 @@ F: Cannot Be Judged
 | 2025-12-17 | Session 3 (end) | **CRITICAL INSIGHT:** Identified that CIA tradecraft layer (13 of 15 engines) still missing. Reprioritized roadmap. |
 | 2025-12-17 | Session 4 | **hypothesis_tournament, authenticity_forensics, terra_incognita_mapper + epistemic_rigor_suite bundle + source_to_confidence pipeline. TIER 1 COMPLETE.** |
 | 2025-12-17 | Session 5 | **signal_sentinel, possibility_space_explorer, relational_topology, rational_actor_modeling, temporal_discontinuity_finder + strategic_warning bundle + warning_assessment_complete pipeline. TIER 2 COMPLETE.** |
+| 2025-12-17 | Session 6 | **steelman_stress_test, escalation_trajectory_analysis, opportunity_vulnerability_matrix, influence_attribution_analysis, key_intelligence_questions_mapper + network_intelligence bundle + persuasion_archaeology bundle. TIER 3 COMPLETE. ALL TRADECRAFT ENGINES DONE.** |
 
 ---
 
@@ -531,31 +532,55 @@ print(f'source_to_confidence: {\"✅\" if \"source_to_confidence\" in pipelines 
 - `strategic_warning.py` (bundle)
 - `warning_assessment_complete.py` (pipeline)
 
+### Session 6
+- `steelman_stress_test.py` (enhanced red team - adversarial testing)
+- `escalation_trajectory_analysis.py` (crisis progression modeling)
+- `opportunity_vulnerability_matrix.py` (exploitable gaps assessment)
+- `influence_attribution_analysis.py` (campaign attribution)
+- `key_intelligence_questions_mapper.py` (KIQ/EEI alignment)
+- `network_intelligence.py` (bundle)
+- `persuasion_archaeology.py` (bundle)
+
 ---
 
-## Session 6 Checklist (TIER 3 / Optional Enhancements)
+## Session 6 Checklist (TIER 3 / Optional Enhancements) ✅ COMPLETE
 
-**TIER 1 + TIER 2 COMPLETE!** Core tradecraft is operational.
+**ALL TIERS COMPLETE!** Full tradecraft layer is operational.
 
-TIER 3 engines are **enhancements**, not critical path. Session 6 can either:
-1. Implement TIER 3 engines
-2. Start UI work
-3. Create additional bundles/pipelines
+**TIER 3 engines (all done):**
+- [x] `steelman_stress_test` — Enhanced red team (builds on steelman_generator)
+- [x] `escalation_trajectory_analysis` — Crisis progression modeling
+- [x] `opportunity_vulnerability_matrix` — Exploitable gaps assessment
+- [x] `influence_attribution_analysis` — Campaign attribution
+- [x] `key_intelligence_questions_mapper` — KIQ/EEI alignment
 
-**TIER 3 engines (optional):**
-- [ ] `steelman_stress_test` — Enhanced red team (builds on steelman_generator)
-- [ ] `escalation_trajectory_analysis` — Crisis progression modeling
-- [ ] `opportunity_vulnerability_matrix` — Exploitable gaps assessment
-- [ ] `influence_attribution_analysis` — Campaign attribution
-- [ ] `key_intelligence_questions_mapper` — KIQ/EEI alignment
-
-**Additional bundles to consider:**
-- [ ] `network_intelligence` bundle (stakeholder_power_interest + relational_topology + rational_actor_modeling)
-- [ ] `persuasion_archaeology` bundle (surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics)
-
-**Reference Example:** Look at `signal_sentinel.py` or `possibility_space_explorer.py` for TIER 2 structure.
+**Additional bundles (all done):**
+- [x] `network_intelligence` bundle (stakeholder_power_interest + relational_topology + rational_actor_modeling)
+- [x] `persuasion_archaeology` bundle (surely_alarm + deepity_detector + rhetorical_strategy + authenticity_forensics)
 
 **Current Stats:**
-- Total engines: 65
-- Total bundles: 16
+- Total engines: 70
+- Total bundles: 18
 - Total pipelines: 21
+
+---
+
+## Session 7 Checklist (UI Work)
+
+**Next Priority:** UI improvements per the CIA audit recommendations.
+
+**Phase 1 — Keyboard Shortcuts:**
+- [ ] Navigation shortcuts (Tab, J/K, Enter)
+- [ ] Mode switching (Ctrl+E/B/P/I)
+- [ ] Analysis execution (Ctrl+Enter)
+- [ ] Result navigation ([/], F)
+
+**Phase 2 — Information Density:**
+- [ ] Compact mode toggle
+- [ ] Multi-column results view
+- [ ] Persistent status bar
+
+**Phase 3 — Workflow Optimization:**
+- [ ] Quick analysis presets
+- [ ] Recent analyses panel
+- [ ] Comparison mode

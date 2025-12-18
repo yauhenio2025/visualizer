@@ -377,6 +377,79 @@ def download_file_from_url(url: str, output_path: Path) -> tuple[bool, str]:
         return False, error_msg
 
 
+def generate_meaningful_folder_name(result: dict, job_id: str) -> str:
+    """Generate a meaningful folder name from job result data.
+
+    Format: YYYYMMDD_HHMMSS_engine_DocumentTitle
+    Example: 20251218_200113_dialectical_structure_Four_Forms_Critical_Theory
+
+    Args:
+        result: Job result dict containing extended_info, outputs, legend
+        job_id: Job ID (used as fallback if no meaningful name can be generated)
+
+    Returns:
+        A sanitized folder name string
+    """
+    import re
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    # Extract engine name(s) from outputs or extended_info
+    engine_parts = []
+    outputs = result.get("outputs", {})
+    if outputs:
+        engine_parts = list(outputs.keys())[:2]  # Max 2 engines in name
+
+    if not engine_parts:
+        engine_parts = [result.get("extended_info", {}).get("engine", "analysis")]
+
+    # Extract document title from extended_info
+    doc_title = ""
+    extended_info = result.get("extended_info", {})
+    documents = extended_info.get("documents", [])
+
+    if documents:
+        # Get first document title
+        first_doc = documents[0]
+        doc_title = first_doc.get("title", "") or first_doc.get("id", "")
+
+        # Clean up the title - remove file extension, special chars
+        if doc_title:
+            # Remove common file extensions
+            doc_title = re.sub(r'\.(pdf|txt|md|docx)$', '', doc_title, flags=re.IGNORECASE)
+            # Remove author/year patterns like "Author - Year - " at the start
+            doc_title = re.sub(r'^[A-Za-z]+\s*-\s*\d{4}\s*-\s*', '', doc_title)
+            # Keep only alphanumeric and spaces, replace multiple spaces
+            doc_title = re.sub(r'[^a-zA-Z0-9\s]', '', doc_title)
+            doc_title = re.sub(r'\s+', '_', doc_title.strip())
+            # Truncate to reasonable length (max 50 chars)
+            if len(doc_title) > 50:
+                doc_title = doc_title[:47] + "..."
+
+    # Build the folder name
+    parts = [timestamp]
+
+    # Add engine(s)
+    if engine_parts:
+        parts.append("_".join(engine_parts[:2]))
+
+    # Add document title if available
+    if doc_title:
+        parts.append(doc_title)
+    else:
+        # Fallback to shortened job_id
+        parts.append(job_id[:8])
+
+    folder_name = "_".join(parts)
+
+    # Final sanitization - ensure valid folder name
+    folder_name = re.sub(r'[<>:"/\\|?*]', '', folder_name)
+    folder_name = re.sub(r'_+', '_', folder_name)  # Collapse multiple underscores
+    folder_name = folder_name.strip('_')
+
+    return folder_name
+
+
 # =============================================================================
 # MCP TOOLS
 # =============================================================================
@@ -681,10 +754,13 @@ def get_results(
     if "error" in result:
         return json.dumps({"error": result["error"]})
 
-    # Determine output directory
+    # Determine output directory with meaningful folder name
     output_dir = Path(download_to).expanduser() if download_to else OUTPUT_DIR
-    job_dir = output_dir / f"job_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    folder_name = generate_meaningful_folder_name(result, job_id)
+    job_dir = output_dir / folder_name
     job_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Using meaningful folder name: {folder_name}")
 
     downloaded_files = []
     download_errors = []

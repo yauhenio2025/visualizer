@@ -220,10 +220,64 @@ def download_file(url: str, output_path: Path) -> tuple[bool, str]:
         return False, str(e)
 
 
+def generate_meaningful_folder_name(result: dict, job_id: str) -> str:
+    """Generate a meaningful folder name from job result data.
+
+    Format: YYYYMMDD_HHMMSS_engine_DocumentTitle
+    Example: 20251218_200113_dialectical_structure_Four_Forms_Critical_Theory
+    """
+    import re
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    # Extract engine name(s) from outputs or extended_info
+    engine_parts = []
+    outputs = result.get("outputs", {})
+    if outputs:
+        engine_parts = list(outputs.keys())[:2]
+
+    if not engine_parts:
+        engine_parts = [result.get("extended_info", {}).get("engine", "analysis")]
+
+    # Extract document title from extended_info
+    doc_title = ""
+    extended_info = result.get("extended_info", {})
+    documents = extended_info.get("documents", [])
+
+    if documents:
+        first_doc = documents[0]
+        doc_title = first_doc.get("title", "") or first_doc.get("id", "")
+
+        if doc_title:
+            doc_title = re.sub(r'\.(pdf|txt|md|docx)$', '', doc_title, flags=re.IGNORECASE)
+            doc_title = re.sub(r'^[A-Za-z]+\s*-\s*\d{4}\s*-\s*', '', doc_title)
+            doc_title = re.sub(r'[^a-zA-Z0-9\s]', '', doc_title)
+            doc_title = re.sub(r'\s+', '_', doc_title.strip())
+            if len(doc_title) > 50:
+                doc_title = doc_title[:47] + "..."
+
+    parts = [timestamp]
+    if engine_parts:
+        parts.append("_".join(engine_parts[:2]))
+    if doc_title:
+        parts.append(doc_title)
+    else:
+        parts.append(job_id[:8])
+
+    folder_name = "_".join(parts)
+    folder_name = re.sub(r'[<>:"/\\|?*]', '', folder_name)
+    folder_name = re.sub(r'_+', '_', folder_name)
+    folder_name = folder_name.strip('_')
+
+    return folder_name
+
+
 def download_job_results(job_id: str, result: dict) -> list[str]:
     """Download all outputs for a completed job."""
-    job_dir = OUTPUT_DIR / f"job_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    folder_name = generate_meaningful_folder_name(result, job_id)
+    job_dir = OUTPUT_DIR / folder_name
     job_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  📁 Folder: {folder_name}")
 
     downloaded = []
     outputs = result.get("outputs", {})

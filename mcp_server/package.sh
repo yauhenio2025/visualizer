@@ -16,7 +16,7 @@ TEMP_DIR=$(mktemp -d)
 PACKAGE_DIR="$TEMP_DIR/$PACKAGE_NAME"
 mkdir -p "$PACKAGE_DIR"
 
-# Copy files (keep it minimal)
+# Copy files (complete package with installer and notifications)
 echo "Copying files..."
 cp "$SCRIPT_DIR/mcp_server.py" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/job_poller.py" "$PACKAGE_DIR/"
@@ -24,10 +24,16 @@ cp "$SCRIPT_DIR/requirements.txt" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/run-mcp-server.sh" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/.env.mcp.template" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/README.md" "$PACKAGE_DIR/"
+cp "$SCRIPT_DIR/install-mcp-server.sh" "$PACKAGE_DIR/"
+cp "$SCRIPT_DIR/visualizer-listener.sh" "$PACKAGE_DIR/"
+cp "$SCRIPT_DIR/start-listener.sh" "$PACKAGE_DIR/"
 
 # Make scripts executable
 chmod +x "$PACKAGE_DIR/run-mcp-server.sh"
 chmod +x "$PACKAGE_DIR/job_poller.py"
+chmod +x "$PACKAGE_DIR/install-mcp-server.sh"
+chmod +x "$PACKAGE_DIR/visualizer-listener.sh"
+chmod +x "$PACKAGE_DIR/start-listener.sh"
 
 # Create zip
 ZIP_FILE="$OUTPUT_DIR/${PACKAGE_NAME}.zip"

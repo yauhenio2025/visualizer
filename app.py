@@ -1322,6 +1322,124 @@ def submit_bundle_analysis():
         })
 
 
+@app.route('/api/analyzer/analyze/multi', methods=['POST'])
+def submit_multi_engine_analysis():
+    """Submit documents for analysis with multiple engines (each with its own output mode)."""
+    data = request.json or {}
+    file_paths = data.get('file_paths', [])
+    inline_documents = data.get('documents', [])
+    engine_list = data.get('engines', [])  # List of engine keys
+    output_modes = data.get('output_modes', {})  # Dict: {engine_key: output_mode}
+    collection_mode = data.get('collection_mode', 'single')
+    collection_name = data.get('collection_name')
+    llm_keys = data.get('llm_keys')
+
+    if not file_paths and not inline_documents:
+        return jsonify({"success": False, "error": "No files provided"})
+
+    if not engine_list or len(engine_list) == 0:
+        return jsonify({"success": False, "error": "No engines selected"})
+
+    # Build documents list (same logic as other endpoints)
+    documents = []
+    errors = []
+
+    if inline_documents:
+        for i, doc in enumerate(inline_documents):
+            doc_id = doc.get('id', f'doc_{i+1}')
+            title = doc.get('title', f'Document {i+1}')
+            content = doc.get('content', '')
+            encoding = doc.get('encoding', 'text')
+
+            if encoding == 'base64':
+                content = extract_pdf_from_base64(content)
+
+            if content and not content.startswith('[Error'):
+                doc_entry = {
+                    "id": doc_id,
+                    "title": title,
+                    "content": content,
+                }
+                if doc.get('authors'):
+                    doc_entry['authors'] = doc['authors']
+                if doc.get('source_name'):
+                    doc_entry['source_name'] = doc['source_name']
+                if doc.get('date_published'):
+                    doc_entry['date_published'] = doc['date_published']
+                if doc.get('url'):
+                    doc_entry['url'] = doc['url']
+                documents.append(doc_entry)
+            else:
+                errors.append(f"Failed to extract content from {title}")
+    else:
+        for i, path in enumerate(file_paths):
+            content = extract_text_from_file(path)
+            filename = os.path.basename(path)
+            if content and not content.startswith('[Error'):
+                documents.append({
+                    "id": filename,
+                    "title": filename,
+                    "content": content
+                })
+            else:
+                errors.append(f"Failed to read: {filename}")
+
+    if not documents:
+        return jsonify({
+            "success": False,
+            "error": "No documents could be read",
+            "details": errors
+        })
+
+    # Submit a job for each engine
+    job_ids = []
+    engine_jobs = {}  # Track which job_id belongs to which engine
+
+    for engine_key in engine_list:
+        engine_output_mode = output_modes.get(engine_key, 'gemini_image')
+
+        try:
+            response = httpx.post(
+                f"{ANALYZER_API_URL}/v1/analyze",
+                headers=get_analyzer_headers(llm_keys),
+                json={
+                    "documents": documents,
+                    "engine": engine_key,
+                    "output_mode": engine_output_mode,
+                    "collection_mode": collection_mode,
+                    "collection_name": collection_name
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+            job_data = response.json()
+            job_id = job_data.get("job_id")
+            if job_id:
+                job_ids.append(job_id)
+                engine_jobs[engine_key] = job_id
+        except httpx.HTTPError as e:
+            errors.append(f"Failed to submit {engine_key}: {str(e)}")
+
+    if not job_ids:
+        return jsonify({
+            "success": False,
+            "error": "Failed to submit any analysis jobs",
+            "details": errors
+        })
+
+    # Return the first job_id as the primary (for backwards compat with polling)
+    # Also return all job_ids and the engine mapping
+    return jsonify({
+        "success": True,
+        "job_id": job_ids[0],  # Primary job for polling
+        "job_ids": job_ids,  # All jobs
+        "engine_jobs": engine_jobs,  # Mapping of engine -> job_id
+        "engine_count": len(engine_list),
+        "document_count": len(documents),
+        "warnings": errors if errors else None
+    })
+
+
 @app.route('/api/analyzer/analyze/pipeline', methods=['POST'])
 def submit_pipeline_analysis():
     """Submit documents for pipeline analysis (chained engines)."""
@@ -2469,6 +2587,182 @@ HTML_PAGE = '''<!DOCTYPE html>
         .bundle-card.selected { border-color: var(--accent); background: var(--bg-card); }
         .bundle-card .name { font-weight: 600; font-size: 0.9rem; }
         .bundle-card .engines { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Selected Engines Panel (Multi-Engine Mode) */
+        .selected-engines-panel {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .selected-engines-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .selected-count {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+        .selected-engines-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-small:hover { background: var(--bg-hover); }
+        .btn-small.btn-danger { color: var(--error); }
+        .btn-small.btn-danger:hover { background: rgba(211,70,70,0.1); }
+        .selected-engines-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .selected-engine-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.5rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+        .engine-category-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .selected-engine-chip .engine-name {
+            font-weight: 500;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .selected-engine-chip .mode-select {
+            padding: 0.15rem 0.3rem;
+            font-size: 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .selected-engine-chip .remove-btn {
+            padding: 0 0.3rem;
+            font-size: 0.9rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            line-height: 1;
+        }
+        .selected-engine-chip .remove-btn:hover { color: var(--error); }
+        .no-engines-selected {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        /* Engine Results Sections (Multi-Engine Results Display) */
+        .engine-results-section {
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+        }
+        .engine-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .engine-section-header:hover {
+            background: linear-gradient(135deg, #22223a 0%, #1c2948 100%);
+        }
+        .engine-badge {
+            padding: 0.3rem 0.75rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: white;
+        }
+        .output-count {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .status-badge.completed { background: rgba(45,125,70,0.2); color: var(--success); }
+        .status-badge.failed { background: rgba(211,70,70,0.2); color: var(--error); }
+        .collapse-icon {
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        .engine-section-body {
+            padding: 1rem;
+            display: grid;
+            gap: 1rem;
+        }
+        .engine-section-body.collapsed { display: none; }
+        .engine-output-item {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .engine-output-item.image-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: pointer;
+        }
+        .engine-output-item .output-title {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+        }
+        .engine-output-item .table-content {
+            padding: 0.75rem;
+            overflow-x: auto;
+        }
+        .engine-output-item .text-content {
+            padding: 0.75rem;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .engine-error {
+            padding: 1rem;
+            color: var(--error);
+            background: rgba(211,70,70,0.1);
+            border-radius: var(--radius);
+        }
 
         /* Pipeline Cards (Meta-Engines) */
         .pipeline-list {
@@ -5346,6 +5640,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <div id="engine-categories" style="display:block;"></div>
                             <!-- Flat grid view (hidden by default) -->
                             <div id="engine-grid" class="engine-grid" style="display:none;"></div>
+                            <!-- Selected Engines Panel (multi-select with per-engine output modes) -->
+                            <div id="selected-engines-panel" class="selected-engines-panel">
+                                <div class="no-engines-selected">Click engines above to select them</div>
+                            </div>
                         </div>
 
                         <!-- Bundle Selection -->
@@ -5500,7 +5798,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let pipelineTiers = [];  // Tier groupings
         let categories = [];
         let outputModes = [];
-        let selectedEngine = null;
+        let selectedEngines = [];  // Array of {engine_key, output_mode}
         let selectedBundle = null;
         let selectedPipeline = null;  // Meta-engine selection
         let selectedTier = null;  // Filter pipelines by tier
@@ -6206,7 +6504,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Filter engines by category
         function filterByCategory(categoryKey) {
             selectedCategory = categoryKey;
-            selectedEngine = null;  // Reset selection when filtering
+            // Don't reset selectedEngines - allow multi-category selection
             curatorRecommendations = null;  // Clear recommendations
             renderCategoryTabs();
             renderEngines();
@@ -6253,7 +6551,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     recInfo = rec ? '<div class="rec-badge" title="' + (rec.rationale || '') + '">AI Recommended (' + Math.round(rec.confidence * 100) + '%)</div>' : '';
                 }
                 var catIcon = categoryIcons[e.category] || '';
-                return '<div class="engine-card ' + (selectedEngine === e.engine_key ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
+                var isSelected = selectedEngines.some(function(s) { return s.engine_key === e.engine_key; });
+                return '<div class="engine-card ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
                 'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
                 recInfo +
                 '<div class="name">' + catIcon + ' ' + displayName + '</div>' +
@@ -6370,7 +6669,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             var displayName = e.engine_name || formatEngineName(e.engine_key);
             var shortDesc = truncateDesc(e.description || '', 80);
             var isRecommended = recommendedKeys.has(e.engine_key);
-            var isSelected = selectedEngine === e.engine_key;
+            var isSelected = selectedEngines.some(function(s) { return s.engine_key === e.engine_key; });
 
             var recBadge = '';
             if (isRecommended) {
@@ -6668,30 +6967,24 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (!container) return;
 
             // Filter compatible modes
+            // With multi-engine selection, show all modes (each engine has its own mode)
             var compatibleModes = outputModes;
-            if (selectedEngine) {
-                compatibleModes = outputModes.filter(function(m) {
-                    // Empty array or missing = works with all engines
-                    if (!m.compatible_engines || m.compatible_engines.length === 0) return true;
-                    return m.compatible_engines.includes(selectedEngine);
-                });
-            }
 
             // Separate visual (Gemini) from textual modes
             var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
             var textModes = compatibleModes.filter(function(m) { return !m.mode_key.startsWith('gemini_'); });
 
-            // Update count
+            // Update count - show selected engine count
             var countEl = $('output-mode-count');
             if (countEl) {
-                countEl.textContent = compatibleModes.length < outputModes.length ?
-                    '(' + compatibleModes.length + ' compatible)' : '';
+                countEl.textContent = selectedEngines.length > 0 ?
+                    '(' + selectedEngines.length + ' engine' + (selectedEngines.length > 1 ? 's' : '') + ')' : '';
             }
 
-            // Auto-select best default if nothing selected
-            if (!selectedOutputMode || !compatibleModes.some(function(m) { return m.mode_key === selectedOutputMode; })) {
-                // Prefer text report as default
-                var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
+            // Auto-select default: Visual (gemini_image) for new UI
+            if (!selectedOutputMode) {
+                var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'gemini_image'; });
+                if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
                 if (!defaultMode) defaultMode = compatibleModes[0];
                 selectedOutputMode = defaultMode ? defaultMode.mode_key : null;
             }
@@ -6835,7 +7128,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Select a pipeline
         function selectPipeline(pipelineKey) {
             selectedPipeline = pipelineKey;
-            selectedEngine = null;
+            selectedEngines = [];  // Clear multi-engine selection
             selectedBundle = null;
             renderPipelines();
             renderOutputModes();
@@ -6963,14 +7256,10 @@ HTML_PAGE = '''<!DOCTYPE html>
             btn.disabled = false;
         }
 
-        // Check if output mode is compatible with selected engine
+        // Check if output mode is compatible
+        // With multi-engine selection, all modes are available (each engine has its own mode)
         function isOutputModeCompatible(mode) {
-            // If no engine selected, all modes are available
-            if (!selectedEngine) return true;
-            // If compatible_engines is empty, mode works with all engines
-            if (!mode.compatible_engines || mode.compatible_engines.length === 0) return true;
-            // Check if selected engine is in compatible list
-            return mode.compatible_engines.includes(selectedEngine);
+            return true;
         }
 
         // Render Output Modes dropdown
@@ -7062,49 +7351,165 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             select.innerHTML = html;
 
-            // Show count - highlight if some are incompatible
-            if (selectedEngine && compatibleCount < outputModes.length) {
-                countSpan.textContent = '(' + compatibleCount + '/' + outputModes.length + ' compatible)';
+            // Show count - with multi-engine, show engine count
+            if (selectedEngines.length > 0) {
+                countSpan.textContent = '(' + selectedEngines.length + ' engine' + (selectedEngines.length > 1 ? 's' : '') + ' selected)';
             } else {
                 countSpan.textContent = '(' + outputModes.length + ' available)';
-            }
-
-            // Auto-select first compatible option if current selection is incompatible
-            var currentValue = select.value;
-            var currentMode = outputModes.find(function(m) { return m.mode_key === currentValue; });
-            if (currentMode && !currentMode._isCompatible) {
-                // Find first compatible mode
-                var firstCompatible = outputModes.find(function(m) { return m._isCompatible; });
-                if (firstCompatible) {
-                    select.value = firstCompatible.mode_key;
-                }
             }
 
             // Also render the visual output mode cards
             renderOutputModeCards();
         }
 
-        // Select Engine
+        // Toggle Engine selection (multi-select)
         function selectEngine(key) {
-            selectedEngine = key;
             selectedBundle = null;
+            selectedPipeline = null;
+
+            // Check if engine is already selected
+            var existingIndex = selectedEngines.findIndex(function(e) { return e.engine_key === key; });
+
+            if (existingIndex >= 0) {
+                // Remove if already selected
+                selectedEngines.splice(existingIndex, 1);
+            } else {
+                // Add with default output mode (Visual)
+                selectedEngines.push({
+                    engine_key: key,
+                    output_mode: selectedOutputMode || 'gemini_image'
+                });
+            }
+
             // Re-render both views to update selection
             if (engineViewMode === 'category') {
                 renderEnginesByCategory();
             } else {
                 renderEngines();
             }
-            renderOutputModes();  // Update output modes based on engine compatibility
+            renderSelectedEnginesPanel();  // Update the selected engines panel
+            renderOutputModes();
             updateAnalyzeButton();
         }
 
         // Select Bundle
         function selectBundle(key) {
             selectedBundle = key;
-            selectedEngine = null;
+            selectedEngines = [];  // Clear multi-engine selection
             renderBundles();
-            renderOutputModes();  // Reset output modes (all available for bundles)
+            renderSelectedEnginesPanel();
+            renderOutputModes();
             updateAnalyzeButton();
+        }
+
+        // Update output mode for a specific selected engine
+        function updateEngineOutputMode(engineKey, newMode) {
+            var engine = selectedEngines.find(function(e) { return e.engine_key === engineKey; });
+            if (engine) {
+                engine.output_mode = newMode;
+            }
+            renderSelectedEnginesPanel();
+        }
+
+        // Remove engine from selection
+        function removeSelectedEngine(engineKey) {
+            selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== engineKey; });
+            // Re-render views
+            if (engineViewMode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                renderEngines();
+            }
+            renderSelectedEnginesPanel();
+            renderOutputModes();
+            updateAnalyzeButton();
+        }
+
+        // Clear all selected engines
+        function clearSelectedEngines() {
+            selectedEngines = [];
+            if (engineViewMode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                renderEngines();
+            }
+            renderSelectedEnginesPanel();
+            renderOutputModes();
+            updateAnalyzeButton();
+        }
+
+        // Set all selected engines to same output mode
+        function setAllEnginesOutputMode(mode) {
+            selectedEngines.forEach(function(e) { e.output_mode = mode; });
+            renderSelectedEnginesPanel();
+        }
+
+        // Render the selected engines panel
+        function renderSelectedEnginesPanel() {
+            var container = $('selected-engines-panel');
+            if (!container) return;
+
+            if (selectedEngines.length === 0) {
+                container.innerHTML = '<div class="no-engines-selected">Click engines above to select them</div>';
+                container.style.display = 'block';
+                return;
+            }
+
+            // Category colors for badges
+            var categoryColors = {
+                'epistemology': '#8b5cf6',
+                'argument': '#3b82f6',
+                'temporal': '#f59e0b',
+                'rhetoric': '#ec4899',
+                'concepts': '#10b981',
+                'power': '#ef4444',
+                'evidence': '#06b6d4',
+                'scholarly': '#6366f1',
+                'market': '#84cc16'
+            };
+
+            // Output mode options
+            var modeOptions = [
+                { key: 'gemini_image', label: '🖼️ Visual', short: '🖼️' },
+                { key: 'structured_text_report', label: '📝 Text', short: '📝' },
+                { key: 'comparative_matrix_table', label: '📊 Table', short: '📊' },
+                { key: 'executive_memo', label: '📋 Memo', short: '📋' }
+            ];
+
+            var html = '<div class="selected-engines-header">';
+            html += '<span class="selected-count">' + selectedEngines.length + ' Engine' + (selectedEngines.length > 1 ? 's' : '') + ' Selected</span>';
+            html += '<div class="selected-engines-actions">';
+            html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'gemini_image\\')">All Visual</button>';
+            html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'structured_text_report\\')">All Text</button>';
+            html += '<button class="btn-small btn-danger" onclick="clearSelectedEngines()">Clear All</button>';
+            html += '</div></div>';
+
+            html += '<div class="selected-engines-list">';
+
+            selectedEngines.forEach(function(sel) {
+                var engineInfo = engines.find(function(e) { return e.engine_key === sel.engine_key; });
+                var displayName = engineInfo ? (engineInfo.engine_name || formatEngineName(sel.engine_key)) : formatEngineName(sel.engine_key);
+                var category = engineInfo ? engineInfo.category : 'other';
+                var badgeColor = categoryColors[category] || '#6b7280';
+
+                var currentModeInfo = modeOptions.find(function(m) { return m.key === sel.output_mode; }) || modeOptions[0];
+
+                html += '<div class="selected-engine-chip">';
+                html += '<span class="engine-category-dot" style="background:' + badgeColor + '"></span>';
+                html += '<span class="engine-name">' + displayName + '</span>';
+                html += '<select class="mode-select" onchange="updateEngineOutputMode(\\'' + sel.engine_key + '\\', this.value)">';
+                modeOptions.forEach(function(opt) {
+                    html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
+                });
+                html += '</select>';
+                html += '<button class="remove-btn" onclick="removeSelectedEngine(\\'' + sel.engine_key + '\\')">×</button>';
+                html += '</div>';
+            });
+
+            html += '</div>';
+
+            container.innerHTML = html;
+            container.style.display = 'block';
         }
 
         // Scan Folder
@@ -7249,7 +7654,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const intentInput = $('intent-input');
                 hasSelection = intentInput && intentInput.value.trim().length > 10;
             } else if (engineMode === 'engine') {
-                hasSelection = selectedEngine;
+                hasSelection = selectedEngines.length > 0;  // Multi-engine selection
             } else if (engineMode === 'bundle') {
                 hasSelection = selectedBundle;
             } else {
@@ -7265,12 +7670,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (engineMode === 'intent') {
                     btn.textContent = 'Describe What You Want to Understand';
                 } else {
-                    var modeLabel = engineMode === 'engine' ? 'Engine' : (engineMode === 'bundle' ? 'Bundle' : 'Pipeline');
+                    var modeLabel = engineMode === 'engine' ? 'Engine(s)' : (engineMode === 'bundle' ? 'Bundle' : 'Pipeline');
                     btn.textContent = 'Select ' + modeLabel + ' to Analyze';
                 }
             } else {
                 if (engineMode === 'intent') {
                     btn.textContent = '🎯 Analyze with Intent (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                } else if (engineMode === 'engine') {
+                    // Show engine count in button
+                    var engineCount = selectedEngines.length;
+                    btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
                 } else {
                     btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
                 }
@@ -7419,27 +7828,55 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 let response;
                 if (engineMode === 'engine') {
-                    // Track this engine for recent engines list
-                    trackEngineUsage(selectedEngine);
+                    // Track engines for recent engines list
+                    selectedEngines.forEach(function(e) { trackEngineUsage(e.engine_key); });
 
-                    const payload = {
-                        engine: selectedEngine,
-                        output_mode: outputMode,
-                        collection_mode: collectionMode,
-                        collection_name: currentCollectionName
-                    };
+                    if (selectedEngines.length === 1) {
+                        // Single engine - use existing endpoint
+                        const payload = {
+                            engine: selectedEngines[0].engine_key,
+                            output_mode: selectedEngines[0].output_mode,
+                            collection_mode: collectionMode,
+                            collection_name: currentCollectionName
+                        };
 
-                    if (docData.type === 'paths') {
-                        payload.file_paths = docData.file_paths;
+                        if (docData.type === 'paths') {
+                            payload.file_paths = docData.file_paths;
+                        } else {
+                            payload.documents = docData.documents;
+                        }
+
+                        response = await fetch('/api/analyzer/analyze', {
+                            method: 'POST',
+                            headers: getApiHeaders(),
+                            body: JSON.stringify(payload)
+                        });
                     } else {
-                        payload.documents = docData.documents;
-                    }
+                        // Multiple engines - use multi endpoint
+                        var multiOutputModes = {};
+                        selectedEngines.forEach(function(e) {
+                            multiOutputModes[e.engine_key] = e.output_mode;
+                        });
 
-                    response = await fetch('/api/analyzer/analyze', {
-                        method: 'POST',
-                        headers: getApiHeaders(),
-                        body: JSON.stringify(payload)
-                    });
+                        const payload = {
+                            engines: selectedEngines.map(function(e) { return e.engine_key; }),
+                            output_modes: multiOutputModes,
+                            collection_mode: collectionMode,
+                            collection_name: currentCollectionName
+                        };
+
+                        if (docData.type === 'paths') {
+                            payload.file_paths = docData.file_paths;
+                        } else {
+                            payload.documents = docData.documents;
+                        }
+
+                        response = await fetch('/api/analyzer/analyze/multi', {
+                            method: 'POST',
+                            headers: getApiHeaders(),
+                            body: JSON.stringify(payload)
+                        });
+                    }
                 } else if (engineMode === 'bundle') {
                     var outputModes = {};
                     var bundle = bundles.find(function(b) { return b.bundle_key === selectedBundle; });
@@ -7519,6 +7956,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (data.success) {
                     if (data.mode === 'individual') {
                         pollMultipleJobs(data.jobs);
+                    } else if (data.job_ids && data.job_ids.length > 1) {
+                        // Multi-engine mode - poll all jobs
+                        currentJobId = data.job_id;  // Primary job for URL
+                        updateJobUrl(data.job_id);
+                        // Store engine mapping for result display
+                        window.multiEngineJobs = data.engine_jobs || {};
+                        pollMultiEngineJobs(data.job_ids, data.engine_jobs);
                     } else {
                         currentJobId = data.job_id;
                         // Update browser URL to stable job URL
@@ -7612,6 +8056,205 @@ HTML_PAGE = '''<!DOCTYPE html>
                 setTimeout(function() { pollMultipleJobs(jobs); }, 2000);
             } else {
                 finishAnalysis();
+            }
+        }
+
+        // Poll Multiple Engine Jobs (for multi-engine mode)
+        var multiEngineResults = {};  // Store results by engine
+        async function pollMultiEngineJobs(jobIds, engineJobs) {
+            // Invert the engine_jobs mapping: job_id -> engine_key
+            var jobToEngine = {};
+            for (var engineKey in engineJobs) {
+                jobToEngine[engineJobs[engineKey]] = engineKey;
+            }
+
+            var completedCount = 0;
+            var failedCount = 0;
+            var allDone = true;
+            var currentProcessingEngine = null;
+
+            for (var i = 0; i < jobIds.length; i++) {
+                var jobId = jobIds[i];
+                var engineKey = jobToEngine[jobId] || 'unknown';
+
+                // Skip if already completed
+                if (multiEngineResults[engineKey] && multiEngineResults[engineKey].status === 'completed') {
+                    completedCount++;
+                    continue;
+                }
+                if (multiEngineResults[engineKey] && multiEngineResults[engineKey].status === 'failed') {
+                    failedCount++;
+                    continue;
+                }
+
+                try {
+                    var res = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });
+                    var status = await res.json();
+
+                    if (status.status === 'completed') {
+                        // Fetch and store result
+                        var resultRes = await fetch('/api/analyzer/jobs/' + jobId + '/result', { headers: getApiHeaders() });
+                        var result = await resultRes.json();
+                        multiEngineResults[engineKey] = {
+                            status: 'completed',
+                            result: result,
+                            job_id: jobId
+                        };
+                        completedCount++;
+                    } else if (status.status === 'failed') {
+                        multiEngineResults[engineKey] = {
+                            status: 'failed',
+                            error: status.error_message || 'Analysis failed',
+                            job_id: jobId
+                        };
+                        failedCount++;
+                    } else {
+                        allDone = false;
+                        if (!currentProcessingEngine) {
+                            currentProcessingEngine = engineKey;
+                        }
+                        multiEngineResults[engineKey] = {
+                            status: 'processing',
+                            progress: status.progress_percent || 0,
+                            stage: status.current_stage || 'processing',
+                            job_id: jobId
+                        };
+                    }
+                } catch (e) {
+                    multiEngineResults[engineKey] = {
+                        status: 'failed',
+                        error: e.message,
+                        job_id: jobId
+                    };
+                    failedCount++;
+                }
+            }
+
+            // Update progress display
+            var totalJobs = jobIds.length;
+            var percent = Math.round(((completedCount + failedCount) / totalJobs) * 100);
+            $('progress-bar').style.width = percent + '%';
+            $('progress-text').textContent = 'Processing ' + (completedCount + failedCount) + '/' + totalJobs + ' engines' +
+                (currentProcessingEngine ? ' (current: ' + formatEngineName(currentProcessingEngine) + ')' : '');
+
+            if (!allDone) {
+                setTimeout(function() { pollMultiEngineJobs(jobIds, engineJobs); }, 2000);
+            } else {
+                // All jobs done - display aggregated results grouped by engine
+                displayMultiEngineResults(multiEngineResults);
+                finishAnalysis();
+            }
+        }
+
+        // Display results grouped by engine
+        function displayMultiEngineResults(resultsByEngine) {
+            allResults = [];  // Reset results
+
+            // Category colors for badges
+            var categoryColors = {
+                'epistemology': '#8b5cf6',
+                'argument': '#3b82f6',
+                'temporal': '#f59e0b',
+                'rhetoric': '#ec4899',
+                'concepts': '#10b981',
+                'power': '#ef4444',
+                'evidence': '#06b6d4',
+                'scholarly': '#6366f1',
+                'market': '#84cc16'
+            };
+
+            var resultContainer = $('result-container');
+            var html = '';
+
+            // Process each engine's results
+            for (var engineKey in resultsByEngine) {
+                var engineData = resultsByEngine[engineKey];
+                var engineInfo = engines.find(function(e) { return e.engine_key === engineKey; });
+                var engineName = engineInfo ? (engineInfo.engine_name || formatEngineName(engineKey)) : formatEngineName(engineKey);
+                var category = engineInfo ? engineInfo.category : 'other';
+                var badgeColor = categoryColors[category] || '#6b7280';
+
+                html += '<div class="engine-results-section">';
+                html += '<div class="engine-section-header" onclick="toggleEngineResultSection(this)">';
+                html += '<span class="engine-badge" style="background:' + badgeColor + '">' + engineName + '</span>';
+
+                if (engineData.status === 'completed') {
+                    var outputCount = Object.keys(engineData.result.outputs || {}).length;
+                    html += '<span class="output-count">' + outputCount + ' output' + (outputCount !== 1 ? 's' : '') + '</span>';
+                    html += '<span class="status-badge completed">✓</span>';
+                } else if (engineData.status === 'failed') {
+                    html += '<span class="status-badge failed">✗ ' + (engineData.error || 'Failed') + '</span>';
+                }
+
+                html += '<span class="collapse-icon">▼</span>';
+                html += '</div>';
+
+                html += '<div class="engine-section-body">';
+
+                if (engineData.status === 'completed' && engineData.result) {
+                    var result = engineData.result;
+                    var outputs = result.outputs || {};
+
+                    // Collect outputs for this engine
+                    for (var outputKey in outputs) {
+                        var output = outputs[outputKey];
+                        var modeKey = output.mode || outputKey.split(' - ')[1] || '';
+
+                        var resultData = {
+                            key: outputKey,
+                            title: formatEngineName(modeKey || outputKey),
+                            engine_key: engineKey,
+                            engine_name: engineName,
+                            engine_category: category,
+                            job_id: engineData.job_id,
+                            output: output,
+                            isImage: !!output.image_url,
+                            imageUrl: output.image_url || null,
+                            content: output.content || output.html_content || '',
+                            isInteractive: !!output.html_content,
+                            modeKey: modeKey
+                        };
+                        allResults.push(resultData);
+
+                        // Render this output
+                        if (resultData.isImage && resultData.imageUrl) {
+                            html += '<div class="engine-output-item image-item">';
+                            html += '<img src="' + resultData.imageUrl + '" alt="' + resultData.title + '" onclick="openLightbox(' + (allResults.length - 1) + ')">';
+                            html += '<div class="output-title">' + resultData.title + '</div>';
+                            html += '</div>';
+                        } else if (resultData.isInteractive) {
+                            html += '<div class="engine-output-item table-item">';
+                            html += '<div class="output-title">' + resultData.title + '</div>';
+                            html += '<div class="table-content">' + resultData.content + '</div>';
+                            html += '</div>';
+                        } else if (resultData.content) {
+                            html += '<div class="engine-output-item text-item">';
+                            html += '<div class="output-title">' + resultData.title + '</div>';
+                            html += '<div class="text-content">' + marked.parse(resultData.content) + '</div>';
+                            html += '</div>';
+                        }
+                    }
+                } else if (engineData.status === 'failed') {
+                    html += '<div class="engine-error">Error: ' + (engineData.error || 'Analysis failed') + '</div>';
+                }
+
+                html += '</div>';  // engine-section-body
+                html += '</div>';  // engine-results-section
+            }
+
+            resultContainer.innerHTML = html;
+        }
+
+        // Toggle engine result section collapse
+        function toggleEngineResultSection(header) {
+            var body = header.nextElementSibling;
+            var icon = header.querySelector('.collapse-icon');
+            if (body.classList.contains('collapsed')) {
+                body.classList.remove('collapsed');
+                icon.textContent = '▼';
+            } else {
+                body.classList.add('collapsed');
+                icon.textContent = '▶';
             }
         }
 

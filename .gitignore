@@ -29,3 +29,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+.env.mcp
+mcp_server/.env.mcp

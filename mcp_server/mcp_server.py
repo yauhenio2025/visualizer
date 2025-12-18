@@ -36,6 +36,18 @@ from datetime import datetime
 from typing import Annotated, Optional, List, Dict, Any
 from pathlib import Path
 
+# Load .env.mcp from the same directory as this script BEFORE other imports
+# This ensures API keys are available when the MCP server starts
+_script_dir = Path(__file__).parent
+_env_file = _script_dir / ".env.mcp"
+if _env_file.exists():
+    with open(_env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ.setdefault(key.strip(), value.strip())
+
 from fastmcp import FastMCP
 from pydantic import Field
 

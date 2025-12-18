@@ -6671,7 +6671,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             var compatibleModes = outputModes;
             if (selectedEngine) {
                 compatibleModes = outputModes.filter(function(m) {
-                    if (!m.compatible_engines) return true;
+                    // Empty array or missing = works with all engines
+                    if (!m.compatible_engines || m.compatible_engines.length === 0) return true;
                     return m.compatible_engines.includes(selectedEngine);
                 });
             }

@@ -644,7 +644,7 @@ def check_job_status(
             "visualizer,completed"
         )
     elif status == "failed":
-        output["error"] = result.get("error", "Job failed")
+        output["error"] = result.get("error_message") or result.get("error", "Job failed")
         send_notification(
             "❌ Job Failed",
             f"Analysis job {job_id[:8]}... failed",

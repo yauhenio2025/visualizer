@@ -85,17 +85,26 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stderr)]
 )
 
-# Add file handler for persistent logs
+# Add file handler for persistent logs with immediate flush
+class FlushingFileHandler(logging.FileHandler):
+    """File handler that flushes after every log message - critical for MCP subprocess context."""
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
 try:
-    file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+    file_handler = FlushingFileHandler(LOG_FILE, mode='a', encoding='utf-8')
     file_handler.setFormatter(log_formatter)
     file_handler.setLevel(logging.DEBUG)  # Always log everything to file
     logging.getLogger().addHandler(file_handler)
+    # Also add to all loggers that might be used
+    logging.getLogger('__main__').addHandler(file_handler)
 except Exception as e:
     sys.stderr.write(f"Warning: Could not create log file {LOG_FILE}: {e}\n")
 
 logger = logging.getLogger(__name__)
 logger.info(f"=== MCP Server Starting === Log level: {LOG_LEVEL}, Log file: {LOG_FILE}")
+logger.info(f"Python: {sys.version}, PID: {os.getpid()}")
 
 # Initialize MCP server
 mcp = FastMCP(

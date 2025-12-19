@@ -190,6 +190,10 @@ def check_job_status(job_id: str) -> dict:
         )
         response.raise_for_status()
         return response.json()
+    except requests.HTTPError as e:
+        # Return specific error type for HTTP errors (including 500s)
+        status_code = getattr(e.response, 'status_code', 0)
+        return {"error": str(e), "status": "http_error", "status_code": status_code}
     except Exception as e:
         return {"error": str(e), "status": "error"}
 
@@ -315,11 +319,23 @@ def download_job_results(job_id: str, result: dict) -> list[str]:
     return downloaded
 
 
+MAX_TRANSIENT_ERRORS = 6  # Max consecutive transient errors before giving up (60 seconds)
+MAX_POLL_TIME = 1800  # 30 minutes max polling time
+
 def monitor_job(job_id: str) -> dict:
     """Monitor a single job until completion."""
     print(f"\n[{job_id[:8]}...] Monitoring...")
 
+    transient_error_count = 0
+    start_time = time.time()
+
     while True:
+        # Check timeout
+        elapsed = time.time() - start_time
+        if elapsed > MAX_POLL_TIME:
+            print(f"[{job_id[:8]}...] ✗ Timeout after {elapsed/60:.1f} minutes")
+            return {"job_id": job_id, "status": "timeout", "error": "Max poll time exceeded"}
+
         status_data = check_job_status(job_id)
         status = status_data.get("status", "unknown")
 
@@ -334,13 +350,24 @@ def monitor_job(job_id: str) -> dict:
             print(f"[{job_id[:8]}...] ✗ Failed: {error}")
             return {"job_id": job_id, "status": "failed", "error": error}
 
-        elif status == "error":
-            print(f"[{job_id[:8]}...] ✗ API Error: {status_data.get('error')}")
-            return {"job_id": job_id, "status": "error", "error": status_data.get("error")}
+        elif status in ("error", "http_error"):
+            # Transient error - retry up to MAX_TRANSIENT_ERRORS times
+            transient_error_count += 1
+            status_code = status_data.get("status_code", "")
+            error_msg = f"{status_code} {status_data.get('error', 'Unknown')}"
+
+            if transient_error_count <= MAX_TRANSIENT_ERRORS:
+                print(f"[{job_id[:8]}...] ⚠️  Transient error ({transient_error_count}/{MAX_TRANSIENT_ERRORS}): {error_msg[:50]}")
+                time.sleep(POLL_INTERVAL)
+                continue
+            else:
+                print(f"[{job_id[:8]}...] ✗ Too many errors, giving up: {error_msg}")
+                return {"job_id": job_id, "status": "error", "error": status_data.get("error")}
 
         else:
-            # Still processing
-            print(f"[{job_id[:8]}...] Status: {status}", end="\r")
+            # Still processing - reset transient error count on success
+            transient_error_count = 0
+            print(f"[{job_id[:8]}...] Status: {status}", end="")
             time.sleep(POLL_INTERVAL)
 
 

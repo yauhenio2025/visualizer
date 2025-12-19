@@ -67,13 +67,35 @@ except ImportError:
     DOCX_SUPPORT = False
     logging.warning("python-docx not installed - DOCX text extraction disabled")
 
-# Configure logging to stderr (stdout is reserved for JSON-RPC)
+# Configure logging to stderr (stdout is reserved for JSON-RPC) AND file
+LOG_LEVEL = os.environ.get('VISUALIZER_LOG_LEVEL', 'DEBUG').upper()
+LOG_FILE = os.environ.get('VISUALIZER_LOG_FILE', str(Path.home() / '.visualizer-mcp.log'))
+
+# Create formatter with detailed information
+log_formatter = logging.Formatter(
+    '%(asctime)s | %(levelname)-8s | %(funcName)-25s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Configure root logger
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=getattr(logging, LOG_LEVEL, logging.DEBUG),
+    format='%(asctime)s | %(levelname)-8s | %(funcName)-25s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[logging.StreamHandler(sys.stderr)]
 )
+
+# Add file handler for persistent logs
+try:
+    file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(logging.DEBUG)  # Always log everything to file
+    logging.getLogger().addHandler(file_handler)
+except Exception as e:
+    sys.stderr.write(f"Warning: Could not create log file {LOG_FILE}: {e}\n")
+
 logger = logging.getLogger(__name__)
+logger.info(f"=== MCP Server Starting === Log level: {LOG_LEVEL}, Log file: {LOG_FILE}")
 
 # Initialize MCP server
 mcp = FastMCP(
@@ -159,6 +181,20 @@ def api_request(
 ) -> dict:
     """Make an API request to visualizer or analyzer backend."""
     url = f"{base_url}{endpoint}"
+    request_id = f"{method}_{endpoint}_{int(time.time() * 1000) % 100000}"
+
+    # Log request details (sanitize sensitive data)
+    safe_data = None
+    if data:
+        safe_data = {k: ('***' if 'key' in k.lower() or 'token' in k.lower() else
+                        f"<{len(str(v))} chars>" if isinstance(v, str) and len(str(v)) > 200 else v)
+                     for k, v in data.items()}
+
+    logger.debug(f"[{request_id}] >>> API Request: {method} {url}")
+    logger.debug(f"[{request_id}] >>> Data: {json.dumps(safe_data, default=str)[:500] if safe_data else 'None'}")
+    logger.debug(f"[{request_id}] >>> Timeout: {timeout}s")
+
+    start_time = time.time()
 
     try:
         request_headers = headers or {}
@@ -172,53 +208,110 @@ def api_request(
         elif method.upper() == 'DELETE':
             response = requests.delete(url, headers=request_headers, timeout=timeout)
         else:
+            logger.error(f"[{request_id}] Unsupported HTTP method: {method}")
             return {"error": f"Unsupported HTTP method: {method}"}
 
+        elapsed = time.time() - start_time
+        logger.debug(f"[{request_id}] <<< Response: {response.status_code} in {elapsed:.2f}s")
+
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+
+        # Log response summary
+        if isinstance(result, dict):
+            if 'error' in result:
+                logger.warning(f"[{request_id}] <<< API returned error: {result.get('error')}")
+            elif 'job_id' in result:
+                logger.info(f"[{request_id}] <<< Job ID: {result.get('job_id')}, Status: {result.get('status', 'N/A')}")
+            elif 'status' in result:
+                logger.debug(f"[{request_id}] <<< Status: {result.get('status')}")
+
+        return result
 
     except requests.Timeout:
-        return {"error": f"Request timeout after {timeout}s"}
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] !!! TIMEOUT after {elapsed:.2f}s (limit: {timeout}s) - URL: {url}")
+        return {"error": f"Request timeout after {timeout}s", "url": url, "request_id": request_id}
+
     except requests.HTTPError as e:
+        elapsed = time.time() - start_time
         error_text = ""
+        status_code = getattr(e.response, 'status_code', 'unknown')
         try:
-            error_text = e.response.text[:500]
+            error_text = e.response.text[:1000]
         except:
             pass
-        return {"error": f"API error: {str(e)}", "details": error_text}
+        logger.error(f"[{request_id}] !!! HTTP {status_code} after {elapsed:.2f}s - URL: {url}")
+        logger.error(f"[{request_id}] !!! Response body: {error_text[:500]}")
+        return {"error": f"API error: {status_code} {str(e)}", "details": error_text, "url": url, "request_id": request_id}
+
     except requests.RequestException as e:
-        return {"error": f"Request failed: {str(e)}"}
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] !!! Request failed after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
+        logger.exception(f"[{request_id}] Full exception:")
+        return {"error": f"Request failed: {str(e)}", "url": url, "request_id": request_id}
+
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] !!! Unexpected error after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
+        logger.exception(f"[{request_id}] Full exception:")
+        return {"error": f"Unexpected error: {str(e)}", "url": url, "request_id": request_id}
 
 
 def extract_pdf_text(file_path: Path) -> str:
     """Extract text from a PDF file using PyMuPDF."""
+    logger.debug(f"Extracting text from PDF: {file_path}")
+
     if not PDF_SUPPORT:
+        logger.warning(f"PDF extraction not available (pymupdf not installed)")
         return "[PDF text extraction not available - install pymupdf]"
 
     try:
         doc = fitz.open(str(file_path))
+        page_count = len(doc)
+        logger.debug(f"PDF opened: {page_count} pages")
+
         text_parts = []
+        chars_extracted = 0
         for page_num, page in enumerate(doc):
             text = page.get_text()
             if text.strip():
                 text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
+                chars_extracted += len(text)
         doc.close()
-        return "\n\n".join(text_parts) if text_parts else "[No text extracted from PDF]"
+
+        if text_parts:
+            logger.info(f"PDF extracted: {len(text_parts)}/{page_count} pages, {chars_extracted:,} chars")
+            return "\n\n".join(text_parts)
+        else:
+            logger.warning(f"PDF has NO extractable text (may be scanned images): {file_path}")
+            return "[No text extracted from PDF - may be scanned images without OCR]"
+
     except Exception as e:
+        logger.error(f"PDF extraction failed: {type(e).__name__}: {str(e)}")
+        logger.exception("Full PDF extraction error:")
         return f"[Error extracting PDF text: {str(e)}]"
 
 
 def extract_docx_text(file_path: Path) -> str:
     """Extract text from a DOCX file using python-docx."""
+    logger.debug(f"Extracting text from DOCX: {file_path}")
+
     if not DOCX_SUPPORT:
+        logger.warning(f"DOCX extraction not available (python-docx not installed)")
         return "[DOCX text extraction not available - install python-docx]"
 
     try:
         doc = DocxDocument(str(file_path))
         text_parts = []
+        para_count = 0
+        table_count = 0
+
         for para in doc.paragraphs:
             if para.text.strip():
                 text_parts.append(para.text)
+                para_count += 1
+
         # Also extract text from tables
         for table in doc.tables:
             for row in table.rows:
@@ -228,63 +321,99 @@ def extract_docx_text(file_path: Path) -> str:
                         row_text.append(cell.text.strip())
                 if row_text:
                     text_parts.append(" | ".join(row_text))
-        return "\n\n".join(text_parts) if text_parts else "[No text extracted from DOCX]"
+                    table_count += 1
+
+        if text_parts:
+            total_chars = sum(len(t) for t in text_parts)
+            logger.info(f"DOCX extracted: {para_count} paragraphs, {table_count} table rows, {total_chars:,} chars")
+            return "\n\n".join(text_parts)
+        else:
+            logger.warning(f"DOCX has no extractable text: {file_path}")
+            return "[No text extracted from DOCX]"
+
     except Exception as e:
+        logger.error(f"DOCX extraction failed: {type(e).__name__}: {str(e)}")
+        logger.exception("Full DOCX extraction error:")
         return f"[Error extracting DOCX text: {str(e)}]"
 
 
 def read_document(file_path: str) -> Dict[str, Any]:
     """Read a document from file path and return structured document object."""
+    logger.info(f"Reading document: {file_path}")
     path = Path(file_path).expanduser().resolve()
 
     if not path.exists():
+        logger.error(f"File not found: {file_path} (resolved: {path})")
         return {"error": f"File not found: {file_path}"}
 
     if not path.is_file():
+        logger.error(f"Not a file: {file_path}")
         return {"error": f"Not a file: {file_path}"}
+
+    file_size = path.stat().st_size
+    logger.debug(f"File exists: {path}, size: {file_size:,} bytes")
 
     # Determine file type
     suffix = path.suffix.lower()
+    logger.debug(f"File type: {suffix}")
 
     # For PDFs, read as base64 AND extract text
     if suffix == '.pdf':
         try:
+            logger.debug(f"Reading PDF as base64...")
             with open(path, 'rb') as f:
                 content = base64.b64encode(f.read()).decode('utf-8')
             encoding = 'base64'
+            logger.debug(f"PDF base64 size: {len(content):,} chars")
             # Also extract text for sample_text usage
             extracted_text = extract_pdf_text(path)
+            logger.debug(f"Extracted text length: {len(extracted_text):,} chars")
         except Exception as e:
+            logger.error(f"Failed to read PDF: {type(e).__name__}: {str(e)}")
+            logger.exception("Full PDF read error:")
             return {"error": f"Cannot read PDF: {str(e)}"}
     # For DOCX, read as base64 AND extract text
     elif suffix == '.docx':
         try:
+            logger.debug(f"Reading DOCX as base64...")
             with open(path, 'rb') as f:
                 content = base64.b64encode(f.read()).decode('utf-8')
             encoding = 'base64'
+            logger.debug(f"DOCX base64 size: {len(content):,} chars")
             # Also extract text for sample_text usage
             extracted_text = extract_docx_text(path)
+            logger.debug(f"Extracted text length: {len(extracted_text):,} chars")
         except Exception as e:
+            logger.error(f"Failed to read DOCX: {type(e).__name__}: {str(e)}")
+            logger.exception("Full DOCX read error:")
             return {"error": f"Cannot read DOCX: {str(e)}"}
     else:
         # For text files (txt, md, markdown, rst, tex), read as text
         try:
+            logger.debug(f"Reading text file...")
             content = path.read_text(encoding='utf-8')
             encoding = 'text'
             extracted_text = content  # Same as content for text files
-        except UnicodeDecodeError:
+            logger.debug(f"Text content length: {len(content):,} chars")
+        except UnicodeDecodeError as e:
+            logger.error(f"Unicode decode error for {path}: {str(e)}")
             return {"error": f"Cannot read file as text (not a supported format): {file_path}"}
         except Exception as e:
+            logger.error(f"Failed to read text file: {type(e).__name__}: {str(e)}")
+            logger.exception("Full text read error:")
             return {"error": f"Cannot read file: {str(e)}"}
 
+    doc_id = f"doc_{int(time.time())}_{hash(str(path)) % 10000}"
+    logger.info(f"Document ready: {doc_id}, title: {path.name}, size: {file_size:,} bytes, encoding: {encoding}")
+
     return {
-        "id": f"doc_{int(time.time())}_{hash(str(path)) % 10000}",
+        "id": doc_id,
         "title": path.name,
         "content": content,
         "encoding": encoding,
         "extracted_text": extracted_text,  # Always have text available
         "path": str(path),
-        "size": path.stat().st_size
+        "size": file_size
     }
 
 
@@ -361,19 +490,42 @@ def download_file_from_url(url: str, output_path: Path) -> tuple[bool, str]:
 
     Returns: (success, error_message)
     """
+    start_time = time.time()
+    # Truncate URL for logging (hide signature params)
+    url_display = url.split('?')[0][-60:] if '?' in url else url[-60:]
+    logger.debug(f"Downloading: ...{url_display}")
+
     try:
         response = requests.get(url, timeout=120, stream=True)
         response.raise_for_status()
 
+        content_length = response.headers.get('content-length')
+        if content_length:
+            logger.debug(f"Content-Length: {int(content_length):,} bytes")
+
+        total_bytes = 0
         with open(output_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
+                total_bytes += len(chunk)
 
-        logger.info(f"Downloaded: {output_path}")
+        elapsed = time.time() - start_time
+        speed_kbps = (total_bytes / 1024) / elapsed if elapsed > 0 else 0
+        logger.debug(f"Downloaded {total_bytes:,} bytes in {elapsed:.1f}s ({speed_kbps:.0f} KB/s)")
         return True, ""
+    except requests.Timeout:
+        elapsed = time.time() - start_time
+        error_msg = f"Timeout after {elapsed:.1f}s"
+        logger.error(f"Download timeout: {error_msg} - URL: ...{url_display}")
+        return False, error_msg
+    except requests.HTTPError as e:
+        status = getattr(e.response, 'status_code', 'unknown')
+        error_msg = f"HTTP {status}: {str(e)[:100]}"
+        logger.error(f"Download HTTP error: {error_msg}")
+        return False, error_msg
     except Exception as e:
-        error_msg = f"Failed to download: {e}"
-        logger.error(f"{error_msg} - URL: {url[:100]}")
+        error_msg = f"{type(e).__name__}: {str(e)[:100]}"
+        logger.error(f"Download failed: {error_msg} - URL: ...{url_display}")
         return False, error_msg
 
 
@@ -592,23 +744,36 @@ def submit_analysis(
 
     Returns: Job ID for tracking progress.
     """
-    logger.info(f"Submitting analysis: {document_path} with {len(engine_keys)} engines")
+    logger.info(f"=" * 60)
+    logger.info(f"SUBMIT_ANALYSIS: {document_path}")
+    logger.info(f"Engines: {engine_keys}")
+    logger.info(f"Output mode: {output_mode}, Auto-monitor: {auto_monitor}")
+    logger.info(f"=" * 60)
 
     # Read document
+    logger.debug("Reading document...")
     doc = read_document(document_path)
     if "error" in doc:
+        logger.error(f"Document read failed: {doc['error']}")
         return json.dumps({"error": doc["error"]})
+
+    logger.info(f"Document loaded: {doc['title']}, size: {doc.get('size', 'unknown')} bytes")
 
     # Build llm_keys for request body (this is what the visualizer expects!)
     llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+    has_anthropic = 'anthropic_api_key' in llm_keys
+    has_gemini = 'gemini_api_key' in llm_keys
+    logger.debug(f"API keys available - Anthropic: {has_anthropic}, Gemini: {has_gemini}")
 
     # Validate output mode
     if output_mode not in ['visual', 'textual']:
+        logger.error(f"Invalid output_mode: {output_mode}")
         return json.dumps({"error": "output_mode must be 'visual' or 'textual'"})
 
     # Determine the actual output mode string for the API
     # Valid modes: gemini_image, structured_text_report, executive_memo, mermaid, d3_interactive, etc.
     api_output_mode = "gemini_image" if output_mode == "visual" else "executive_memo"
+    logger.debug(f"API output mode: {api_output_mode}")
 
     # Prepare document for submission (remove extra fields the API doesn't need)
     doc_for_api = {
@@ -617,12 +782,15 @@ def submit_analysis(
         "content": doc["content"],
         "encoding": doc["encoding"]
     }
+    logger.debug(f"Document for API: id={doc_for_api['id']}, encoding={doc_for_api['encoding']}, content_size={len(doc_for_api['content']):,} chars")
 
     job_ids = []
     errors = []
 
     # Submit each engine separately (more reliable than bundle for arbitrary engine lists)
-    for engine_key in engine_keys:
+    for i, engine_key in enumerate(engine_keys, 1):
+        logger.info(f"[{i}/{len(engine_keys)}] Submitting engine: {engine_key}")
+
         result = api_request(
             VISUALIZER_API_URL,
             'POST',
@@ -638,17 +806,31 @@ def submit_analysis(
         )
 
         if "error" in result:
-            errors.append(f"{engine_key}: {result['error']}")
+            error_msg = f"{engine_key}: {result['error']}"
+            logger.error(f"[{i}/{len(engine_keys)}] FAILED: {error_msg}")
+            if 'details' in result:
+                logger.error(f"[{i}/{len(engine_keys)}] Details: {result['details'][:300]}")
+            errors.append(error_msg)
         elif result.get("job_id"):
+            job_id = result["job_id"]
+            logger.info(f"[{i}/{len(engine_keys)}] SUCCESS: job_id={job_id}")
             job_ids.append({
                 "engine": engine_key,
-                "job_id": result["job_id"]
+                "job_id": job_id
             })
         else:
-            errors.append(f"{engine_key}: No job ID returned")
+            error_msg = f"{engine_key}: No job ID returned"
+            logger.error(f"[{i}/{len(engine_keys)}] FAILED: {error_msg}")
+            logger.error(f"[{i}/{len(engine_keys)}] Full response: {json.dumps(result)[:500]}")
+            errors.append(error_msg)
 
     if not job_ids and errors:
+        logger.error(f"ALL SUBMISSIONS FAILED: {len(errors)} errors")
+        for err in errors:
+            logger.error(f"  - {err}")
         return json.dumps({"error": "All submissions failed", "details": errors})
+
+    logger.info(f"SUBMISSION SUMMARY: {len(job_ids)} succeeded, {len(errors)} failed")
 
     output = {
         "jobs": job_ids,
@@ -671,11 +853,12 @@ def submit_analysis(
     if auto_monitor and job_ids:
         # Extract just the job IDs and spawn background poller
         all_job_ids = [j["job_id"] for j in job_ids]
+        logger.info(f"Spawning background poller for {len(all_job_ids)} jobs")
         spawn_job_poller(all_job_ids)
         output["message"] += " Results will auto-download when complete."
         output["auto_monitor"] = True
 
-    logger.info(f"Jobs submitted: {job_ids}")
+    logger.info(f"=" * 60)
     return json.dumps(output, indent=2)
 
 
@@ -688,7 +871,9 @@ def check_job_status(
 
     Returns: Current job status, progress, and results if complete.
     """
-    logger.info(f"Checking status for job: {job_id}")
+    check_start = time.time()
+    job_short = job_id[:8]
+    logger.info(f"[{job_short}] Checking job status...")
 
     result = api_request(
         VISUALIZER_API_URL,
@@ -697,34 +882,72 @@ def check_job_status(
     )
 
     if "error" in result:
+        logger.error(f"[{job_short}] Failed to get status: {result.get('error')}")
+        logger.error(f"[{job_short}] Request details: {result.get('request_id', 'N/A')}, URL: {result.get('url', 'N/A')}")
         return json.dumps({"error": result["error"]})
 
     status = result.get("status", "unknown")
+    created_at = result.get("created_at")
+    updated_at = result.get("updated_at")
+
+    # Log timing information
+    if created_at and updated_at:
+        logger.debug(f"[{job_short}] Created: {created_at}, Updated: {updated_at}")
+
+    # Log detailed status info
+    logger.info(f"[{job_short}] Status: {status.upper()}")
 
     output = {
         "job_id": job_id,
         "status": status,
-        "created_at": result.get("created_at"),
-        "updated_at": result.get("updated_at")
+        "created_at": created_at,
+        "updated_at": updated_at
     }
 
     if status == "completed":
         output["result_available"] = True
         output["message"] = "Job completed! Use get_results() to download outputs."
+        logger.info(f"[{job_short}] ✓ Job COMPLETED successfully")
+        # Log output info if available
+        outputs = result.get("outputs", {})
+        if outputs:
+            engine_keys = list(outputs.keys())
+            logger.info(f"[{job_short}] Engines completed: {engine_keys}")
         send_notification(
             "✅ Job Complete",
             f"Analysis job {job_id[:8]}... is ready",
             "visualizer,completed"
         )
     elif status == "failed":
-        output["error"] = result.get("error_message") or result.get("error", "Job failed")
+        error_msg = result.get("error_message") or result.get("error", "Job failed")
+        output["error"] = error_msg
+        # Log failure details extensively
+        logger.error(f"[{job_short}] ✗ Job FAILED: {error_msg}")
+        logger.error(f"[{job_short}] Full error response: {json.dumps(result, default=str)[:2000]}")
+        # Log any additional debug info from the response
+        if "traceback" in result:
+            logger.error(f"[{job_short}] Traceback: {result['traceback'][:1000]}")
+        if "extended_info" in result:
+            ext_info = result["extended_info"]
+            logger.error(f"[{job_short}] Engine: {ext_info.get('engine')}, Pipeline: {ext_info.get('pipeline')}")
         send_notification(
             "❌ Job Failed",
-            f"Analysis job {job_id[:8]}... failed",
+            f"Analysis job {job_id[:8]}... failed: {error_msg[:100]}",
             "visualizer,failed"
         )
     elif status in ["pending", "running", "extracting", "curating", "rendering"]:
         output["message"] = f"Job is {status}. Check back in a few moments."
+        logger.debug(f"[{job_short}] Job in progress: {status}")
+        # Log progress if available
+        progress = result.get("progress")
+        if progress:
+            output["progress"] = progress
+            logger.debug(f"[{job_short}] Progress: {progress}")
+    else:
+        logger.warning(f"[{job_short}] Unknown status: {status}")
+
+    elapsed = time.time() - check_start
+    logger.debug(f"[{job_short}] Status check completed in {elapsed:.2f}s")
 
     return json.dumps(output, indent=2)
 
@@ -742,9 +965,12 @@ def get_results(
 
     Returns: Paths to downloaded files.
     """
-    logger.info(f"Getting results for job: {job_id}")
+    download_start = time.time()
+    job_short = job_id[:8]
+    logger.info(f"[{job_short}] ===== DOWNLOADING RESULTS =====")
 
     # First get job details
+    logger.debug(f"[{job_short}] Fetching job result from API...")
     result = api_request(
         VISUALIZER_API_URL,
         'GET',
@@ -752,7 +978,18 @@ def get_results(
     )
 
     if "error" in result:
+        logger.error(f"[{job_short}] Failed to get results: {result.get('error')}")
+        logger.error(f"[{job_short}] Request details: {result.get('request_id', 'N/A')}")
         return json.dumps({"error": result["error"]})
+
+    # Log result structure
+    logger.debug(f"[{job_short}] Result keys: {list(result.keys())}")
+    if "extended_info" in result:
+        ext = result["extended_info"]
+        logger.info(f"[{job_short}] Engine: {ext.get('engine')}, Documents: {ext.get('documents_total')}")
+    if "metadata" in result:
+        meta = result["metadata"]
+        logger.info(f"[{job_short}] Processing time: {meta.get('total_ms')}ms, Cost: ${meta.get('cost_usd', 0):.4f}")
 
     # Determine output directory with meaningful folder name
     output_dir = Path(download_to).expanduser() if download_to else OUTPUT_DIR
@@ -760,18 +997,24 @@ def get_results(
     job_dir = output_dir / folder_name
     job_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Using meaningful folder name: {folder_name}")
+    logger.info(f"[{job_short}] Output folder: {folder_name}")
+    logger.debug(f"[{job_short}] Full path: {job_dir}")
 
     downloaded_files = []
     download_errors = []
+    total_bytes = 0
 
     # Handle the CORRECT response structure: outputs.{engine_key}.{image_url|text|...}
     outputs = result.get("outputs", {})
+    logger.info(f"[{job_short}] Found {len(outputs)} output(s) to download")
 
     if isinstance(outputs, dict):
         for engine_key, engine_result in outputs.items():
             if not isinstance(engine_result, dict):
+                logger.warning(f"[{job_short}] Skipping {engine_key}: not a dict ({type(engine_result)})")
                 continue
+
+            logger.debug(f"[{job_short}] Processing output: {engine_key}")
 
             # Check for image_url (visual mode - Gemini image)
             image_url = engine_result.get("image_url")
@@ -785,10 +1028,17 @@ def get_results(
                     ext = ".jpg"  # Default for S3 images
 
                 file_path = job_dir / f"{engine_key}{ext}"
+                logger.debug(f"[{job_short}] Downloading image: {engine_key}{ext}")
+                dl_start = time.time()
                 success, error = download_file_from_url(image_url, file_path)
+                dl_elapsed = time.time() - dl_start
                 if success:
+                    file_size = file_path.stat().st_size
+                    total_bytes += file_size
+                    logger.info(f"[{job_short}] ✓ {engine_key}{ext} ({file_size/1024:.1f}KB in {dl_elapsed:.1f}s)")
                     downloaded_files.append(str(file_path))
                 else:
+                    logger.error(f"[{job_short}] ✗ Failed {engine_key}: {error}")
                     download_errors.append(f"{engine_key}: {error}")
                 continue
 
@@ -797,8 +1047,10 @@ def get_results(
             if text_content and isinstance(text_content, str):
                 file_path = job_dir / f"{engine_key}.md"
                 file_path.write_text(text_content, encoding='utf-8')
+                file_size = len(text_content.encode('utf-8'))
+                total_bytes += file_size
                 downloaded_files.append(str(file_path))
-                logger.info(f"Saved text: {file_path}")
+                logger.info(f"[{job_short}] ✓ {engine_key}.md ({file_size/1024:.1f}KB)")
                 continue
 
             # Check for S3 URL in output field (legacy format)
@@ -853,25 +1105,42 @@ def get_results(
 
     # Save raw JSON for reference
     json_path = job_dir / "results.json"
-    json_path.write_text(json.dumps(result, indent=2), encoding='utf-8')
+    json_content = json.dumps(result, indent=2)
+    json_path.write_text(json_content, encoding='utf-8')
+    json_size = len(json_content.encode('utf-8'))
+    total_bytes += json_size
     downloaded_files.append(str(json_path))
+    logger.debug(f"[{job_short}] Saved results.json ({json_size/1024:.1f}KB)")
+
+    # Calculate totals
+    total_elapsed = time.time() - download_start
+    total_kb = total_bytes / 1024
+    total_mb = total_bytes / (1024 * 1024)
 
     output = {
         "job_id": job_id,
         "download_directory": str(job_dir),
         "files_downloaded": len(downloaded_files),
         "files": downloaded_files,
+        "total_size_kb": round(total_kb, 1),
+        "download_time_seconds": round(total_elapsed, 1),
         "errors": download_errors if download_errors else None
     }
+
+    # Log summary
+    logger.info(f"[{job_short}] ===== DOWNLOAD COMPLETE =====")
+    logger.info(f"[{job_short}] Files: {len(downloaded_files)}, Total: {total_mb:.2f}MB, Time: {total_elapsed:.1f}s")
+    if download_errors:
+        logger.warning(f"[{job_short}] Errors: {len(download_errors)} - {download_errors}")
+    logger.info(f"[{job_short}] Location: {job_dir}")
 
     # Send notification
     send_notification(
         "✅ Results Downloaded",
-        f"Downloaded {len(downloaded_files)} file(s) to {job_dir}",
+        f"Downloaded {len(downloaded_files)} file(s) ({total_mb:.1f}MB) to {folder_name}",
         "visualizer,completed"
     )
 
-    logger.info(f"Downloaded {len(downloaded_files)} files to {job_dir}")
     return json.dumps(output, indent=2)
 
 

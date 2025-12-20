@@ -5731,6 +5731,139 @@ HTML_PAGE = '''<!DOCTYPE html>
             background: var(--surface);
         }
 
+        /* Generate More Modal */
+        .generate-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1100;
+        }
+        .generate-modal.active { display: flex; }
+        .generate-modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .generate-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .generate-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+        .generate-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+            line-height: 1;
+        }
+        .generate-modal-close:hover { color: var(--text); }
+        .generate-modal-doc {
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .generate-modal-doc-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+        .generate-modal-doc-name {
+            font-weight: 500;
+            color: var(--text);
+        }
+        .generate-modal-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 1rem;
+        }
+        .generate-modal-tab {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .generate-modal-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            font-weight: 500;
+        }
+        .generate-modal-body {
+            padding: 1rem 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            max-height: 400px;
+        }
+        .generate-modal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+        .generate-modal-item {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: var(--bg-card);
+        }
+        .generate-modal-item:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+        .generate-modal-item.selected {
+            border-color: var(--accent);
+            background: rgba(26, 26, 26, 0.05);
+        }
+        .generate-modal-item-name {
+            font-weight: 500;
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+        .generate-modal-item-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+        .generate-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .generate-modal-footer .selected-info {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
         /* Document Table */
         .doc-table {
             width: 100%;
@@ -10276,11 +10409,34 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (saved) {
                 try {
                     libraryItems = JSON.parse(saved);
+                    // Deduplicate on load - remove items with same job_id + key
+                    var beforeCount = libraryItems.length;
+                    libraryItems = deduplicateLibraryItems(libraryItems);
+                    if (libraryItems.length < beforeCount) {
+                        console.log('Cleaned up ' + (beforeCount - libraryItems.length) + ' duplicate library items');
+                        // Save the cleaned up version
+                        try {
+                            localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+                        } catch (e) {}
+                    }
                     renderLibrary();
                 } catch (e) {
                     libraryItems = [];
                 }
             }
+        }
+
+        function deduplicateLibraryItems(items) {
+            var seen = {};
+            var unique = [];
+            items.forEach(function(item) {
+                var key = (item.job_id || 'no-job') + '::' + (item.key || 'no-key');
+                if (!seen[key]) {
+                    seen[key] = true;
+                    unique.push(item);
+                }
+            });
+            return unique;
         }
 
         // Cache for recent jobs - avoid re-fetching too often
@@ -10894,19 +11050,266 @@ HTML_PAGE = '''<!DOCTYPE html>
             return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
         }
 
-        function showGenerateMoreOptions(inputKey, analysisType) {
-            // For now, show an alert - this can be enhanced to open a modal
-            // with the appropriate analysis options pre-selected
-            var message = 'Generate ' + analysisType + ' analysis for: ' + inputKey.replace('collection:', '').replace('doc:', '').replace('job:', '') + '\\n\\n';
-            message += 'This feature will allow you to run additional analyses on this input.\\n';
-            message += 'Coming soon: Select specific engines, bundles, or pipelines from a modal.';
-            alert(message);
+        // ===== GENERATE MORE MODAL =====
+        var generateModalInputKey = null;
+        var generateModalSelection = { type: null, key: null };
 
-            // TODO: Open a modal with analysis options
-            // The modal should:
-            // 1. Show the input document name
-            // 2. List available engines/bundles/pipelines
-            // 3. Allow selection and execution
+        function showGenerateMoreOptions(inputKey, analysisType) {
+            generateModalInputKey = inputKey;
+            generateModalSelection = { type: null, key: null };
+
+            // Get document name from inputKey
+            var docName = inputKey.replace('collection:', '').replace('doc:', '').replace('job:', '').replace('multi:', '');
+            $('generate-modal-doc-name').textContent = docName;
+
+            // Populate the modal with engines/bundles/pipelines
+            populateGenerateModal();
+
+            // Switch to the appropriate tab
+            switchGenerateTab(analysisType === 'engine' ? 'engines' : analysisType + 's');
+
+            // Show modal
+            $('generate-modal').classList.add('active');
+            updateGenerateModalSelection();
+        }
+
+        function closeGenerateModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            $('generate-modal').classList.remove('active');
+            generateModalInputKey = null;
+            generateModalSelection = { type: null, key: null };
+        }
+
+        function switchGenerateTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.generate-modal-tab').forEach(function(tab) {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+
+            // Show/hide content
+            $('generate-modal-engines').style.display = tabName === 'engines' ? 'grid' : 'none';
+            $('generate-modal-bundles').style.display = tabName === 'bundles' ? 'grid' : 'none';
+            $('generate-modal-pipelines').style.display = tabName === 'pipelines' ? 'grid' : 'none';
+
+            // Clear selection when switching tabs
+            generateModalSelection = { type: null, key: null };
+            updateGenerateModalSelection();
+        }
+
+        function populateGenerateModal() {
+            // Populate engines
+            var enginesGrid = $('generate-modal-engines');
+            enginesGrid.innerHTML = '';
+            if (engines && engines.length > 0) {
+                engines.forEach(function(eng) {
+                    var item = document.createElement('div');
+                    item.className = 'generate-modal-item';
+                    item.dataset.type = 'engine';
+                    item.dataset.key = eng.engine_key;
+                    item.innerHTML = '<div class="generate-modal-item-name">' + (eng.name || eng.engine_key.replace(/_/g, ' ')) + '</div>' +
+                        '<div class="generate-modal-item-desc">' + (eng.description || '').substring(0, 80) + '</div>';
+                    item.onclick = function() { selectGenerateItem('engine', eng.engine_key); };
+                    enginesGrid.appendChild(item);
+                });
+            } else {
+                enginesGrid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;">Loading engines...</div>';
+            }
+
+            // Populate bundles
+            var bundlesGrid = $('generate-modal-bundles');
+            bundlesGrid.innerHTML = '';
+            if (bundles && bundles.length > 0) {
+                bundles.forEach(function(bundle) {
+                    var item = document.createElement('div');
+                    item.className = 'generate-modal-item';
+                    item.dataset.type = 'bundle';
+                    item.dataset.key = bundle.bundle_key;
+                    item.innerHTML = '<div class="generate-modal-item-name">' + (bundle.name || bundle.bundle_key.replace(/_/g, ' ')) + '</div>' +
+                        '<div class="generate-modal-item-desc">' + (bundle.member_engines || []).length + ' engines</div>';
+                    item.onclick = function() { selectGenerateItem('bundle', bundle.bundle_key); };
+                    bundlesGrid.appendChild(item);
+                });
+            } else {
+                bundlesGrid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;">Loading bundles...</div>';
+            }
+
+            // Populate pipelines
+            var pipelinesGrid = $('generate-modal-pipelines');
+            pipelinesGrid.innerHTML = '';
+            if (pipelines && pipelines.length > 0) {
+                pipelines.forEach(function(pipe) {
+                    var item = document.createElement('div');
+                    item.className = 'generate-modal-item';
+                    item.dataset.type = 'pipeline';
+                    item.dataset.key = pipe.pipeline_key;
+                    item.innerHTML = '<div class="generate-modal-item-name">' + (pipe.name || pipe.pipeline_key.replace(/_/g, ' ')) + '</div>' +
+                        '<div class="generate-modal-item-desc">' + (pipe.description || '').substring(0, 80) + '</div>';
+                    item.onclick = function() { selectGenerateItem('pipeline', pipe.pipeline_key); };
+                    pipelinesGrid.appendChild(item);
+                });
+            } else {
+                pipelinesGrid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;">Loading pipelines...</div>';
+            }
+        }
+
+        function selectGenerateItem(type, key) {
+            // Clear previous selection
+            document.querySelectorAll('.generate-modal-item.selected').forEach(function(el) {
+                el.classList.remove('selected');
+            });
+
+            // Set new selection
+            generateModalSelection = { type: type, key: key };
+
+            // Highlight selected item
+            var item = document.querySelector('.generate-modal-item[data-type="' + type + '"][data-key="' + key + '"]');
+            if (item) item.classList.add('selected');
+
+            updateGenerateModalSelection();
+        }
+
+        function updateGenerateModalSelection() {
+            var info = $('generate-modal-selected');
+            var btn = $('generate-modal-run');
+
+            if (generateModalSelection.type && generateModalSelection.key) {
+                info.textContent = 'Selected: ' + generateModalSelection.key.replace(/_/g, ' ');
+                btn.disabled = false;
+            } else {
+                info.textContent = 'Select an analysis to run';
+                btn.disabled = true;
+            }
+        }
+
+        async function runGenerateMore() {
+            if (!generateModalSelection.type || !generateModalSelection.key || !generateModalInputKey) {
+                alert('Please select an analysis to run');
+                return;
+            }
+
+            var btn = $('generate-modal-run');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+
+            try {
+                // Get document info from the library items
+                var docInfo = getDocInfoFromInputKey(generateModalInputKey);
+                if (!docInfo) {
+                    throw new Error('Could not find document information');
+                }
+
+                var payload = {
+                    output_mode: 'visual',  // Default to visual
+                    collection_mode: 'single'
+                };
+
+                // Set document source
+                if (docInfo.file_path) {
+                    payload.file_paths = [docInfo.file_path];
+                } else if (docInfo.documents) {
+                    payload.documents = docInfo.documents;
+                } else {
+                    throw new Error('No document path or content available');
+                }
+
+                var endpoint;
+                if (generateModalSelection.type === 'engine') {
+                    payload.engine = generateModalSelection.key;
+                    endpoint = '/api/analyzer/analyze';
+                } else if (generateModalSelection.type === 'bundle') {
+                    payload.bundle = generateModalSelection.key;
+                    // Get bundle member engines for output modes
+                    var bundle = bundles.find(function(b) { return b.bundle_key === generateModalSelection.key; });
+                    if (bundle) {
+                        var outputModes = {};
+                        bundle.member_engines.forEach(function(e) { outputModes[e] = 'visual'; });
+                        payload.output_modes = outputModes;
+                    }
+                    endpoint = '/api/analyzer/analyze/bundle';
+                } else if (generateModalSelection.type === 'pipeline') {
+                    payload.pipeline = generateModalSelection.key;
+                    endpoint = '/api/analyzer/analyze/pipeline';
+                }
+
+                console.log('Submitting analysis:', endpoint, payload);
+
+                var response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    var errData = await response.json();
+                    throw new Error(errData.error || 'Analysis submission failed');
+                }
+
+                var data = await response.json();
+                console.log('Analysis started:', data);
+
+                // Close modal and switch to Analyze tab to show progress
+                closeGenerateModal();
+                currentJobId = data.job_id;
+
+                // Switch to Analyze tab to show the job progress
+                switchTab('analyze');
+
+                // Start polling for this job
+                $('progress-section').classList.add('show');
+                updateStage('upload', 'complete');
+                updateStage('queue', 'active');
+                pollJobStatus(data.job_id);
+
+                alert('Analysis started! Job ID: ' + data.job_id + '\\n\\nSwitching to Analyze tab to show progress.');
+
+            } catch (e) {
+                console.error('Error starting analysis:', e);
+                alert('Failed to start analysis: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Analysis';
+            }
+        }
+
+        function getDocInfoFromInputKey(inputKey) {
+            // Find library items matching this input key and extract document info
+            var matchingItems = libraryItems.filter(function(item) {
+                return getInputKey(item) === inputKey;
+            });
+
+            if (matchingItems.length === 0) return null;
+
+            var item = matchingItems[0];
+            var extInfo = item.extended_info || {};
+            var documents = extInfo.documents || [];
+
+            // Try to get file path
+            if (documents.length > 0 && documents[0].path) {
+                return { file_path: documents[0].path };
+            }
+
+            // If we have document content stored
+            if (documents.length > 0) {
+                return {
+                    documents: documents.map(function(doc) {
+                        return {
+                            title: doc.title || doc.name || 'document',
+                            content: doc.content || '',
+                            source_name: doc.source_name || doc.source || ''
+                        };
+                    })
+                };
+            }
+
+            // Try to extract path from the input key itself
+            if (inputKey.startsWith('doc:')) {
+                var docName = inputKey.replace('doc:', '');
+                // This is a filename - we need to find the full path
+                // For now, return just the name and let the backend handle it
+                return { file_path: docName };
+            }
+
+            return null;
         }
 
         function createJobGroup(jobId, group) {
@@ -11912,6 +12315,37 @@ HTML_PAGE = '''<!DOCTYPE html>
         <div class="content-modal-container" onclick="event.stopPropagation()">
             <div class="content-modal-header" id="content-modal-title"></div>
             <div class="content-modal-body" id="content-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Generate More Analysis Modal -->
+    <div id="generate-modal" class="generate-modal" onclick="closeGenerateModal(event)">
+        <div class="generate-modal-content" onclick="event.stopPropagation()">
+            <div class="generate-modal-header">
+                <h3>Run Additional Analysis</h3>
+                <button class="generate-modal-close" onclick="closeGenerateModal()">&times;</button>
+            </div>
+            <div class="generate-modal-doc">
+                <div class="generate-modal-doc-label">Document</div>
+                <div class="generate-modal-doc-name" id="generate-modal-doc-name">-</div>
+            </div>
+            <div class="generate-modal-tabs">
+                <button class="generate-modal-tab active" data-tab="engines" onclick="switchGenerateTab('engines')">🎯 Engines</button>
+                <button class="generate-modal-tab" data-tab="bundles" onclick="switchGenerateTab('bundles')">📦 Bundles</button>
+                <button class="generate-modal-tab" data-tab="pipelines" onclick="switchGenerateTab('pipelines')">🔄 Pipelines</button>
+            </div>
+            <div class="generate-modal-body">
+                <div id="generate-modal-engines" class="generate-modal-grid"></div>
+                <div id="generate-modal-bundles" class="generate-modal-grid" style="display:none;"></div>
+                <div id="generate-modal-pipelines" class="generate-modal-grid" style="display:none;"></div>
+            </div>
+            <div class="generate-modal-footer">
+                <span class="selected-info" id="generate-modal-selected">Select an analysis to run</span>
+                <div>
+                    <button class="btn btn-sm" onclick="closeGenerateModal()">Cancel</button>
+                    <button class="btn btn-sm btn-primary" id="generate-modal-run" onclick="runGenerateMore()" disabled>Run Analysis</button>
+                </div>
+            </div>
         </div>
     </div>
 

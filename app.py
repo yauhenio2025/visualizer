@@ -11252,7 +11252,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 currentJobId = data.job_id;
 
                 // Switch to Analyze tab to show the job progress
-                switchTab('analyze');
+                switchView('analyze');
 
                 // Start polling for this job
                 $('progress-section').classList.add('show');

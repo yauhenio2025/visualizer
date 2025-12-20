@@ -11247,9 +11247,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var data = await response.json();
                 console.log('Analysis started:', data);
 
+                // Get job ID - could be job_id or id depending on API
+                var jobId = data.job_id || data.id;
+                if (!jobId) {
+                    console.error('No job_id in response:', data);
+                    throw new Error('Server did not return a job ID');
+                }
+
                 // Close modal and switch to Analyze tab to show progress
                 closeGenerateModal();
-                currentJobId = data.job_id;
+                currentJobId = jobId;
 
                 // Switch to Analyze tab to show the job progress
                 switchView('analyze');
@@ -11257,7 +11264,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Start polling for this job
                 $('progress-section').classList.add('show');
                 resetStages();
-                pollJobStatus(data.job_id);
+                pollJobStatus(jobId);
 
             } catch (e) {
                 console.error('Error starting analysis:', e);

@@ -10675,10 +10675,11 @@ HTML_PAGE = '''<!DOCTYPE html>
             var extInfo = item.extended_info || {};
             var documents = extInfo.documents || [];
 
-            // Extract actual document titles
+            // Extract actual document titles - prefer extracted_title over filename
             if (documents.length > 0) {
                 var titles = documents.map(function(doc) {
-                    return doc.title || doc.name || doc.id || 'Untitled';
+                    // Prefer extracted title (from LLM extraction) over filename
+                    return doc.extracted_title || doc.title || doc.name || doc.id || 'Untitled';
                 }).filter(function(t) { return t && t !== 'Untitled'; });
 
                 if (titles.length === 1) {

@@ -16,3 +16,6 @@ google-genai>=1.0.0
 
 # Environment
 python-dotenv>=1.0.0
+
+# AWS S3 for document storage
+boto3>=1.34.0

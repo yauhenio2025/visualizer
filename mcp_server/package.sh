@@ -23,6 +23,7 @@ cp "$SCRIPT_DIR/job_poller.py" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/run-mcp-server.sh" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/.env.mcp.template" "$PACKAGE_DIR/"
+cp "$SCRIPT_DIR/.env.mcp" "$PACKAGE_DIR/" 2>/dev/null || true  # Include actual keys if present
 cp "$SCRIPT_DIR/README.md" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/install-mcp-server.sh" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/visualizer-listener.sh" "$PACKAGE_DIR/"

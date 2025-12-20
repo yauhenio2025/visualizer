@@ -86,6 +86,155 @@ WEBSAVER_API_KEY = os.environ.get("WEBSAVER_API_KEY", "ws-export-key-12345")
 # Document extensions for analysis
 DOCUMENT_EXTENSIONS = {'.pdf', '.md', '.txt'}
 
+# S3 Storage Configuration (for storing input documents)
+try:
+    import boto3
+    from botocore.config import Config
+    from botocore.exceptions import ClientError
+    S3_AVAILABLE = True
+except ImportError:
+    S3_AVAILABLE = False
+    print("Warning: boto3 not installed. S3 document storage disabled. Run: pip install boto3")
+
+# S3 settings - same as analyzer uses
+S3_ENDPOINT = os.environ.get("STORAGE_ENDPOINT")  # None for AWS S3
+S3_ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY")
+S3_SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY")
+S3_BUCKET = os.environ.get("STORAGE_BUCKET", "analyzer-outputs")
+S3_REGION = os.environ.get("STORAGE_REGION", "eu-central-1")
+S3_PUBLIC_URL_BASE = os.environ.get("STORAGE_PUBLIC_URL_BASE")
+
+# S3 client singleton
+_s3_client = None
+
+def get_s3_client():
+    """Get or create S3 client singleton."""
+    global _s3_client
+    if _s3_client is not None:
+        return _s3_client
+
+    if not S3_AVAILABLE:
+        return None
+
+    if not S3_ACCESS_KEY or not S3_SECRET_KEY:
+        print("S3 credentials not configured. Input document storage disabled.")
+        return None
+
+    try:
+        client_kwargs = {
+            "aws_access_key_id": S3_ACCESS_KEY,
+            "aws_secret_access_key": S3_SECRET_KEY,
+        }
+
+        if S3_ENDPOINT:
+            # R2 or MinIO with custom endpoint
+            client_kwargs["endpoint_url"] = S3_ENDPOINT
+            client_kwargs["region_name"] = "auto"
+            client_kwargs["config"] = Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+            )
+            print(f"S3 client initialized with R2/custom endpoint: {S3_ENDPOINT}")
+        else:
+            # AWS S3
+            client_kwargs["region_name"] = S3_REGION
+            client_kwargs["endpoint_url"] = f"https://s3.{S3_REGION}.amazonaws.com"
+            client_kwargs["config"] = Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            )
+            print(f"S3 client initialized with AWS S3 region: {S3_REGION}")
+
+        _s3_client = boto3.client("s3", **client_kwargs)
+        return _s3_client
+    except Exception as e:
+        print(f"Failed to initialize S3 client: {e}")
+        return None
+
+
+def upload_documents_to_s3(documents: List[Dict], job_id: str) -> Optional[str]:
+    """
+    Upload input documents to S3 for later re-use.
+
+    Args:
+        documents: List of document dicts with id, title, content
+        job_id: Job ID to organize the storage path
+
+    Returns:
+        S3 key for the stored documents, or None if storage failed
+    """
+    client = get_s3_client()
+    if not client:
+        return None
+
+    try:
+        import json
+
+        # Create a combined document package
+        doc_package = {
+            "documents": documents,
+            "stored_at": datetime.datetime.utcnow().isoformat(),
+            "job_id": job_id
+        }
+
+        # Generate storage key
+        date_path = datetime.datetime.utcnow().strftime("%Y/%m/%d")
+        key = f"inputs/{date_path}/{job_id}/documents.json"
+
+        # Upload as JSON
+        body = json.dumps(doc_package, ensure_ascii=False)
+        client.put_object(
+            Bucket=S3_BUCKET,
+            Key=key,
+            Body=body.encode('utf-8'),
+            ContentType="application/json",
+            CacheControl="max-age=86400",
+        )
+
+        print(f"[S3] Uploaded {len(documents)} documents to {key}")
+        return key
+
+    except ClientError as e:
+        print(f"[S3] Upload failed: {e}")
+        return None
+    except Exception as e:
+        print(f"[S3] Upload error: {e}")
+        return None
+
+
+def fetch_documents_from_s3(s3_key: str) -> Optional[List[Dict]]:
+    """
+    Fetch documents from S3 for re-analysis.
+
+    Args:
+        s3_key: S3 key where documents were stored
+
+    Returns:
+        List of document dicts, or None if fetch failed
+    """
+    client = get_s3_client()
+    if not client:
+        return None
+
+    try:
+        import json
+
+        response = client.get_object(Bucket=S3_BUCKET, Key=s3_key)
+        body = response['Body'].read().decode('utf-8')
+        doc_package = json.loads(body)
+
+        documents = doc_package.get('documents', [])
+        print(f"[S3] Fetched {len(documents)} documents from {s3_key}")
+        return documents
+
+    except ClientError as e:
+        print(f"[S3] Fetch failed: {e}")
+        return None
+    except Exception as e:
+        print(f"[S3] Fetch error: {e}")
+        return None
+
+
 # Application Initialization
 app = Flask(__name__)
 
@@ -1312,11 +1461,17 @@ def submit_analysis():
             # Get job_id - analyzer might return 'job_id' or 'id'
             job_id = job_data.get("job_id") or job_data.get("id")
 
+            # Upload documents to S3 for re-analysis later
+            s3_input_key = None
+            if job_id:
+                s3_input_key = upload_documents_to_s3(documents, job_id)
+
             return jsonify({
                 "success": True,
                 "mode": "collection",
                 "job_id": job_id,
                 "document_count": len(documents),
+                "s3_input_key": s3_input_key,
                 "warnings": errors if errors else None
             })
 
@@ -1430,11 +1585,19 @@ def submit_bundle_analysis():
         response.raise_for_status()
         job_data = response.json()
 
+        job_id = job_data.get("job_id")
+
+        # Upload documents to S3 for re-analysis later
+        s3_input_key = None
+        if job_id:
+            s3_input_key = upload_documents_to_s3(documents, job_id)
+
         return jsonify({
             "success": True,
-            "job_id": job_data.get("job_id"),
+            "job_id": job_id,
             "bundle": bundle,
             "document_count": len(documents),
+            "s3_input_key": s3_input_key,
             "warnings": errors if errors else None
         })
 
@@ -1550,6 +1713,11 @@ def submit_multi_engine_analysis():
             "details": errors
         })
 
+    # Upload documents to S3 for re-analysis later (use first job_id)
+    s3_input_key = None
+    if job_ids:
+        s3_input_key = upload_documents_to_s3(documents, job_ids[0])
+
     # Return the first job_id as the primary (for backwards compat with polling)
     # Also return all job_ids and the engine mapping
     return jsonify({
@@ -1559,6 +1727,7 @@ def submit_multi_engine_analysis():
         "engine_jobs": engine_jobs,  # Mapping of engine -> job_id
         "engine_count": len(engine_list),
         "document_count": len(documents),
+        "s3_input_key": s3_input_key,
         "warnings": errors if errors else None
     })
 
@@ -1660,11 +1829,19 @@ def submit_pipeline_analysis():
         response.raise_for_status()
         job_data = response.json()
 
+        job_id = job_data.get("job_id")
+
+        # Upload documents to S3 for re-analysis later
+        s3_input_key = None
+        if job_id:
+            s3_input_key = upload_documents_to_s3(documents, job_id)
+
         return jsonify({
             "success": True,
-            "job_id": job_data.get("job_id"),
+            "job_id": job_id,
             "pipeline": pipeline,
             "document_count": len(documents),
+            "s3_input_key": s3_input_key,
             "warnings": errors if errors else None
         })
 
@@ -1880,11 +2057,19 @@ def submit_intent_analysis():
         analyze_response.raise_for_status()
         job_data = analyze_response.json()
 
+        job_id = job_data.get("job_id")
+
+        # Upload documents to S3 for re-analysis later
+        s3_input_key = None
+        if job_id:
+            s3_input_key = upload_documents_to_s3(documents, job_id)
+
         result["success"] = True
-        result["job_id"] = job_data.get("job_id")
+        result["job_id"] = job_id
+        result["s3_input_key"] = s3_input_key
         result["warnings"] = errors if errors else None
 
-        print(f"[INTENT] Job submitted: {job_data.get('job_id')}")
+        print(f"[INTENT] Job submitted: {job_id}")
 
         return jsonify(result)
 
@@ -1967,6 +2152,26 @@ def list_analysis_jobs():
         return jsonify(response.json())
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to list jobs: {str(e)}"}), 500
+
+
+@app.route('/api/analyzer/fetch-documents', methods=['POST'])
+def fetch_documents_endpoint():
+    """Fetch documents from S3 for re-analysis."""
+    data = request.json or {}
+    s3_key = data.get('s3_input_key')
+
+    if not s3_key:
+        return jsonify({"success": False, "error": "No S3 key provided"})
+
+    documents = fetch_documents_from_s3(s3_key)
+    if documents is None:
+        return jsonify({"success": False, "error": "Failed to fetch documents from S3"})
+
+    return jsonify({
+        "success": True,
+        "documents": documents,
+        "count": len(documents)
+    })
 
 
 @app.route('/api/admin/cleanup-orphaned-jobs', methods=['POST'])
@@ -8859,6 +9064,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 console.log('Analysis response:', data);
 
                 if (data.success) {
+                    // Store S3 input key for later re-analysis
+                    window.jobS3Keys = window.jobS3Keys || {};
+                    if (data.s3_input_key && data.job_id) {
+                        window.jobS3Keys[data.job_id] = data.s3_input_key;
+                        console.log('[S3] Stored input key for job', data.job_id, ':', data.s3_input_key);
+                    }
+
                     if (data.mode === 'individual') {
                         pollMultipleJobs(data.jobs);
                     } else if (data.job_ids && data.job_ids.length > 1) {
@@ -8867,6 +9079,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                         updateJobUrl(data.job_id);
                         // Store engine mapping for result display
                         window.multiEngineJobs = data.engine_jobs || {};
+                        // Store S3 key for all sub-jobs too
+                        if (data.s3_input_key) {
+                            data.job_ids.forEach(function(jid) {
+                                window.jobS3Keys[jid] = data.s3_input_key;
+                            });
+                        }
                         pollMultiEngineJobs(data.job_ids, data.engine_jobs);
                     } else {
                         currentJobId = data.job_id;
@@ -9395,6 +9613,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             function collectOutput(engineKey, modeKey, output) {
                 count++;
                 var displayKey = modeKey ? engineKey + ' - ' + modeKey : engineKey;
+                // Get S3 input key for this job (for re-analysis later)
+                var s3Key = (window.jobS3Keys && window.jobS3Keys[currentJobId]) || null;
                 var resultData = {
                     key: displayKey,
                     title: displayKey.replace(/_/g, ' '),
@@ -9402,6 +9622,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     output: output,
                     metadata: metadata,
                     extended_info: extInfo,
+                    s3_input_key: s3Key,
                     isImage: !!output.image_url,
                     imageUrl: output.image_url || null,
                     content: output.content || output.html_content || '',
@@ -11197,7 +11418,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             try {
                 // Get document info from the library items
-                var docInfo = getDocInfoFromInputKey(generateModalInputKey);
+                var docInfo = await getDocInfoFromInputKey(generateModalInputKey);
                 if (!docInfo) {
                     throw new Error('Document content not available for re-analysis. This can happen when the original document was uploaded from your computer and the content was not stored.');
                 }
@@ -11279,7 +11500,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
         }
 
-        function getDocInfoFromInputKey(inputKey) {
+        async function getDocInfoFromInputKey(inputKey) {
             // Find library items matching this input key and extract document info
             var matchingItems = libraryItems.filter(function(item) {
                 return getInputKey(item) === inputKey;
@@ -11325,6 +11546,37 @@ HTML_PAGE = '''<!DOCTYPE html>
                     return {
                         file_paths: docsWithPath.map(function(doc) { return doc.path; })
                     };
+                }
+            }
+
+            // Check for S3 input key - try to fetch documents from S3
+            var s3Key = item.s3_input_key;
+            if (s3Key) {
+                console.log('[S3] Trying to fetch documents from S3 with key:', s3Key);
+                try {
+                    var response = await fetch('/api/analyzer/fetch-documents', {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({ s3_input_key: s3Key })
+                    });
+                    var data = await response.json();
+                    if (data.success && data.documents && data.documents.length > 0) {
+                        console.log('[S3] Successfully fetched', data.documents.length, 'documents from S3');
+                        return {
+                            documents: data.documents.map(function(doc) {
+                                return {
+                                    id: doc.id || 'doc',
+                                    title: doc.title || 'document',
+                                    content: doc.content,
+                                    source_name: doc.source_name || ''
+                                };
+                            })
+                        };
+                    } else {
+                        console.log('[S3] Fetch returned no documents:', data);
+                    }
+                } catch (e) {
+                    console.error('[S3] Error fetching from S3:', e);
                 }
             }
 

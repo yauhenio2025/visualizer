@@ -4763,6 +4763,52 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-size: 0.8rem;
             color: var(--text-muted);
             margin-top: 0.2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .input-group-meta .meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        /* Document list in input groups */
+        .input-group-docs {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed var(--border);
+        }
+        .input-doc-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0;
+            font-size: 0.85rem;
+        }
+        .input-doc-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .input-doc-title {
+            font-weight: 500;
+            color: var(--text);
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .input-doc-source {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--bg-secondary);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .input-doc-more {
+            color: var(--text-muted);
+            font-style: italic;
         }
         .input-group-count {
             background: #8b5cf6;
@@ -9786,6 +9832,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         const result = await resultRes.json();
 
                         if (result.outputs) {
+                            var extInfo = result.extended_info || {};
                             for (var key in result.outputs) {
                                 var output = result.outputs[key];
                                 var resultData = {
@@ -9794,6 +9841,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                                     job_id: job.job_id,
                                     output: output,
                                     metadata: result.metadata || {},
+                                    extended_info: extInfo,
                                     isImage: !!output.image_url,
                                     imageUrl: output.image_url || null,
                                     content: output.content || output.html_content || '',
@@ -10113,18 +10161,26 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         function getInputKey(item) {
-            // Try to get a unique key for the input document
+            // Try to get a unique key for the input document(s)
             var extInfo = item.extended_info || {};
-            var metadata = item.metadata || {};
+            var documents = extInfo.documents || [];
 
-            // Check collection name first
-            if (extInfo.collection_name) {
-                return 'collection:' + extInfo.collection_name;
+            // If we have document info, use the first document's title as key
+            if (documents.length > 0) {
+                var firstDoc = documents[0];
+                var docTitle = firstDoc.title || firstDoc.name || firstDoc.id || '';
+                if (docTitle) {
+                    // For multiple docs, create a combined key
+                    if (documents.length > 1) {
+                        return 'multi:' + docTitle + ':' + documents.length;
+                    }
+                    return 'doc:' + docTitle;
+                }
             }
 
-            // Check for document title in metadata
-            if (metadata.document_title) {
-                return 'doc:' + metadata.document_title;
+            // Check collection name
+            if (extInfo.collection_name) {
+                return 'collection:' + extInfo.collection_name;
             }
 
             // Fall back to job_id as a proxy for input
@@ -10137,23 +10193,33 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function getInputName(item) {
             var extInfo = item.extended_info || {};
-            var metadata = item.metadata || {};
+            var documents = extInfo.documents || [];
 
+            // Extract actual document titles
+            if (documents.length > 0) {
+                var titles = documents.map(function(doc) {
+                    return doc.title || doc.name || doc.id || 'Untitled';
+                }).filter(function(t) { return t && t !== 'Untitled'; });
+
+                if (titles.length === 1) {
+                    return titles[0];
+                } else if (titles.length > 1) {
+                    return titles[0] + ' + ' + (titles.length - 1) + ' more';
+                }
+            }
+
+            // Check collection name
             if (extInfo.collection_name) {
                 return extInfo.collection_name;
             }
 
-            if (metadata.document_title) {
-                return metadata.document_title;
-            }
+            return 'Unknown Document';
+        }
 
-            // Extract from pipeline name if available
-            var pipelineName = extInfo.pipeline || extInfo.engine || '';
-            if (pipelineName) {
-                return 'Analysis: ' + pipelineName.replace(/_/g, ' ');
-            }
-
-            return 'Unknown Input';
+        function getInputDocuments(item) {
+            // Get full document list for display
+            var extInfo = item.extended_info || {};
+            return extInfo.documents || [];
         }
 
         function createInputGroup(inputKey, group) {
@@ -10164,18 +10230,52 @@ HTML_PAGE = '''<!DOCTYPE html>
             var uniqueEngines = getUniqueEngines(group.items);
             var dateStr = group.latestDate ? new Date(group.latestDate).toLocaleDateString() : '';
 
+            // Get all documents for this group
+            var allDocs = [];
+            group.items.forEach(function(item) {
+                var docs = getInputDocuments(item);
+                docs.forEach(function(doc) {
+                    var docTitle = doc.title || doc.name || doc.id;
+                    if (docTitle && !allDocs.some(function(d) { return d.title === docTitle; })) {
+                        allDocs.push({ title: docTitle, source: doc.source_name || doc.source || '' });
+                    }
+                });
+            });
+
             var header = document.createElement('div');
             header.className = 'input-group-header';
+
+            // Build document list HTML
+            var docsHtml = '';
+            if (allDocs.length > 0) {
+                docsHtml = '<div class="input-group-docs">';
+                allDocs.slice(0, 5).forEach(function(doc, idx) {
+                    docsHtml += '<div class="input-doc-item">' +
+                        '<span class="input-doc-icon">' + (idx === 0 ? '📄' : '📎') + '</span>' +
+                        '<span class="input-doc-title">' + doc.title + '</span>' +
+                        (doc.source ? '<span class="input-doc-source">' + doc.source + '</span>' : '') +
+                    '</div>';
+                });
+                if (allDocs.length > 5) {
+                    docsHtml += '<div class="input-doc-item input-doc-more">+' + (allDocs.length - 5) + ' more documents</div>';
+                }
+                docsHtml += '</div>';
+            }
+
             header.innerHTML =
                 '<div class="input-group-top-row">' +
                     '<span class="input-group-toggle">▼</span>' +
-                    '<span class="input-group-icon">📄</span>' +
                     '<div class="input-group-info">' +
                         '<div class="input-group-name">' + group.inputName + '</div>' +
-                        '<div class="input-group-meta">' + uniqueEngines.length + ' output types • ' + dateStr + '</div>' +
+                        '<div class="input-group-meta">' +
+                            '<span class="meta-item">📊 ' + uniqueEngines.length + ' analyses</span>' +
+                            '<span class="meta-item">🖼️ ' + group.items.length + ' outputs</span>' +
+                            '<span class="meta-item">📅 ' + dateStr + '</span>' +
+                        '</div>' +
                     '</div>' +
-                    '<span class="input-group-count">' + group.items.length + ' outputs</span>' +
-                '</div>';
+                    '<span class="input-group-count">' + group.items.length + '</span>' +
+                '</div>' +
+                docsHtml;
 
             header.onclick = function(e) {
                 if (!e.target.closest('.generate-more-btn')) {

@@ -4767,68 +4767,210 @@ HTML_PAGE = '''<!DOCTYPE html>
             gap: 1rem;
             flex-wrap: wrap;
         }
-        .input-group-meta .meta-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
+        /* === COLLECTION LAYOUT === */
+        .input-group.is-collection .input-group-header {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8eefa 100%);
         }
-        /* Document list in input groups */
-        .input-group-docs {
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px dashed var(--border);
+        .collection-header-main {
+            flex: 1;
+            min-width: 0;
         }
-        .input-doc-item {
+        .collection-title {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.4rem 0;
-            font-size: 0.85rem;
-        }
-        .input-doc-icon {
+            font-weight: 600;
             font-size: 1rem;
+            margin-bottom: 0.3rem;
+        }
+        .collection-icon { font-size: 1.2rem; }
+        .collection-count { color: var(--text); }
+        .collection-sources {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .source-badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .source-badge small {
+            opacity: 0.7;
+        }
+        .collection-stats {
+            display: flex;
+            gap: 0.5rem;
             flex-shrink: 0;
         }
-        .input-doc-title {
-            font-weight: 500;
-            color: var(--text);
+        .stat-pill {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            color: var(--text-secondary);
+        }
+        .stat-pill .stat-num {
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .collection-doc-list {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(0,0,0,0.06);
+        }
+        .doc-list-header {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .collection-doc-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+            font-size: 0.8rem;
+        }
+        .collection-doc-row .doc-num {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            width: 1.5rem;
+        }
+        .collection-doc-row .doc-title {
             flex: 1;
             min-width: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--text);
         }
-        .input-doc-source {
-            font-size: 0.75rem;
+        .collection-doc-row .doc-source {
+            font-size: 0.65rem;
             color: var(--text-muted);
-            background: var(--bg-secondary);
-            padding: 0.15rem 0.5rem;
-            border-radius: 4px;
-            flex-shrink: 0;
+            background: rgba(0,0,0,0.04);
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
         }
-        .input-doc-more {
+        .doc-list-more {
+            font-size: 0.75rem;
             color: var(--text-muted);
             font-style: italic;
+            padding-top: 0.25rem;
         }
-        .input-group-count {
-            background: #8b5cf6;
-            color: white;
-            padding: 0.2rem 0.6rem;
-            border-radius: 12px;
+
+        /* === SINGLE DOCUMENT LAYOUT === */
+        .input-group.is-single-doc .input-group-header {
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+        }
+        .single-doc-main {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .single-doc-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .single-doc-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .single-doc-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text);
+            line-height: 1.3;
+        }
+        .title-hint {
+            font-size: 0.7rem;
+            color: #9333ea;
+            margin-top: 0.2rem;
+        }
+        .single-doc-source {
             font-size: 0.75rem;
-            font-weight: 500;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
         }
+        .single-doc-stats {
+            display: flex;
+            gap: 0.75rem;
+            flex-shrink: 0;
+        }
+        .single-doc-stats .stat-box {
+            text-align: center;
+            padding: 0.4rem 0.6rem;
+            background: rgba(147, 51, 234, 0.08);
+            border-radius: 8px;
+        }
+        .single-doc-stats .stat-box .num {
+            display: block;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #9333ea;
+        }
+        .single-doc-stats .stat-box .label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* === OUTPUT GRID (Tufte small multiples) === */
+        .input-outputs-container {
+            padding: 1rem;
+            background: var(--bg-secondary);
+        }
+        .engine-section {
+            margin-bottom: 1rem;
+        }
+        .engine-section:last-child {
+            margin-bottom: 0;
+        }
+        .engine-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .engine-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: capitalize;
+        }
+        .engine-badge {
+            font-size: 0.65rem;
+            padding: 0.1rem 0.4rem;
+            background: var(--accent);
+            color: white;
+            border-radius: 8px;
+        }
+        .engine-outputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.5rem;
+        }
+
+        /* Collapsed states */
         .input-group-toggle {
             font-size: 0.6rem;
             color: var(--text-muted);
             transition: transform 0.2s;
+            flex-shrink: 0;
         }
         .input-group.collapsed .input-group-toggle {
             transform: rotate(-90deg);
         }
-        .input-group.collapsed .input-group-items {
-            display: none;
-        }
+        .input-group.collapsed .collection-doc-list,
+        .input-group.collapsed .input-outputs-container,
         .input-group.collapsed .input-group-actions {
             display: none;
         }
@@ -4836,17 +4978,22 @@ HTML_PAGE = '''<!DOCTYPE html>
         /* Generate More Actions */
         .input-group-actions {
             display: flex;
+            align-items: center;
             gap: 0.5rem;
             padding: 0.75rem 1rem;
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border-top: 1px dashed var(--border);
             flex-wrap: wrap;
+        }
+        .actions-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
         .generate-more-btn {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.4rem 0.8rem;
+            gap: 0.3rem;
+            padding: 0.35rem 0.7rem;
             border: 1px solid var(--border);
             border-radius: 6px;
             background: var(--bg-card);
@@ -4861,7 +5008,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             border-color: var(--accent);
         }
         .generate-more-btn .btn-icon {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         /* Output select */
@@ -10224,7 +10371,6 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         function createInputGroup(inputKey, group) {
             var groupEl = document.createElement('div');
-            groupEl.className = 'input-group';
             groupEl.dataset.inputKey = inputKey;
 
             var uniqueEngines = getUniqueEngines(group.items);
@@ -10237,45 +10383,80 @@ HTML_PAGE = '''<!DOCTYPE html>
                 docs.forEach(function(doc) {
                     var docTitle = doc.title || doc.name || doc.id;
                     if (docTitle && !allDocs.some(function(d) { return d.title === docTitle; })) {
-                        allDocs.push({ title: docTitle, source: doc.source_name || doc.source || '' });
+                        allDocs.push({
+                            title: docTitle,
+                            source: doc.source_name || doc.source || '',
+                            extractedTitle: doc.extracted_title || null
+                        });
                     }
                 });
             });
 
+            // Determine layout: Collection (multi-doc) vs Single Document
+            var isCollection = allDocs.length > 1;
+            groupEl.className = 'input-group' + (isCollection ? ' is-collection' : ' is-single-doc');
+
             var header = document.createElement('div');
             header.className = 'input-group-header';
 
-            // Build document list HTML
-            var docsHtml = '';
-            if (allDocs.length > 0) {
-                docsHtml = '<div class="input-group-docs">';
-                allDocs.slice(0, 5).forEach(function(doc, idx) {
-                    docsHtml += '<div class="input-doc-item">' +
-                        '<span class="input-doc-icon">' + (idx === 0 ? '📄' : '📎') + '</span>' +
-                        '<span class="input-doc-title">' + doc.title + '</span>' +
-                        (doc.source ? '<span class="input-doc-source">' + doc.source + '</span>' : '') +
-                    '</div>';
-                });
-                if (allDocs.length > 5) {
-                    docsHtml += '<div class="input-doc-item input-doc-more">+' + (allDocs.length - 5) + ' more documents</div>';
-                }
-                docsHtml += '</div>';
-            }
+            if (isCollection) {
+                // === COLLECTION LAYOUT (Tufte: small multiples, layered info) ===
+                var sources = {};
+                allDocs.forEach(function(d) { if (d.source) sources[d.source] = (sources[d.source] || 0) + 1; });
+                var sourceBadges = Object.keys(sources).slice(0, 3).map(function(s) {
+                    return '<span class="source-badge">' + s + ' <small>(' + sources[s] + ')</small></span>';
+                }).join('');
 
-            header.innerHTML =
-                '<div class="input-group-top-row">' +
-                    '<span class="input-group-toggle">▼</span>' +
-                    '<div class="input-group-info">' +
-                        '<div class="input-group-name">' + group.inputName + '</div>' +
-                        '<div class="input-group-meta">' +
-                            '<span class="meta-item">📊 ' + uniqueEngines.length + ' analyses</span>' +
-                            '<span class="meta-item">🖼️ ' + group.items.length + ' outputs</span>' +
-                            '<span class="meta-item">📅 ' + dateStr + '</span>' +
+                header.innerHTML =
+                    '<div class="input-group-top-row">' +
+                        '<span class="input-group-toggle">▼</span>' +
+                        '<div class="collection-header-main">' +
+                            '<div class="collection-title">' +
+                                '<span class="collection-icon">📚</span>' +
+                                '<span class="collection-count">' + allDocs.length + ' Documents</span>' +
+                            '</div>' +
+                            '<div class="collection-sources">' + sourceBadges + '</div>' +
+                        '</div>' +
+                        '<div class="collection-stats">' +
+                            '<div class="stat-pill"><span class="stat-num">' + uniqueEngines.length + '</span> analyses</div>' +
+                            '<div class="stat-pill"><span class="stat-num">' + group.items.length + '</span> outputs</div>' +
                         '</div>' +
                     '</div>' +
-                    '<span class="input-group-count">' + group.items.length + '</span>' +
-                '</div>' +
-                docsHtml;
+                    '<div class="collection-doc-list">' +
+                        '<div class="doc-list-header">Documents in collection:</div>' +
+                        allDocs.slice(0, 8).map(function(doc, idx) {
+                            return '<div class="collection-doc-row">' +
+                                '<span class="doc-num">' + (idx + 1) + '.</span>' +
+                                '<span class="doc-title">' + truncateTitle(doc.title, 70) + '</span>' +
+                                (doc.source ? '<span class="doc-source">' + doc.source + '</span>' : '') +
+                            '</div>';
+                        }).join('') +
+                        (allDocs.length > 8 ? '<div class="doc-list-more">+' + (allDocs.length - 8) + ' more documents</div>' : '') +
+                    '</div>';
+
+            } else {
+                // === SINGLE DOCUMENT LAYOUT ===
+                var doc = allDocs[0] || { title: group.inputName, source: '' };
+                var displayTitle = doc.extractedTitle || doc.title;
+                var isFilename = displayTitle && displayTitle.match(/\.(pdf|txt|md|docx?)$/i);
+
+                header.innerHTML =
+                    '<div class="input-group-top-row">' +
+                        '<span class="input-group-toggle">▼</span>' +
+                        '<div class="single-doc-main">' +
+                            '<span class="single-doc-icon">📄</span>' +
+                            '<div class="single-doc-info">' +
+                                '<div class="single-doc-title">' + truncateTitle(displayTitle, 80) + '</div>' +
+                                (isFilename ? '<div class="title-hint">💡 Full title will be extracted from content</div>' : '') +
+                                (doc.source ? '<div class="single-doc-source">Source: ' + doc.source + '</div>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="single-doc-stats">' +
+                            '<div class="stat-box"><span class="num">' + uniqueEngines.length + '</span><span class="label">analyses</span></div>' +
+                            '<div class="stat-box"><span class="num">' + group.items.length + '</span><span class="label">outputs</span></div>' +
+                        '</div>' +
+                    '</div>';
+            }
 
             header.onclick = function(e) {
                 if (!e.target.closest('.generate-more-btn')) {
@@ -10283,39 +10464,55 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
             };
 
+            // === OUTPUT GRID: Organized by engine (Tufte small multiples) ===
             var itemsContainer = document.createElement('div');
-            itemsContainer.className = 'job-group-items';
+            itemsContainer.className = 'input-outputs-container';
 
-            // Sort items by engine type for better organization
-            var sortedItems = group.items.slice().sort(function(a, b) {
-                return (a.key || '').localeCompare(b.key || '');
+            var byEngine = {};
+            group.items.forEach(function(item) {
+                var eng = item.key || 'other';
+                if (!byEngine[eng]) byEngine[eng] = [];
+                byEngine[eng].push(item);
             });
 
-            sortedItems.forEach(function(item) {
-                var card = createLibraryCard(item, item._libraryIndex);
-                itemsContainer.appendChild(card);
+            Object.keys(byEngine).sort().forEach(function(engKey) {
+                var engItems = byEngine[engKey];
+                var section = document.createElement('div');
+                section.className = 'engine-section';
+                section.innerHTML = '<div class="engine-section-header">' +
+                    '<span class="engine-name">' + engKey.replace(/_/g, ' ') + '</span>' +
+                    '<span class="engine-badge">' + engItems.length + '</span>' +
+                '</div>';
+
+                var grid = document.createElement('div');
+                grid.className = 'engine-outputs-grid';
+                engItems.forEach(function(item) {
+                    grid.appendChild(createLibraryCard(item, item._libraryIndex));
+                });
+                section.appendChild(grid);
+                itemsContainer.appendChild(section);
             });
 
-            // Generate More actions section
+            // Generate More actions
             var actionsSection = document.createElement('div');
             actionsSection.className = 'input-group-actions';
             actionsSection.innerHTML =
-                '<span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Generate more:</span>' +
-                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;engine&apos;)">' +
-                    '<span class="btn-icon">🎯</span> Engine' +
-                '</button>' +
-                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;bundle&apos;)">' +
-                    '<span class="btn-icon">📦</span> Bundle' +
-                '</button>' +
-                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;pipeline&apos;)">' +
-                    '<span class="btn-icon">🔄</span> Pipeline' +
-                '</button>';
+                '<span class="actions-label">Run more analyses:</span>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;engine&apos;)"><span class="btn-icon">🎯</span>Engine</button>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;bundle&apos;)"><span class="btn-icon">📦</span>Bundle</button>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;pipeline&apos;)"><span class="btn-icon">🔄</span>Pipeline</button>';
 
             groupEl.appendChild(header);
             groupEl.appendChild(itemsContainer);
             groupEl.appendChild(actionsSection);
 
             return groupEl;
+        }
+
+        function truncateTitle(title, maxLen) {
+            if (!title) return 'Untitled';
+            if (title.length <= maxLen) return title;
+            return title.substring(0, maxLen - 3) + '...';
         }
 
         function getUniqueEngines(items) {

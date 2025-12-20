@@ -4465,8 +4465,32 @@ HTML_PAGE = '''<!DOCTYPE html>
         .gallery-card-title {
             font-weight: 600;
             font-size: 1rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
             color: var(--text);
+        }
+        .gallery-card-source {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gallery-card-source .source-icon {
+            flex-shrink: 0;
+        }
+        .gallery-card-source .source-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gallery-card-source.is-collection {
+            color: #5b8dd9;
+        }
+        .gallery-card-source.is-single {
+            color: #9b7ed9;
         }
         .gallery-card-meta {
             display: flex;
@@ -11083,6 +11107,37 @@ HTML_PAGE = '''<!DOCTYPE html>
             titleEl.className = 'gallery-card-title';
             titleEl.textContent = data.title;
             info.appendChild(titleEl);
+
+            // Add document source context
+            var extInfo = data.extended_info || {};
+            var documents = extInfo.documents || [];
+            if (documents.length > 0) {
+                var sourceEl = document.createElement('div');
+                if (documents.length === 1) {
+                    // Single document - show document name
+                    var doc = documents[0];
+                    var docTitle = doc.extracted_title || doc.title || doc.name || doc.id || 'Document';
+                    // Truncate long titles
+                    if (docTitle.length > 40) {
+                        docTitle = docTitle.substring(0, 37) + '...';
+                    }
+                    sourceEl.className = 'gallery-card-source is-single';
+                    sourceEl.innerHTML = '<span class="source-icon">📄</span><span class="source-text" title="' + (doc.extracted_title || doc.title || doc.name || '') + '">' + docTitle + '</span>';
+                } else {
+                    // Collection - show count and maybe first doc
+                    var collName = extInfo.collection_name || '';
+                    var firstDoc = documents[0];
+                    var firstTitle = firstDoc.extracted_title || firstDoc.title || firstDoc.name || '';
+                    if (firstTitle.length > 25) firstTitle = firstTitle.substring(0, 22) + '...';
+                    sourceEl.className = 'gallery-card-source is-collection';
+                    if (collName) {
+                        sourceEl.innerHTML = '<span class="source-icon">📚</span><span class="source-text">' + collName + ' (' + documents.length + ' docs)</span>';
+                    } else {
+                        sourceEl.innerHTML = '<span class="source-icon">📚</span><span class="source-text">' + documents.length + ' docs: ' + firstTitle + '...</span>';
+                    }
+                }
+                info.appendChild(sourceEl);
+            }
 
             var meta = document.createElement('div');
             meta.className = 'gallery-card-meta';

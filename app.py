@@ -11256,11 +11256,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Start polling for this job
                 $('progress-section').classList.add('show');
-                updateStage('upload', 'complete');
-                updateStage('queue', 'active');
+                resetStages();
                 pollJobStatus(data.job_id);
-
-                alert('Analysis started! Job ID: ' + data.job_id + '\\n\\nSwitching to Analyze tab to show progress.');
 
             } catch (e) {
                 console.error('Error starting analysis:', e);

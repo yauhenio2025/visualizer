@@ -874,6 +874,125 @@ def get_analyzer_headers(llm_keys: Optional[Dict[str, str]] = None) -> Dict[str,
     return headers
 
 
+# =============================================================================
+# DOCUMENT METADATA EXTRACTION (using Claude)
+# =============================================================================
+
+@app.route('/api/extract-document-metadata', methods=['POST'])
+def extract_document_metadata():
+    """
+    Extract proper title, authors, and abstract from document content using Claude.
+
+    Request body:
+    {
+        "content": "document text content (first ~5000 chars)",
+        "filename": "original filename (optional, for context)",
+        "anthropic_api_key": "sk-ant-..."
+    }
+
+    Returns:
+    {
+        "extracted_title": "Proper Document Title",
+        "authors": ["Author One", "Author Two"],
+        "abstract": "Brief summary...",
+        "publication": "Journal/Conference name if found",
+        "year": "2024"
+    }
+    """
+    import anthropic
+
+    data = request.get_json() or {}
+    content = data.get('content', '')
+    filename = data.get('filename', '')
+    api_key = data.get('anthropic_api_key') or request.headers.get('X-Anthropic-Api-Key')
+
+    if not content:
+        return jsonify({"error": "No content provided"}), 400
+
+    if not api_key:
+        return jsonify({"error": "Anthropic API key required"}), 400
+
+    # Take first 5000 chars for title extraction (usually enough for title page)
+    content_sample = content[:5000]
+
+    extraction_prompt = f"""Extract the document metadata from this academic paper or document.
+
+FILENAME: {filename}
+
+DOCUMENT CONTENT (first portion):
+{content_sample}
+
+Please extract:
+1. The full proper title of the document (NOT the filename)
+2. Authors (as a list)
+3. Abstract or executive summary (first 2-3 sentences if long)
+4. Publication venue (journal, conference, publisher) if mentioned
+5. Year of publication if mentioned
+
+Respond in JSON format:
+{{
+    "extracted_title": "Full Proper Title Here",
+    "authors": ["Author One", "Author Two"],
+    "abstract": "Brief summary of the document...",
+    "publication": "Journal or Publisher Name",
+    "year": "2024"
+}}
+
+If you cannot find a field, use null for that field.
+IMPORTANT: The extracted_title should be the actual document title, not the filename."""
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1024,
+            messages=[
+                {"role": "user", "content": extraction_prompt}
+            ]
+        )
+
+        # Parse the JSON response
+        response_text = response.content[0].text
+
+        # Try to extract JSON from the response
+        import json
+
+        # Handle potential markdown code blocks
+        if '```json' in response_text:
+            json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+        elif '```' in response_text:
+            json_match = re.search(r'```\s*(.*?)\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+
+        try:
+            extracted = json.loads(response_text)
+        except json.JSONDecodeError:
+            # If JSON parsing fails, return raw response for debugging
+            return jsonify({
+                "extracted_title": None,
+                "authors": [],
+                "abstract": None,
+                "publication": None,
+                "year": None,
+                "raw_response": response_text,
+                "parse_error": "Failed to parse JSON response"
+            })
+
+        return jsonify(extracted)
+
+    except anthropic.AuthenticationError:
+        return jsonify({"error": "Invalid Anthropic API key"}), 401
+    except anthropic.RateLimitError:
+        return jsonify({"error": "Rate limit exceeded, try again later"}), 429
+    except Exception as e:
+        print(f"Error extracting metadata: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analyzer/engines', methods=['GET'])
 def list_analyzer_engines():
     """Fetch available engines from Analyzer API."""
@@ -2470,6 +2589,53 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
         .doc-item .article-meta .size {
             opacity: 0.6;
+        }
+        /* Title extraction UI */
+        .doc-item .extract-btn {
+            padding: 0.3rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .doc-item .extract-btn:hover {
+            opacity: 1;
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .doc-item .extracted-badge {
+            color: #10b981;
+            font-size: 0.9rem;
+            padding: 0 0.3rem;
+        }
+        .doc-item.has-extracted {
+            background: rgba(16, 185, 129, 0.04);
+        }
+        .doc-item.has-extracted .name {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .doc-item .filename-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+            opacity: 0.7;
+        }
+        .doc-item.extracting {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .doc-item.extracting .extract-btn {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
         }
 
         .doc-count {
@@ -7961,25 +8127,38 @@ HTML_PAGE = '''<!DOCTYPE html>
             list.innerHTML = scannedDocs.map(function(d) {
                 var escapedPath = d.path.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
                 const isArticle = d.type === 'article';
-                const itemClass = isArticle ? 'doc-item article' : 'doc-item';
+                const hasExtractedTitle = d.metadata_extracted && d.extracted_title;
+                const isPdfWithUglyName = d.type === 'pdf' && !isArticle && !hasExtractedTitle;
+                const itemClass = isArticle ? 'doc-item article' : (hasExtractedTitle ? 'doc-item has-extracted' : 'doc-item');
+
+                // Display name: use extracted title if available
+                const displayName = hasExtractedTitle ? d.extracted_title : d.name;
+                const filenameHint = hasExtractedTitle ? '<div class="filename-hint">📄 ' + escapeHtml(d.name) + '</div>' : '';
 
                 // Format date if available
                 let dateStr = '';
-                if (d.date_published) {
+                if (d.date_published || d.extracted_year) {
                     try {
-                        const date = new Date(d.date_published);
-                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        const dateVal = d.date_published || d.extracted_year;
+                        if (dateVal.length === 4) {
+                            dateStr = dateVal; // Just year
+                        } else {
+                            const date = new Date(dateVal);
+                            dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        }
                     } catch (e) {
-                        dateStr = d.date_published;
+                        dateStr = d.date_published || d.extracted_year;
                     }
                 }
 
-                // Build metadata line for articles
+                // Build metadata line
                 let metaHtml = '';
-                if (isArticle) {
+                if (isArticle || hasExtractedTitle) {
                     const parts = [];
-                    if (d.authors) parts.push('<span class="author">' + escapeHtml(d.authors) + '</span>');
-                    if (d.source_name) parts.push('<span class="source">' + escapeHtml(d.source_name) + '</span>');
+                    const authors = d.authors || (d.extracted_authors && d.extracted_authors.length > 0 ? d.extracted_authors.join(', ') : '');
+                    if (authors) parts.push('<span class="author">' + escapeHtml(authors) + '</span>');
+                    const source = d.source_name || d.extracted_publication;
+                    if (source) parts.push('<span class="source">' + escapeHtml(source) + '</span>');
                     if (dateStr) parts.push('<span class="date">' + dateStr + '</span>');
                     if (d.size) parts.push('<span class="size">' + d.size + '</span>');
                     metaHtml = '<div class="article-meta">' + parts.join('') + '</div>';
@@ -7987,13 +8166,23 @@ HTML_PAGE = '''<!DOCTYPE html>
                     metaHtml = '<div class="meta">' + d.type.toUpperCase() + ' - ' + d.size + '</div>';
                 }
 
-                return '<div class="' + itemClass + '">' +
+                // Extract button for PDFs without extracted title
+                let extractBtn = '';
+                if (isPdfWithUglyName) {
+                    extractBtn = '<button class="extract-btn" onclick="event.stopPropagation(); extractDocumentMetadata(&apos;' + escapedPath + '&apos;)" title="Extract proper title using AI">✨</button>';
+                } else if (hasExtractedTitle) {
+                    extractBtn = '<span class="extracted-badge" title="Title extracted">✓</span>';
+                }
+
+                return '<div class="' + itemClass + '" data-doc-path="' + escapeHtml(d.path) + '">' +
                 '<input type="checkbox" ' + (selectedDocs.has(d.path) ? 'checked' : '') + ' onchange="toggleDoc(\\'' + escapedPath + '\\')">' +
                 '<span class="icon">' + (icons[d.type] || '&#128196;') + '</span>' +
                 '<div class="info">' +
-                '<div class="name">' + escapeHtml(d.name) + '</div>' +
+                '<div class="name">' + escapeHtml(displayName) + '</div>' +
+                filenameHint +
                 metaHtml +
                 '</div>' +
+                extractBtn +
                 '</div>';
             }).join('');
 
@@ -8149,6 +8338,136 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
         }
 
+        // ===== DOCUMENT TITLE EXTRACTION =====
+        async function extractDocumentMetadata(docPath) {
+            // Find the document in scannedDocs
+            const doc = scannedDocs.find(d => d.path === docPath);
+            if (!doc) {
+                console.error('Document not found:', docPath);
+                return;
+            }
+
+            // Get API key from stored keys
+            const keys = getStoredKeys();
+            if (!keys.anthropic) {
+                alert('Anthropic API key required for title extraction. Please set it in KEYS.');
+                return;
+            }
+
+            // Show extracting state
+            const docEl = document.querySelector('[data-doc-path="' + CSS.escape(docPath) + '"]');
+            if (docEl) {
+                docEl.classList.add('extracting');
+                const btn = docEl.querySelector('.extract-btn');
+                if (btn) btn.textContent = '⏳';
+            }
+
+            try {
+                let textContent = '';
+
+                if (doc.file && doc.file instanceof File) {
+                    // Browser-uploaded file
+                    if (doc.file.name.toLowerCase().endsWith('.pdf')) {
+                        // For PDFs, we need to read as text - the backend will handle extraction
+                        // For now, just send what we can read
+                        const reader = new FileReader();
+                        textContent = await new Promise((resolve) => {
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsText(doc.file);
+                        });
+                    } else {
+                        textContent = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsText(doc.file);
+                        });
+                    }
+                } else if (doc.content) {
+                    // Web-Saver imported doc with content
+                    textContent = doc.content;
+                } else {
+                    // Server-scanned doc - need to fetch content
+                    const res = await fetch('/api/analyzer/read-file?path=' + encodeURIComponent(doc.path));
+                    if (res.ok) {
+                        const data = await res.json();
+                        textContent = data.content || '';
+                    }
+                }
+
+                if (!textContent || textContent.length < 100) {
+                    throw new Error('Could not read document content');
+                }
+
+                // Call extraction API
+                const response = await fetch('/api/extract-document-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: textContent,
+                        filename: doc.name,
+                        anthropic_api_key: keys.anthropic
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Extraction failed');
+                }
+
+                const metadata = await response.json();
+                console.log('Extracted metadata:', metadata);
+
+                // Update document with extracted metadata
+                doc.extracted_title = metadata.extracted_title;
+                doc.extracted_authors = metadata.authors;
+                doc.extracted_abstract = metadata.abstract;
+                doc.extracted_publication = metadata.publication;
+                doc.extracted_year = metadata.year;
+                doc.metadata_extracted = true;
+
+                // Re-render the doc list to show new title
+                renderDocList();
+
+            } catch (error) {
+                console.error('Extraction error:', error);
+                alert('Title extraction failed: ' + error.message);
+            } finally {
+                if (docEl) {
+                    docEl.classList.remove('extracting');
+                }
+            }
+        }
+
+        // Extract titles for all selected documents
+        async function extractAllDocumentTitles() {
+            const selectedPaths = Array.from(selectedDocs);
+            const docsToExtract = scannedDocs.filter(d =>
+                selectedPaths.includes(d.path) &&
+                !d.metadata_extracted &&
+                d.name.match(/\.(pdf|txt|md)$/i)
+            );
+
+            if (docsToExtract.length === 0) {
+                alert('No documents need title extraction (already extracted or not supported)');
+                return;
+            }
+
+            const keys = getStoredKeys();
+            if (!keys.anthropic) {
+                alert('Anthropic API key required. Please set it in KEYS.');
+                return;
+            }
+
+            const confirmMsg = 'Extract titles for ' + docsToExtract.length + ' document(s)? This will use your Anthropic API key.';
+            if (!confirm(confirmMsg)) return;
+
+            for (const doc of docsToExtract) {
+                await extractDocumentMetadata(doc.path);
+                // Small delay between requests
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+
         // Get documents for analysis - either paths or inline content
         async function getDocumentsForAnalysis() {
             const selectedPaths = Array.from(selectedDocs);
@@ -8170,15 +8489,27 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             for (let i = 0; i < selectedDocObjects.length; i++) {
                 const doc = selectedDocObjects[i];
+                // Use extracted title if available, otherwise use filename
+                const docTitle = doc.extracted_title || doc.name;
+                const docAuthors = doc.extracted_authors || doc.authors;
+                const docPublication = doc.extracted_publication || doc.source_name;
+                const docYear = doc.extracted_year || doc.date_published;
+
                 if (doc.file && doc.file instanceof File) {
                     // Browser-uploaded file - read from File object
                     try {
                         const { content, encoding } = await readFileContent(doc.file);
                         documents.push({
                             id: 'doc_' + (i + 1),
-                            title: doc.name,
+                            title: docTitle,
+                            original_filename: doc.name,
                             content: content,
-                            encoding: encoding
+                            encoding: encoding,
+                            // Include extracted metadata
+                            extracted_title: doc.extracted_title || null,
+                            authors: docAuthors,
+                            source_name: docPublication,
+                            date_published: docYear
                         });
                     } catch (e) {
                         console.error('Failed to read file:', doc.name, e);
@@ -8187,14 +8518,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                     // Web-Saver imported doc - content already available
                     documents.push({
                         id: 'doc_' + (i + 1),
-                        title: doc.name,
+                        title: docTitle,
+                        original_filename: doc.name,
                         content: doc.content,
                         encoding: 'text',
                         // METADATA for citation tooltips
-                        source_name: doc.source_name,
-                        date_published: doc.date_published,
+                        extracted_title: doc.extracted_title || null,
+                        source_name: docPublication,
+                        date_published: docYear,
                         url: doc.url,
-                        authors: doc.authors
+                        authors: docAuthors
                     });
                 }
             }

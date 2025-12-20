@@ -1307,11 +1307,15 @@ def submit_analysis():
             )
             response.raise_for_status()
             job_data = response.json()
+            print(f"[DEBUG] Analyzer response: {job_data}")
+
+            # Get job_id - analyzer might return 'job_id' or 'id'
+            job_id = job_data.get("job_id") or job_data.get("id")
 
             return jsonify({
                 "success": True,
                 "mode": "collection",
-                "job_id": job_data.get("job_id"),
+                "job_id": job_id,
                 "document_count": len(documents),
                 "warnings": errors if errors else None
             })
@@ -11195,7 +11199,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Get document info from the library items
                 var docInfo = getDocInfoFromInputKey(generateModalInputKey);
                 if (!docInfo) {
-                    throw new Error('Could not find document information');
+                    throw new Error('Document content not available for re-analysis. This can happen when the original document was uploaded from your computer and the content was not stored.');
                 }
 
                 var payload = {
@@ -11281,38 +11285,51 @@ HTML_PAGE = '''<!DOCTYPE html>
                 return getInputKey(item) === inputKey;
             });
 
+            console.log('getDocInfoFromInputKey:', inputKey, 'found', matchingItems.length, 'items');
+
             if (matchingItems.length === 0) return null;
 
             var item = matchingItems[0];
             var extInfo = item.extended_info || {};
             var documents = extInfo.documents || [];
 
-            // Try to get file path
-            if (documents.length > 0 && documents[0].path) {
-                return { file_path: documents[0].path };
-            }
+            console.log('Extended info documents:', documents);
 
-            // If we have document content stored
+            // Check if documents have actual content we can re-submit
             if (documents.length > 0) {
-                return {
-                    documents: documents.map(function(doc) {
-                        return {
-                            title: doc.title || doc.name || 'document',
-                            content: doc.content || '',
-                            source_name: doc.source_name || doc.source || ''
-                        };
-                    })
-                };
+                var docsWithContent = documents.filter(function(doc) {
+                    return doc.content && doc.content.length > 0;
+                });
+
+                if (docsWithContent.length > 0) {
+                    console.log('Found', docsWithContent.length, 'documents with content');
+                    return {
+                        documents: docsWithContent.map(function(doc) {
+                            return {
+                                id: doc.id || doc.name || 'doc',
+                                title: doc.title || doc.name || 'document',
+                                content: doc.content,
+                                source_name: doc.source_name || doc.source || ''
+                            };
+                        })
+                    };
+                }
+
+                // Documents exist but no content - check for server paths
+                var docsWithPath = documents.filter(function(doc) {
+                    return doc.path && doc.path.startsWith('/');
+                });
+
+                if (docsWithPath.length > 0) {
+                    console.log('Found', docsWithPath.length, 'documents with server paths');
+                    return {
+                        file_paths: docsWithPath.map(function(doc) { return doc.path; })
+                    };
+                }
             }
 
-            // Try to extract path from the input key itself
-            if (inputKey.startsWith('doc:')) {
-                var docName = inputKey.replace('doc:', '');
-                // This is a filename - we need to find the full path
-                // For now, return just the name and let the backend handle it
-                return { file_path: docName };
-            }
-
+            // No usable document info - cannot re-run analysis
+            console.log('No usable document info found for re-analysis');
             return null;
         }
 

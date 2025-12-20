@@ -10390,6 +10390,15 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         function addToLibrary(item) {
+            // Check for duplicates - skip if same job_id + key already exists
+            var isDuplicate = libraryItems.some(function(existing) {
+                return existing.job_id === item.job_id && existing.key === item.key;
+            });
+            if (isDuplicate) {
+                console.log('Skipping duplicate library item:', item.job_id, item.key);
+                return;
+            }
+
             item.addedAt = new Date().toISOString();
 
             // Add original item to in-memory array for display
@@ -10997,7 +11006,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Update localStorage
             try {
-                localStorage.setItem('vizLibrary', JSON.stringify(libraryItems));
+                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
             } catch (e) {
                 console.error('Failed to save library:', e);
             }
@@ -11014,7 +11023,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
 
             try {
-                localStorage.setItem('vizLibrary', JSON.stringify(libraryItems));
+                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
             } catch (e) {
                 console.error('Failed to save library:', e);
             }

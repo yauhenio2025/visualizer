@@ -4433,6 +4433,65 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         /* Library View */
+        .library-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 0 0.5rem;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .library-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg-secondary);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .library-tab {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 7px;
+            transition: all 0.2s;
+        }
+        .library-tab:hover {
+            color: var(--text);
+            background: var(--bg-card);
+        }
+        .library-tab.active {
+            background: var(--bg-card);
+            color: var(--accent);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .library-tab .tab-icon {
+            font-size: 1rem;
+        }
+        .library-tab .tab-label {
+            display: inline;
+        }
+        @media (max-width: 600px) {
+            .library-tabs {
+                flex-wrap: wrap;
+            }
+            .library-tab .tab-label {
+                display: none;
+            }
+            .library-tab {
+                padding: 0.5rem 0.75rem;
+            }
+        }
+
         .library-grid {
             display: flex;
             flex-direction: column;
@@ -4612,6 +4671,151 @@ HTML_PAGE = '''<!DOCTYPE html>
         .job-group-items .gallery-card-actions button {
             padding: 0.35rem;
             font-size: 0.7rem;
+        }
+
+        /* Output Type Group (By Output Type tab) */
+        .output-type-group {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-card);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .output-type-header {
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fa 100%);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .output-type-header:hover {
+            background: linear-gradient(135deg, #e8f0fa 0%, #dde8f5 100%);
+        }
+        .output-type-icon {
+            font-size: 1.5rem;
+        }
+        .output-type-info {
+            flex: 1;
+        }
+        .output-type-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text);
+            text-transform: capitalize;
+        }
+        .output-type-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+        .output-type-count {
+            background: #3b82f6;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .output-type-group.collapsed .output-type-items {
+            display: none;
+        }
+
+        /* Input Group (By Input tab) */
+        .input-group {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-card);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .input-group-header {
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #f5f0ff 0%, #efe8fa 100%);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .input-group-header:hover {
+            background: linear-gradient(135deg, #efe8fa 0%, #e5ddf5 100%);
+        }
+        .input-group-top-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .input-group-icon {
+            font-size: 1.5rem;
+        }
+        .input-group-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .input-group-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .input-group-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+        .input-group-count {
+            background: #8b5cf6;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .input-group-toggle {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .input-group.collapsed .input-group-toggle {
+            transform: rotate(-90deg);
+        }
+        .input-group.collapsed .input-group-items {
+            display: none;
+        }
+        .input-group.collapsed .input-group-actions {
+            display: none;
+        }
+
+        /* Generate More Actions */
+        .input-group-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-top: 1px dashed var(--border);
+            flex-wrap: wrap;
+        }
+        .generate-more-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .generate-more-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .generate-more-btn .btn-icon {
+            font-size: 0.9rem;
         }
 
         /* Output select */
@@ -5729,7 +5933,21 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         <!-- Library View -->
         <div id="library-view" class="view-content">
-            <div style="margin-bottom: 1rem; text-align: right;">
+            <div class="library-header">
+                <div class="library-tabs">
+                    <button class="library-tab active" data-tab="jobs" onclick="switchLibraryTab('jobs')">
+                        <span class="tab-icon">📦</span>
+                        <span class="tab-label">By Jobs</span>
+                    </button>
+                    <button class="library-tab" data-tab="outputs" onclick="switchLibraryTab('outputs')">
+                        <span class="tab-icon">🎨</span>
+                        <span class="tab-label">By Output Type</span>
+                    </button>
+                    <button class="library-tab" data-tab="inputs" onclick="switchLibraryTab('inputs')">
+                        <span class="tab-icon">📄</span>
+                        <span class="tab-label">By Input</span>
+                    </button>
+                </div>
                 <button class="btn btn-sm" onclick="loadRecentJobs()">Load Recent Jobs</button>
             </div>
             <div class="library-empty" id="library-empty">
@@ -9488,6 +9706,21 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Library
+        let currentLibraryTab = 'jobs';  // 'jobs', 'outputs', 'inputs'
+
+        function switchLibraryTab(tab) {
+            currentLibraryTab = tab;
+            // Update tab button states
+            document.querySelectorAll('.library-tab').forEach(function(btn) {
+                if (btn.dataset.tab === tab) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            renderLibrary();
+        }
+
         function loadLibrary() {
             var saved = localStorage.getItem('visualizer_library');
             if (saved) {
@@ -9643,12 +9876,33 @@ HTML_PAGE = '''<!DOCTYPE html>
             empty.style.display = 'none';
             grid.innerHTML = '';
 
+            // Store original index for all items (for deletion)
+            libraryItems.forEach(function(item, index) {
+                item._libraryIndex = index;
+            });
+
+            // Dispatch to appropriate renderer based on current tab
+            switch (currentLibraryTab) {
+                case 'outputs':
+                    renderLibraryByOutputType(grid);
+                    break;
+                case 'inputs':
+                    renderLibraryByInputs(grid);
+                    break;
+                case 'jobs':
+                default:
+                    renderLibraryByJobs(grid);
+                    break;
+            }
+        }
+
+        // ===== BY JOBS VIEW =====
+        function renderLibraryByJobs(grid) {
             // Group items by job_id
             var groups = {};
             var ungrouped = [];
 
-            libraryItems.forEach(function(item, index) {
-                item._libraryIndex = index;  // Store original index for deletion
+            libraryItems.forEach(function(item) {
                 if (item.job_id) {
                     if (!groups[item.job_id]) {
                         groups[item.job_id] = {
@@ -9706,6 +9960,289 @@ HTML_PAGE = '''<!DOCTYPE html>
                 ungroupedSection.appendChild(itemsContainer);
                 grid.appendChild(ungroupedSection);
             }
+        }
+
+        // ===== BY OUTPUT TYPE VIEW =====
+        function renderLibraryByOutputType(grid) {
+            // Group items by engine key
+            var groups = {};
+
+            libraryItems.forEach(function(item) {
+                var key = item.key || 'unknown';
+                if (!groups[key]) {
+                    groups[key] = {
+                        items: [],
+                        latestDate: item.addedAt
+                    };
+                }
+                groups[key].items.push(item);
+                if (item.addedAt && item.addedAt > groups[key].latestDate) {
+                    groups[key].latestDate = item.addedAt;
+                }
+            });
+
+            // Sort by count (most outputs first)
+            var sortedKeys = Object.keys(groups).sort(function(a, b) {
+                return groups[b].items.length - groups[a].items.length;
+            });
+
+            // Render each output type group
+            sortedKeys.forEach(function(engineKey) {
+                var group = groups[engineKey];
+                var groupEl = createOutputTypeGroup(engineKey, group);
+                grid.appendChild(groupEl);
+            });
+        }
+
+        function createOutputTypeGroup(engineKey, group) {
+            var groupEl = document.createElement('div');
+            groupEl.className = 'output-type-group';
+
+            // Determine icon based on output type
+            var icon = getOutputTypeIcon(engineKey);
+            var displayName = engineKey.replace(/_/g, ' ');
+
+            var header = document.createElement('div');
+            header.className = 'output-type-header';
+            header.innerHTML =
+                '<span class="output-type-icon">' + icon + '</span>' +
+                '<div class="output-type-info">' +
+                    '<div class="output-type-name">' + displayName + '</div>' +
+                    '<div class="output-type-desc">' + group.items.length + ' generated across ' + countUniqueJobs(group.items) + ' jobs</div>' +
+                '</div>' +
+                '<span class="output-type-count">' + group.items.length + '</span>' +
+                '<span class="job-group-toggle">▼</span>';
+
+            header.onclick = function() {
+                groupEl.classList.toggle('collapsed');
+            };
+
+            var itemsContainer = document.createElement('div');
+            itemsContainer.className = 'job-group-items';
+
+            // Sort items by date (newest first)
+            var sortedItems = group.items.slice().sort(function(a, b) {
+                return new Date(b.addedAt) - new Date(a.addedAt);
+            });
+
+            sortedItems.forEach(function(item) {
+                var card = createLibraryCard(item, item._libraryIndex);
+                itemsContainer.appendChild(card);
+            });
+
+            groupEl.appendChild(header);
+            groupEl.appendChild(itemsContainer);
+
+            return groupEl;
+        }
+
+        function getOutputTypeIcon(engineKey) {
+            var icons = {
+                'anomaly_detector': '🔍',
+                'argument_architecture': '🏛️',
+                'concept_map': '🗺️',
+                'power_map': '⚡',
+                'timeline': '📅',
+                'evidence_chain': '🔗',
+                'rhetoric_analysis': '💬',
+                'citation_network': '📚',
+                'funding_tracker': '💰',
+                'policy_evolution': '📜',
+                'sentiment_analysis': '😊',
+                'entity_network': '🕸️',
+                'comparative_analysis': '⚖️',
+                'synthesis': '🔮'
+            };
+            // Check for partial matches
+            for (var key in icons) {
+                if (engineKey.toLowerCase().includes(key.toLowerCase())) {
+                    return icons[key];
+                }
+            }
+            return '📊';  // Default icon
+        }
+
+        function countUniqueJobs(items) {
+            var jobIds = {};
+            items.forEach(function(item) {
+                if (item.job_id) jobIds[item.job_id] = true;
+            });
+            return Object.keys(jobIds).length;
+        }
+
+        // ===== BY INPUT VIEW =====
+        function renderLibraryByInputs(grid) {
+            // Group items by input document
+            // Try to extract input info from metadata or extended_info
+            var groups = {};
+
+            libraryItems.forEach(function(item) {
+                // Try to determine input source
+                var inputKey = getInputKey(item);
+                var inputName = getInputName(item);
+
+                if (!groups[inputKey]) {
+                    groups[inputKey] = {
+                        items: [],
+                        inputName: inputName,
+                        inputKey: inputKey,
+                        latestDate: item.addedAt,
+                        jobIds: {}
+                    };
+                }
+                groups[inputKey].items.push(item);
+                if (item.job_id) {
+                    groups[inputKey].jobIds[item.job_id] = true;
+                }
+                if (item.addedAt && item.addedAt > groups[inputKey].latestDate) {
+                    groups[inputKey].latestDate = item.addedAt;
+                }
+            });
+
+            // Sort by most recent activity
+            var sortedKeys = Object.keys(groups).sort(function(a, b) {
+                return new Date(groups[b].latestDate) - new Date(groups[a].latestDate);
+            });
+
+            // Render each input group
+            sortedKeys.forEach(function(inputKey) {
+                var group = groups[inputKey];
+                var groupEl = createInputGroup(inputKey, group);
+                grid.appendChild(groupEl);
+            });
+        }
+
+        function getInputKey(item) {
+            // Try to get a unique key for the input document
+            var extInfo = item.extended_info || {};
+            var metadata = item.metadata || {};
+
+            // Check collection name first
+            if (extInfo.collection_name) {
+                return 'collection:' + extInfo.collection_name;
+            }
+
+            // Check for document title in metadata
+            if (metadata.document_title) {
+                return 'doc:' + metadata.document_title;
+            }
+
+            // Fall back to job_id as a proxy for input
+            if (item.job_id) {
+                return 'job:' + item.job_id;
+            }
+
+            return 'unknown';
+        }
+
+        function getInputName(item) {
+            var extInfo = item.extended_info || {};
+            var metadata = item.metadata || {};
+
+            if (extInfo.collection_name) {
+                return extInfo.collection_name;
+            }
+
+            if (metadata.document_title) {
+                return metadata.document_title;
+            }
+
+            // Extract from pipeline name if available
+            var pipelineName = extInfo.pipeline || extInfo.engine || '';
+            if (pipelineName) {
+                return 'Analysis: ' + pipelineName.replace(/_/g, ' ');
+            }
+
+            return 'Unknown Input';
+        }
+
+        function createInputGroup(inputKey, group) {
+            var groupEl = document.createElement('div');
+            groupEl.className = 'input-group';
+            groupEl.dataset.inputKey = inputKey;
+
+            var uniqueEngines = getUniqueEngines(group.items);
+            var dateStr = group.latestDate ? new Date(group.latestDate).toLocaleDateString() : '';
+
+            var header = document.createElement('div');
+            header.className = 'input-group-header';
+            header.innerHTML =
+                '<div class="input-group-top-row">' +
+                    '<span class="input-group-toggle">▼</span>' +
+                    '<span class="input-group-icon">📄</span>' +
+                    '<div class="input-group-info">' +
+                        '<div class="input-group-name">' + group.inputName + '</div>' +
+                        '<div class="input-group-meta">' + uniqueEngines.length + ' output types • ' + dateStr + '</div>' +
+                    '</div>' +
+                    '<span class="input-group-count">' + group.items.length + ' outputs</span>' +
+                '</div>';
+
+            header.onclick = function(e) {
+                if (!e.target.closest('.generate-more-btn')) {
+                    groupEl.classList.toggle('collapsed');
+                }
+            };
+
+            var itemsContainer = document.createElement('div');
+            itemsContainer.className = 'job-group-items';
+
+            // Sort items by engine type for better organization
+            var sortedItems = group.items.slice().sort(function(a, b) {
+                return (a.key || '').localeCompare(b.key || '');
+            });
+
+            sortedItems.forEach(function(item) {
+                var card = createLibraryCard(item, item._libraryIndex);
+                itemsContainer.appendChild(card);
+            });
+
+            // Generate More actions section
+            var actionsSection = document.createElement('div');
+            actionsSection.className = 'input-group-actions';
+            actionsSection.innerHTML =
+                '<span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Generate more:</span>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;engine&apos;)">' +
+                    '<span class="btn-icon">🎯</span> Engine' +
+                '</button>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;bundle&apos;)">' +
+                    '<span class="btn-icon">📦</span> Bundle' +
+                '</button>' +
+                '<button class="generate-more-btn" onclick="event.stopPropagation(); showGenerateMoreOptions(&apos;' + escapeHtml(inputKey) + '&apos;, &apos;pipeline&apos;)">' +
+                    '<span class="btn-icon">🔄</span> Pipeline' +
+                '</button>';
+
+            groupEl.appendChild(header);
+            groupEl.appendChild(itemsContainer);
+            groupEl.appendChild(actionsSection);
+
+            return groupEl;
+        }
+
+        function getUniqueEngines(items) {
+            var engines = {};
+            items.forEach(function(item) {
+                if (item.key) engines[item.key] = true;
+            });
+            return Object.keys(engines);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function showGenerateMoreOptions(inputKey, analysisType) {
+            // For now, show an alert - this can be enhanced to open a modal
+            // with the appropriate analysis options pre-selected
+            var message = 'Generate ' + analysisType + ' analysis for: ' + inputKey.replace('collection:', '').replace('doc:', '').replace('job:', '') + '\\n\\n';
+            message += 'This feature will allow you to run additional analyses on this input.\\n';
+            message += 'Coming soon: Select specific engines, bundles, or pipelines from a modal.';
+            alert(message);
+
+            // TODO: Open a modal with analysis options
+            // The modal should:
+            // 1. Show the input document name
+            // 2. List available engines/bundles/pipelines
+            // 3. Allow selection and execution
         }
 
         function createJobGroup(jobId, group) {

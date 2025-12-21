@@ -4013,6 +4013,43 @@ HTML_PAGE = '''<!DOCTYPE html>
             background: var(--bg-hover);
         }
 
+        /* Job Resume Section */
+        .job-resume-section {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+        }
+
+        .btn-success:disabled {
+            background: #9e9e9e;
+            cursor: not-allowed;
+        }
+
+        .resume-hint {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
         /* Debug Panel */
         .debug-toggle {
             position: fixed;
@@ -6627,6 +6664,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <span class="job-url-label">Job URL:</span>
                             <a id="job-url-link" href="#" class="job-url-link" target="_blank"></a>
                             <button class="btn-small" onclick="copyJobUrl()" title="Copy URL">📋</button>
+                        </div>
+                        <div id="job-resume-section" class="job-resume-section" style="display:none;">
+                            <button id="resume-job-btn" class="btn btn-success" onclick="resumeCurrentJob()">▶ Resume Job</button>
+                            <span class="resume-hint">Resume from last completed stage</span>
                         </div>
                     </div>
 
@@ -9545,6 +9586,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 warningsEl.style.display = 'none';
                 warningsEl.innerHTML = '';
             }
+            // Hide resume section
+            const resumeSection = $('job-resume-section');
+            if (resumeSection) {
+                resumeSection.style.display = 'none';
+            }
         }
 
         function resetProgressDetails() {
@@ -10593,6 +10639,44 @@ HTML_PAGE = '''<!DOCTYPE html>
             $('analyze-btn').disabled = false;
             updateAnalyzeButton();
             // Don't auto-hide progress section on error - keep error visible
+
+            // Show resume button if we have a job ID
+            var resumeSection = $('job-resume-section');
+            if (resumeSection && currentJobId) {
+                resumeSection.style.display = 'flex';
+            }
+        }
+
+        function resumeCurrentJob() {
+            if (!currentJobId) {
+                alert('No job ID available to resume');
+                return;
+            }
+
+            var btn = $('resume-job-btn');
+            btn.disabled = true;
+            btn.textContent = 'Resuming...';
+
+            fetch('/api/analyzer/jobs/' + currentJobId + '/resume', { method: 'POST' })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert('Resume failed: ' + data.error);
+                        btn.disabled = false;
+                        btn.textContent = '▶ Resume Job';
+                    } else {
+                        // Hide resume section and start polling
+                        $('job-resume-section').style.display = 'none';
+                        $('progress-text').textContent = 'Resuming from ' + (data.resuming_from || 'start') + '...';
+                        $('progress-text').style.color = 'var(--accent)';
+                        pollJobStatus(currentJobId);
+                    }
+                })
+                .catch(function(error) {
+                    alert('Resume failed: ' + error.message);
+                    btn.disabled = false;
+                    btn.textContent = '▶ Resume Job';
+                });
         }
 
         function finishAnalysis() {

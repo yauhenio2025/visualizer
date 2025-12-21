@@ -2211,6 +2211,34 @@ def fetch_documents_endpoint():
     })
 
 
+@app.route('/api/analyzer/jobs/<job_id>/documents', methods=['GET'])
+def get_job_documents(job_id):
+    """
+    Fetch documents from the analyzer's stored job request_data.
+
+    This is a fallback for old jobs that don't have s3_input_key stored.
+    The analyzer stores the full document content in request_data.
+    """
+    try:
+        # Fetch documents from analyzer's new endpoint
+        response = httpx.get(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}/documents",
+            headers=get_analyzer_headers(),
+            timeout=30.0,
+        )
+
+        if response.status_code == 404:
+            return jsonify({"success": False, "error": "Job or documents not found"})
+
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except httpx.HTTPError as e:
+        return jsonify({"success": False, "error": f"API error: {str(e)}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route('/api/admin/cleanup-orphaned-jobs', methods=['POST'])
 def cleanup_orphaned_jobs():
     """Cleanup orphaned Procrastinate jobs stuck in 'doing' status."""
@@ -11714,6 +11742,35 @@ HTML_PAGE = '''<!DOCTYPE html>
                     }
                 } catch (e) {
                     console.error('[S3] Error fetching from S3:', e);
+                }
+            }
+
+            // Fallback: Try to fetch documents from the analyzer's stored job request_data
+            var jobId = item.job_id;
+            if (jobId) {
+                console.log('[FALLBACK] Trying to fetch documents from job request_data:', jobId);
+                try {
+                    var response = await fetch('/api/analyzer/jobs/' + jobId + '/documents', {
+                        headers: getApiHeaders()
+                    });
+                    var data = await response.json();
+                    if (data.success && data.documents && data.documents.length > 0) {
+                        console.log('[FALLBACK] Successfully fetched', data.documents.length, 'documents from job');
+                        return {
+                            documents: data.documents.map(function(doc) {
+                                return {
+                                    id: doc.id || 'doc',
+                                    title: doc.title || 'document',
+                                    content: doc.content,
+                                    source_name: doc.source_name || ''
+                                };
+                            })
+                        };
+                    } else {
+                        console.log('[FALLBACK] Fetch returned no documents:', data);
+                    }
+                } catch (e) {
+                    console.error('[FALLBACK] Error fetching from job:', e);
                 }
             }
 

@@ -7176,6 +7176,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var jobId = isJobUrl[1];
                 console.log('Loading job from URL:', jobId);
                 loadJobFromUrl(jobId);
+                // Also load analyzer data for "Run more analyses" modal
+                loadAnalyzerData();
             } else {
                 // Normal page load
                 loadAnalyzerData();

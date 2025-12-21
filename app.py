@@ -11589,7 +11589,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
 
                 var payload = {
-                    output_mode: 'visual',  // Default to visual
+                    output_mode: 'gemini_image',  // Use gemini_image for visual output
                     collection_mode: 'single'
                 };
 
@@ -11612,7 +11612,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     var bundle = bundles.find(function(b) { return b.bundle_key === generateModalSelection.key; });
                     if (bundle) {
                         var outputModes = {};
-                        bundle.member_engines.forEach(function(e) { outputModes[e] = 'visual'; });
+                        bundle.member_engines.forEach(function(e) { outputModes[e] = 'gemini_image'; });
                         payload.output_modes = outputModes;
                     }
                     endpoint = '/api/analyzer/analyze/bundle';

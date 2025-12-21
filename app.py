@@ -202,6 +202,31 @@ def upload_documents_to_s3(documents: List[Dict], job_id: str) -> Optional[str]:
         return None
 
 
+def update_analyzer_s3_key(job_id: str, s3_key: str) -> bool:
+    """
+    Update the analyzer job with the S3 input key.
+
+    This stores the S3 key in the analyzer's database so it can be
+    returned in job status/result responses for re-analysis.
+    """
+    try:
+        response = httpx.patch(
+            f"{ANALYZER_API_URL}/v1/jobs/{job_id}/s3-input-key",
+            headers=get_analyzer_headers(),
+            json={"s3_input_key": s3_key},
+            timeout=10.0,
+        )
+        if response.status_code == 200:
+            print(f"[S3] Updated analyzer job {job_id} with s3_input_key")
+            return True
+        else:
+            print(f"[S3] Failed to update analyzer: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"[S3] Error updating analyzer: {e}")
+        return False
+
+
 def fetch_documents_from_s3(s3_key: str) -> Optional[List[Dict]]:
     """
     Fetch documents from S3 for re-analysis.
@@ -1465,6 +1490,8 @@ def submit_analysis():
             s3_input_key = None
             if job_id:
                 s3_input_key = upload_documents_to_s3(documents, job_id)
+                if s3_input_key:
+                    update_analyzer_s3_key(job_id, s3_input_key)
 
             return jsonify({
                 "success": True,
@@ -1591,6 +1618,8 @@ def submit_bundle_analysis():
         s3_input_key = None
         if job_id:
             s3_input_key = upload_documents_to_s3(documents, job_id)
+            if s3_input_key:
+                update_analyzer_s3_key(job_id, s3_input_key)
 
         return jsonify({
             "success": True,
@@ -1717,6 +1746,10 @@ def submit_multi_engine_analysis():
     s3_input_key = None
     if job_ids:
         s3_input_key = upload_documents_to_s3(documents, job_ids[0])
+        if s3_input_key:
+            # Update all jobs with the same s3_input_key
+            for jid in job_ids:
+                update_analyzer_s3_key(jid, s3_input_key)
 
     # Return the first job_id as the primary (for backwards compat with polling)
     # Also return all job_ids and the engine mapping
@@ -1835,6 +1868,8 @@ def submit_pipeline_analysis():
         s3_input_key = None
         if job_id:
             s3_input_key = upload_documents_to_s3(documents, job_id)
+            if s3_input_key:
+                update_analyzer_s3_key(job_id, s3_input_key)
 
         return jsonify({
             "success": True,
@@ -2063,6 +2098,8 @@ def submit_intent_analysis():
         s3_input_key = None
         if job_id:
             s3_input_key = upload_documents_to_s3(documents, job_id)
+            if s3_input_key:
+                update_analyzer_s3_key(job_id, s3_input_key)
 
         result["success"] = True
         result["job_id"] = job_id
@@ -7205,6 +7242,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const job = await statusRes.json();
                 currentJobId = jobId;
 
+                // Store s3_input_key from job status if available
+                if (job.s3_input_key) {
+                    window.jobS3Keys = window.jobS3Keys || {};
+                    window.jobS3Keys[jobId] = job.s3_input_key;
+                    console.log('[S3] Got s3_input_key from job status:', job.s3_input_key);
+                }
+
                 // Update URL to show job URL section
                 updateJobUrl(jobId);
 
@@ -9646,6 +9690,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             var metadata = result.metadata || {};
             var extInfo = result.extended_info || {};
             var isMultiOutput = result.multi_output || false;
+
+            // Extract s3_input_key from extended_info and store it
+            if (extInfo.s3_input_key && currentJobId) {
+                window.jobS3Keys = window.jobS3Keys || {};
+                window.jobS3Keys[currentJobId] = extInfo.s3_input_key;
+                console.log('[S3] Got s3_input_key from result extended_info:', extInfo.s3_input_key);
+            }
 
             // Display job info header
             displayJobInfoHeader(extInfo);

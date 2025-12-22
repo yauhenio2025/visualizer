@@ -5179,10 +5179,17 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
         .job-group-items {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 1rem;
             padding: 1.25rem;
             background: #f8f9fa;
+        }
+        /* When only 1-2 items, constrain width */
+        .job-group-items:has(> :only-child) {
+            grid-template-columns: minmax(200px, 320px);
+        }
+        .job-group-items:has(> :nth-child(2):last-child) {
+            grid-template-columns: repeat(2, minmax(200px, 320px));
         }
         .job-group.collapsed .job-group-items {
             display: none;
@@ -5474,11 +5481,11 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         /* === OUTPUT GRID (Tufte small multiples) === */
         .input-outputs-container {
-            padding: 1rem;
-            background: var(--bg-secondary);
+            padding: 1.25rem;
+            background: #f8f9fa;
         }
         .engine-section {
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
         }
         .engine-section:last-child {
             margin-bottom: 0;
@@ -5487,27 +5494,37 @@ HTML_PAGE = '''<!DOCTYPE html>
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-bottom: 0.5rem;
-            padding-bottom: 0.25rem;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--border);
         }
         .engine-name {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            color: var(--text-secondary);
+            color: var(--text);
             text-transform: capitalize;
         }
         .engine-badge {
             font-size: 0.65rem;
-            padding: 0.1rem 0.4rem;
-            background: var(--accent);
-            color: white;
-            border-radius: 8px;
+            padding: 0.15rem 0.5rem;
+            background: #e0e7ff;
+            color: #4338ca;
+            border-radius: 10px;
+            font-weight: 600;
         }
         .engine-outputs-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        /* When only 1-2 items, don't let them stretch too wide */
+        .engine-outputs-grid:has(> :only-child) {
+            grid-template-columns: minmax(200px, 320px);
+        }
+        .engine-outputs-grid:has(> :nth-child(2):last-child) {
+            grid-template-columns: repeat(2, minmax(200px, 320px));
         }
 
         /* Collapsed states */

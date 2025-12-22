@@ -5583,6 +5583,56 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-size: 0.65rem;
         }
 
+        /* Flat outputs grid - Tufte small multiples */
+        .flat-outputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+            padding: 0.75rem;
+        }
+        .flat-outputs-grid .gallery-card {
+            position: relative;
+            width: 100%;
+        }
+        .flat-outputs-grid .gallery-card-preview {
+            height: 110px;
+        }
+        .flat-outputs-grid .gallery-card-info {
+            padding: 0.5rem 0.625rem;
+        }
+        .flat-outputs-grid .gallery-card-title {
+            font-size: 0.75rem;
+            line-height: 1.3;
+        }
+        .flat-outputs-grid .gallery-card-meta {
+            font-size: 0.65rem;
+        }
+        .flat-outputs-grid .gallery-card-actions {
+            padding: 0.375rem 0.625rem 0.5rem;
+        }
+        .flat-outputs-grid .gallery-card-actions button {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.65rem;
+        }
+        /* Engine badge overlay */
+        .card-engine-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            font-size: 0.55rem;
+            font-weight: 600;
+            text-transform: capitalize;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            z-index: 2;
+            max-width: calc(100% - 16px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         /* Collapsed states */
         .input-group-toggle {
             font-size: 0.6rem;
@@ -11610,34 +11660,21 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
             };
 
-            // === OUTPUT GRID: Organized by engine (Tufte small multiples) ===
+            // === OUTPUT GRID: Flat grid (Tufte small multiples - no separate sections) ===
             var itemsContainer = document.createElement('div');
             itemsContainer.className = 'input-outputs-container';
 
-            var byEngine = {};
-            group.items.forEach(function(item) {
-                var eng = item.key || 'other';
-                if (!byEngine[eng]) byEngine[eng] = [];
-                byEngine[eng].push(item);
+            // Sort items by engine for visual grouping, but render in flat grid
+            var sortedItems = group.items.slice().sort(function(a, b) {
+                return (a.key || 'zzz').localeCompare(b.key || 'zzz');
             });
 
-            Object.keys(byEngine).sort().forEach(function(engKey) {
-                var engItems = byEngine[engKey];
-                var section = document.createElement('div');
-                section.className = 'engine-section';
-                section.innerHTML = '<div class="engine-section-header">' +
-                    '<span class="engine-name">' + engKey.replace(/_/g, ' ') + '</span>' +
-                    '<span class="engine-badge">' + engItems.length + '</span>' +
-                '</div>';
-
-                var grid = document.createElement('div');
-                grid.className = 'engine-outputs-grid';
-                engItems.forEach(function(item) {
-                    grid.appendChild(createLibraryCard(item, item._libraryIndex));
-                });
-                section.appendChild(grid);
-                itemsContainer.appendChild(section);
+            var grid = document.createElement('div');
+            grid.className = 'flat-outputs-grid';
+            sortedItems.forEach(function(item) {
+                grid.appendChild(createLibraryCard(item, item._libraryIndex, true)); // true = show engine badge
             });
+            itemsContainer.appendChild(grid);
 
             // Generate More actions
             var actionsSection = document.createElement('div');
@@ -12150,9 +12187,17 @@ HTML_PAGE = '''<!DOCTYPE html>
             openResultModal(0);
         }
 
-        function createLibraryCard(data, index) {
+        function createLibraryCard(data, index, showEngineBadge) {
             var card = document.createElement('div');
             card.className = 'gallery-card';
+
+            // Engine badge overlay (for flat grid views)
+            if (showEngineBadge && data.key) {
+                var engBadge = document.createElement('div');
+                engBadge.className = 'card-engine-badge';
+                engBadge.textContent = data.key.replace(/_/g, ' ');
+                card.appendChild(engBadge);
+            }
 
             var preview = document.createElement('div');
             preview.className = 'gallery-card-preview';

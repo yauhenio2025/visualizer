@@ -9523,12 +9523,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (engineData.status === 'completed' && engineData.result) {
                     var result = engineData.result;
                     var outputs = result.outputs || {};
+                    var isMultiOutput = result.multi_output === true;
 
-                    // Collect outputs for this engine
-                    for (var outputKey in outputs) {
-                        var output = outputs[outputKey];
-                        var modeKey = output.mode || outputKey.split(' - ')[1] || '';
-
+                    // Helper to render a single output
+                    function renderOutput(outputKey, output, modeKey) {
                         var resultData = {
                             key: outputKey,
                             title: formatEngineName(modeKey || outputKey),
@@ -9561,6 +9559,32 @@ HTML_PAGE = '''<!DOCTYPE html>
                             html += '<div class="output-title">' + resultData.title + '</div>';
                             html += '<div class="text-content">' + marked.parse(resultData.content) + '</div>';
                             html += '</div>';
+                        }
+                    }
+
+                    // Collect outputs for this engine
+                    for (var outputKey in outputs) {
+                        var engineOutput = outputs[outputKey];
+
+                        if (isMultiOutput && typeof engineOutput === 'object' && engineOutput !== null) {
+                            // Check if this is a nested multi-output structure
+                            var hasDirectProps = engineOutput.image_url !== undefined ||
+                                                 engineOutput.content !== undefined ||
+                                                 engineOutput.html_content !== undefined;
+                            if (!hasDirectProps) {
+                                // Multi-output: iterate nested modes
+                                for (var modeKey in engineOutput) {
+                                    var modeOutput = engineOutput[modeKey];
+                                    if (typeof modeOutput === 'object' && modeOutput !== null) {
+                                        renderOutput(outputKey + '_' + modeKey, modeOutput, modeKey);
+                                    }
+                                }
+                            } else {
+                                renderOutput(outputKey, engineOutput, engineOutput.mode || '');
+                            }
+                        } else {
+                            var modeKey = engineOutput.mode || outputKey.split(' - ')[1] || '';
+                            renderOutput(outputKey, engineOutput, modeKey);
                         }
                     }
                 } else if (engineData.status === 'failed') {
@@ -10974,33 +10998,70 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                         if (result.outputs) {
                             var extInfo = result.extended_info || {};
-                            for (var key in result.outputs) {
-                                var output = result.outputs[key];
-                                var resultData = {
-                                    key: key,
-                                    title: key.replace(/_/g, ' '),
-                                    job_id: job.job_id,
-                                    output: output,
-                                    metadata: result.metadata || {},
-                                    extended_info: extInfo,
-                                    isImage: !!output.image_url,
-                                    imageUrl: output.image_url || null,
-                                    content: output.content || output.html_content || '',
-                                    data: output.data || null,
-                                    addedAt: job.completed_at || new Date().toISOString(),
-                                    isInteractive: !!output.html_content
-                                };
+                            var isMultiOutput = result.multi_output === true;
 
-                                // Add to cache
-                                recentJobsCache.jobs.push(resultData);
+                            for (var engineKey in result.outputs) {
+                                var engineOutput = result.outputs[engineKey];
 
-                                // Check if already in library
-                                var exists = libraryItems.some(function(it) {
-                                    return it.job_id === resultData.job_id && it.key === key;
-                                });
+                                if (isMultiOutput) {
+                                    // Multi-output: engineOutput is {mode_key: OutputResult, ...}
+                                    for (var modeKey in engineOutput) {
+                                        var output = engineOutput[modeKey];
+                                        if (!output || typeof output !== 'object') continue;
 
-                                if (!exists) {
-                                    libraryItems.push(resultData);
+                                        var itemKey = engineKey + '_' + modeKey;
+                                        var resultData = {
+                                            key: itemKey,
+                                            title: engineKey.replace(/_/g, ' ') + ' (' + modeKey.replace(/_/g, ' ') + ')',
+                                            job_id: job.job_id,
+                                            output: output,
+                                            metadata: result.metadata || {},
+                                            extended_info: extInfo,
+                                            isImage: !!output.image_url,
+                                            imageUrl: output.image_url || null,
+                                            content: output.content || output.html_content || '',
+                                            data: output.data || null,
+                                            addedAt: job.completed_at || new Date().toISOString(),
+                                            isInteractive: !!output.html_content
+                                        };
+
+                                        recentJobsCache.jobs.push(resultData);
+
+                                        var exists = libraryItems.some(function(it) {
+                                            return it.job_id === resultData.job_id && it.key === itemKey;
+                                        });
+
+                                        if (!exists) {
+                                            libraryItems.push(resultData);
+                                        }
+                                    }
+                                } else {
+                                    // Single output: engineOutput is OutputResult directly
+                                    var output = engineOutput;
+                                    var resultData = {
+                                        key: engineKey,
+                                        title: engineKey.replace(/_/g, ' '),
+                                        job_id: job.job_id,
+                                        output: output,
+                                        metadata: result.metadata || {},
+                                        extended_info: extInfo,
+                                        isImage: !!output.image_url,
+                                        imageUrl: output.image_url || null,
+                                        content: output.content || output.html_content || '',
+                                        data: output.data || null,
+                                        addedAt: job.completed_at || new Date().toISOString(),
+                                        isInteractive: !!output.html_content
+                                    };
+
+                                    recentJobsCache.jobs.push(resultData);
+
+                                    var exists = libraryItems.some(function(it) {
+                                        return it.job_id === resultData.job_id && it.key === engineKey;
+                                    });
+
+                                    if (!exists) {
+                                        libraryItems.push(resultData);
+                                    }
                                 }
                             }
                         }

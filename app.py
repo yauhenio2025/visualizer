@@ -7461,13 +7461,58 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (urlSection) urlSection.style.display = 'none';
         }
 
-        // View switching
-        function switchView(viewId, evt) {
+        // View switching with URL hash support
+        function switchView(viewId, evt, updateHash) {
             document.querySelectorAll('.view-content').forEach(function(el) { el.classList.remove('active'); });
             document.querySelectorAll('.nav-btn').forEach(function(el) { el.classList.remove('active'); });
             document.getElementById(viewId + '-view').classList.add('active');
+            // Update nav button
+            document.querySelectorAll('.nav-btn').forEach(function(btn) {
+                if (btn.textContent.toLowerCase().includes(viewId)) {
+                    btn.classList.add('active');
+                }
+            });
             if (evt && evt.target) evt.target.classList.add('active');
+
+            // Update URL hash (unless we're responding to a hash change)
+            if (updateHash !== false) {
+                if (viewId === 'library') {
+                    window.history.replaceState(null, '', '#library-' + currentLibraryTab);
+                } else {
+                    window.history.replaceState(null, '', '#' + viewId);
+                }
+            }
         }
+
+        // Handle URL hash changes for navigation
+        function handleHashChange() {
+            var hash = window.location.hash.slice(1); // Remove #
+            if (!hash) return;
+
+            if (hash === 'analyze') {
+                switchView('analyze', null, false);
+            } else if (hash.startsWith('library')) {
+                switchView('library', null, false);
+                // Check for library sub-tab
+                var parts = hash.split('-');
+                if (parts.length > 1) {
+                    var tab = parts[1];
+                    if (['jobs', 'outputs', 'inputs'].includes(tab)) {
+                        switchLibraryTab(tab, false);
+                    }
+                }
+            }
+        }
+
+        // Listen for hash changes (back/forward navigation)
+        window.addEventListener('hashchange', handleHashChange);
+
+        // Handle initial hash on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.location.hash) {
+                handleHashChange();
+            }
+        });
 
         // File Upload
         function triggerFileUpload() {
@@ -10928,7 +10973,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Library
         let currentLibraryTab = 'jobs';  // 'jobs', 'outputs', 'inputs'
 
-        function switchLibraryTab(tab) {
+        function switchLibraryTab(tab, updateHash) {
             currentLibraryTab = tab;
             // Update tab button states
             document.querySelectorAll('.library-tab').forEach(function(btn) {
@@ -10938,6 +10983,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                     btn.classList.remove('active');
                 }
             });
+            // Update URL hash (unless responding to hash change)
+            if (updateHash !== false) {
+                window.history.replaceState(null, '', '#library-' + tab);
+            }
             renderLibrary();
         }
 

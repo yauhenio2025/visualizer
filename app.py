@@ -4740,16 +4740,17 @@ HTML_PAGE = '''<!DOCTYPE html>
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: var(--text-muted);
-            gap: 0.5rem;
+            color: #94a3b8;
+            gap: 0.25rem;
+            background: linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%);
         }
         .image-load-error .error-icon {
-            font-size: 2rem;
-            opacity: 0.4;
+            font-size: 1.5rem;
+            opacity: 0.5;
         }
         .image-load-error .error-text {
-            font-size: 0.75rem;
-            opacity: 0.6;
+            font-size: 0.65rem;
+            opacity: 0.7;
         }
         .gallery-card-preview .text-preview {
             padding: 1rem;
@@ -5479,52 +5480,75 @@ HTML_PAGE = '''<!DOCTYPE html>
             text-transform: uppercase;
         }
 
-        /* === OUTPUT GRID (Tufte small multiples) === */
+        /* === OUTPUT GRID (Compact, continuous layout) === */
         .input-outputs-container {
-            padding: 1.25rem;
-            background: #f8f9fa;
+            padding: 1rem;
+            background: #fafafa;
         }
         .engine-section {
-            margin-bottom: 1.25rem;
+            margin-bottom: 0.75rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
         }
         .engine-section:last-child {
             margin-bottom: 0;
         }
         .engine-section-header {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-            padding: 0.5rem 0.75rem;
-            background: white;
-            border-radius: 6px;
-            border: 1px solid var(--border);
+            gap: 0.4rem;
+            padding: 0.4rem 0.75rem;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            width: 100%;
+            box-sizing: border-box;
         }
         .engine-name {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            color: var(--text);
+            color: var(--text-secondary);
             text-transform: capitalize;
         }
         .engine-badge {
-            font-size: 0.65rem;
-            padding: 0.15rem 0.5rem;
-            background: #e0e7ff;
-            color: #4338ca;
-            border-radius: 10px;
+            font-size: 0.6rem;
+            padding: 0.1rem 0.4rem;
+            background: var(--accent);
+            color: white;
+            border-radius: 8px;
             font-weight: 600;
         }
         .engine-outputs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            padding: 0.75rem;
         }
-        /* When only 1-2 items, don't let them stretch too wide */
-        .engine-outputs-grid:has(> :only-child) {
-            grid-template-columns: minmax(200px, 320px);
+        .engine-outputs-grid .gallery-card {
+            flex: 0 0 auto;
+            width: 180px;
         }
-        .engine-outputs-grid:has(> :nth-child(2):last-child) {
-            grid-template-columns: repeat(2, minmax(200px, 320px));
+        /* Compact cards inside engine grids */
+        .engine-outputs-grid .gallery-card-preview {
+            height: 100px;
+        }
+        .engine-outputs-grid .gallery-card-info {
+            padding: 0.5rem 0.625rem;
+        }
+        .engine-outputs-grid .gallery-card-title {
+            font-size: 0.75rem;
+            line-height: 1.3;
+        }
+        .engine-outputs-grid .gallery-card-meta {
+            font-size: 0.65rem;
+        }
+        .engine-outputs-grid .gallery-card-actions {
+            padding: 0.375rem 0.625rem 0.5rem;
+        }
+        .engine-outputs-grid .gallery-card-actions button {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.65rem;
         }
 
         /* Collapsed states */

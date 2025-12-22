@@ -1499,7 +1499,7 @@ def get_collection_affordances(
     # Build document list from paths
     documents = []
     for path in document_paths[:20]:  # Limit to 20 docs
-        doc = prepare_document(path)
+        doc = read_document(path)
         if doc:
             documents.append({
                 "id": str(Path(path).stem),
@@ -1627,7 +1627,7 @@ def analyze_collection_with_intent(
     # Step 1: Prepare documents
     documents = []
     for path in document_paths:
-        doc = prepare_document(path)
+        doc = read_document(path)
         if doc:
             documents.append(doc)
 

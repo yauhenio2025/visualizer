@@ -4013,107 +4013,136 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         /* ============================================================
-           OUTPUT MODE CARDS (replacing dropdown)
+           OUTPUT FORMAT - Tufte-inspired compact design
+           High data-ink ratio, minimal chrome, horizontal flow
            ============================================================ */
         .output-mode-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.5rem;
-            margin: 0.75rem 0;
+            margin: 0.5rem 0;
         }
 
-        .output-mode-card {
-            padding: 0.6rem 0.75rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.15s;
-            text-align: center;
+        /* Category tabs - horizontal, minimal */
+        .output-category-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0.75rem;
         }
 
-        .output-mode-card:hover {
-            border-color: var(--accent-muted);
-            background: var(--bg-card);
-        }
-
-        .output-mode-card.selected {
-            border-color: var(--accent);
-            background: var(--bg-card);
-            box-shadow: var(--shadow);
-        }
-
-        .output-mode-card.visual {
-            border-left: 3px solid #9b59b6;
-        }
-
-        .output-mode-card .mode-icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .output-mode-card .mode-name {
-            font-size: 0.75rem;
+        .output-category-tab {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.7rem;
             font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.15s;
         }
 
-        .output-mode-card .mode-tag {
+        .output-category-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .output-category-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .output-category-tab .tab-count {
             font-size: 0.6rem;
             color: var(--text-muted);
-            margin-top: 0.15rem;
+            margin-left: 0.25rem;
         }
 
-        .output-mode-card .gemini-badge {
-            display: inline-block;
-            font-size: 0.55rem;
-            padding: 0.1rem 0.35rem;
-            background: linear-gradient(135deg, #9b59b6 0%, #3498db 100%);
-            color: white;
+        .output-category-tab.active .tab-count {
+            color: var(--accent-muted);
+        }
+
+        /* Chip grid - compact horizontal flow */
+        .output-chip-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        /* Individual chips - minimal, text-focused */
+        .output-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            background: var(--bg-input);
+            border: 1px solid var(--border);
             border-radius: 3px;
-            margin-top: 0.2rem;
+            cursor: pointer;
+            transition: all 0.1s;
+            white-space: nowrap;
         }
 
-        /* Output mode sections (grouped by category) */
+        .output-chip:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .output-chip.selected {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .output-chip .chip-check {
+            font-size: 0.6rem;
+            opacity: 0;
+            margin-right: -0.2rem;
+            transition: opacity 0.1s;
+        }
+
+        .output-chip.selected .chip-check {
+            opacity: 1;
+            margin-right: 0;
+        }
+
+        /* Visual indicator for Gemini modes */
+        .output-chip.visual-mode {
+            border-left: 2px solid #9b59b6;
+        }
+
+        .output-chip.visual-mode.selected {
+            background: linear-gradient(135deg, #9b59b6 0%, #3498db 100%);
+            border-left-color: transparent;
+        }
+
+        /* Subtle tag for special modes */
+        .output-chip .chip-tag {
+            font-size: 0.55rem;
+            padding: 0.1rem 0.25rem;
+            background: rgba(0,0,0,0.1);
+            border-radius: 2px;
+            margin-left: 0.15rem;
+        }
+
+        .output-chip.selected .chip-tag {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Legacy section styling - keep but simplified */
         .output-mode-section {
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
 
         .output-mode-section-header {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-secondary);
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             margin-bottom: 0.5rem;
             padding-bottom: 0.25rem;
             border-bottom: 1px solid var(--border);
         }
 
-        .output-mode-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 0.5rem;
-        }
-
-        /* Analysis report cards (new differentiated types) */
-        .output-mode-card.analysis {
-            border-left: 3px solid #27ae60;
-            position: relative;
-        }
-
-        .output-mode-card.analysis:hover {
-            border-left-color: #2ecc71;
-        }
-
-        .output-mode-card .mode-desc {
-            font-size: 0.55rem;
-            color: var(--text-muted);
-            margin-top: 0.2rem;
-            line-height: 1.2;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
 
         /* View mode toggle for category vs flat */
         .view-mode-toggle {
@@ -8599,106 +8628,93 @@ HTML_PAGE = '''<!DOCTYPE html>
         // New differentiated analysis report types
         var analysisReportTypes = ['snapshot', 'deep_dive', 'evidence_pack', 'signal_report', 'status_brief', 'stakeholder_profile', 'gap_analysis', 'options_brief'];
 
-        // Render output modes as visual cards
+        // Track which output category tab is active
+        var activeOutputCategory = 'reports';
+
+        // Render output modes as compact Tufte-style chips
         function renderOutputModeCards() {
             var container = $('output-mode-cards');
             var dropdown = $('output-mode');
             if (!container) return;
 
-            // Filter compatible modes
-            // With multi-engine selection, show all modes (each engine has its own mode)
             var compatibleModes = outputModes;
 
-            // Separate into three categories:
-            // 1. Analysis Reports (new 8 differentiated types)
-            // 2. Visual modes (Gemini)
-            // 3. Legacy text modes (table, mermaid, etc.)
+            // Separate into three categories
             var analysisReports = compatibleModes.filter(function(m) { return analysisReportTypes.includes(m.mode_key); });
             var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
-            var legacyTextModes = compatibleModes.filter(function(m) {
+            var dataFormats = compatibleModes.filter(function(m) {
                 return !m.mode_key.startsWith('gemini_') && !analysisReportTypes.includes(m.mode_key);
             });
 
-            // Update count - show selected format count
+            // Count selected per category
+            var reportsSelected = selectedOutputModes.filter(function(m) { return analysisReportTypes.includes(m); }).length;
+            var visualSelected = selectedOutputModes.filter(function(m) { return m.startsWith('gemini_'); }).length;
+            var dataSelected = selectedOutputModes.filter(function(m) {
+                return !m.startsWith('gemini_') && !analysisReportTypes.includes(m);
+            }).length;
+
+            // Update count display
             var countEl = $('output-mode-count');
             if (countEl) {
                 countEl.textContent = selectedOutputModes.length > 0 ?
-                    '(' + selectedOutputModes.length + ' format' + (selectedOutputModes.length > 1 ? 's' : '') + ')' : '';
+                    '(' + selectedOutputModes.length + ')' : '';
             }
 
-            // Auto-select default: Visual (gemini_image) for new UI
+            // Auto-select default
             if (selectedOutputModes.length === 0) {
                 var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'gemini_image'; });
                 if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'deep_dive'; });
-                if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
-                if (!defaultMode) defaultMode = compatibleModes[0];
                 if (defaultMode) selectedOutputModes.push(defaultMode.mode_key);
             }
 
-            // Sync first selected to hidden dropdown (for backwards compatibility)
+            // Sync to hidden dropdown
             if (dropdown && selectedOutputModes.length > 0) {
                 dropdown.value = selectedOutputModes[0];
             }
 
-            var html = '';
+            // Build category tabs
+            var html = '<div class="output-category-tabs">';
+            html += '<div class="output-category-tab ' + (activeOutputCategory === 'reports' ? 'active' : '') + '" onclick="switchOutputCategory(\\'reports\\')">';
+            html += 'Reports<span class="tab-count">' + (reportsSelected > 0 ? reportsSelected : '') + '</span></div>';
+            html += '<div class="output-category-tab ' + (activeOutputCategory === 'visual' ? 'active' : '') + '" onclick="switchOutputCategory(\\'visual\\')">';
+            html += 'Visual<span class="tab-count">' + (visualSelected > 0 ? visualSelected : '') + '</span></div>';
+            html += '<div class="output-category-tab ' + (activeOutputCategory === 'data' ? 'active' : '') + '" onclick="switchOutputCategory(\\'data\\')">';
+            html += 'Data<span class="tab-count">' + (dataSelected > 0 ? dataSelected : '') + '</span></div>';
+            html += '</div>';
 
-            // Analysis Reports section (new differentiated types)
-            if (analysisReports.length > 0) {
-                html += '<div class="output-mode-section">';
-                html += '<div class="output-mode-section-header">📊 Analysis Reports</div>';
-                html += '<div class="output-mode-grid">';
-                analysisReports.forEach(function(m) {
-                    var icon = outputModeIcons[m.mode_key] || '📄';
-                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
-                    var desc = outputModeDescriptions[m.mode_key] || '';
-                    var isSelected = selectedOutputModes.includes(m.mode_key);
-                    html += '<div class="output-mode-card analysis ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')" title="' + desc + '">';
-                    html += '<div class="mode-icon">' + icon + '</div>';
-                    html += '<div class="mode-name">' + name + '</div>';
-                    if (desc) {
-                        html += '<div class="mode-desc">' + desc.substring(0, 40) + (desc.length > 40 ? '...' : '') + '</div>';
-                    }
-                    html += '</div>';
-                });
-                html += '</div></div>';
-            }
+            // Build chip grid for active category
+            html += '<div class="output-chip-grid">';
 
-            // Visual modes section with Gemini badge
-            if (visualModes.length > 0) {
-                html += '<div class="output-mode-section">';
-                html += '<div class="output-mode-section-header">🖼️ Visual Outputs</div>';
-                html += '<div class="output-mode-grid">';
-                visualModes.forEach(function(m) {
-                    var icon = outputModeIcons[m.mode_key] || '🖼️';
-                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
-                    var isSelected = selectedOutputModes.includes(m.mode_key);
-                    html += '<div class="output-mode-card visual ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
-                    html += '<div class="mode-icon">' + icon + '</div>';
-                    html += '<div class="mode-name">' + name + '</div>';
-                    html += '<div class="gemini-badge">4K Visual</div>';
-                    html += '</div>';
-                });
-                html += '</div></div>';
-            }
+            var activeItems = [];
+            if (activeOutputCategory === 'reports') activeItems = analysisReports;
+            else if (activeOutputCategory === 'visual') activeItems = visualModes;
+            else activeItems = dataFormats;
 
-            // Legacy text modes section
-            if (legacyTextModes.length > 0) {
-                html += '<div class="output-mode-section">';
-                html += '<div class="output-mode-section-header">📝 Data Formats</div>';
-                html += '<div class="output-mode-grid">';
-                legacyTextModes.forEach(function(m) {
-                    var icon = outputModeIcons[m.mode_key] || '📄';
-                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
-                    var isSelected = selectedOutputModes.includes(m.mode_key);
-                    html += '<div class="output-mode-card ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
-                    html += '<div class="mode-icon">' + icon + '</div>';
-                    html += '<div class="mode-name">' + name + '</div>';
-                    html += '</div>';
-                });
-                html += '</div></div>';
-            }
+            activeItems.forEach(function(m) {
+                var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
+                var desc = outputModeDescriptions[m.mode_key] || m.description || '';
+                var isSelected = selectedOutputModes.includes(m.mode_key);
+                var isVisual = m.mode_key.startsWith('gemini_');
 
-            container.innerHTML = html || '<div style="padding:0.5rem; color:var(--text-muted);">No output modes available</div>';
+                html += '<div class="output-chip ' + (isSelected ? 'selected' : '') + (isVisual ? ' visual-mode' : '') + '" ';
+                html += 'onclick="selectOutputMode(\\'' + m.mode_key + '\\')" title="' + desc + '">';
+                html += '<span class="chip-check">✓</span>';
+                html += '<span>' + name + '</span>';
+                if (isVisual && m.mode_key === 'gemini_image') {
+                    html += '<span class="chip-tag">4K</span>';
+                }
+                html += '</div>';
+            });
+
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // Switch output category tab
+        function switchOutputCategory(category) {
+            activeOutputCategory = category;
+            renderOutputModeCards();
         }
 
         // Toggle output mode card selection (multi-select)

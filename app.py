@@ -1301,6 +1301,183 @@ def list_analyzer_categories():
         return jsonify({"error": str(e)}), 500
 
 
+# =============================================================================
+# TEXTUAL OUTPUT ENDPOINTS (8 differentiated output types)
+# =============================================================================
+
+@app.route('/api/analyzer/output-types', methods=['GET'])
+def list_output_types():
+    """
+    Get all available textual output types with metadata.
+
+    Returns:
+        List of output types with name, icon, description, audience, etc.
+    """
+    try:
+        from analyzer.prompts.textual_output_templates import OUTPUT_TYPE_METADATA
+        result = []
+        for key, meta in OUTPUT_TYPE_METADATA.items():
+            result.append({
+                "key": key,
+                "name": meta.name,
+                "icon": meta.icon,
+                "description": meta.description,
+                "length": meta.length,
+                "reading_time": meta.reading_time,
+                "audience": meta.audience,
+                "core_question": meta.core_question,
+            })
+        return jsonify({"output_types": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/output-recommendations/<engine_key>', methods=['GET'])
+def get_output_recommendations_for_engine(engine_key):
+    """
+    Get recommended output types for a specific engine.
+
+    Args:
+        engine_key: The engine key (e.g., "stakeholder_power_interest")
+
+    Returns:
+        List of recommended output types sorted by affinity (best first)
+    """
+    try:
+        from analyzer.prompts.textual_output_templates import (
+            ENGINE_OUTPUT_AFFINITY,
+            OUTPUT_TYPE_METADATA,
+            get_recommended_outputs,
+        )
+
+        recommended = get_recommended_outputs(engine_key)
+        result = []
+
+        for output_type in recommended:
+            try:
+                meta = OUTPUT_TYPE_METADATA[output_type]
+                affinity = ENGINE_OUTPUT_AFFINITY.get(engine_key, {}).get(output_type, 0)
+                result.append({
+                    "output_type": output_type,
+                    "name": meta.name,
+                    "icon": meta.icon,
+                    "description": meta.description,
+                    "affinity": affinity,
+                    "affinity_label": "Ideal" if affinity == 3 else "Good" if affinity == 2 else "Possible",
+                    "reading_time": meta.reading_time,
+                })
+            except KeyError:
+                continue
+
+        return jsonify({
+            "engine": engine_key,
+            "recommendations": result,
+            "default": result[0]["output_type"] if result else "deep_dive",
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/render-textual', methods=['POST'])
+def render_textual_output_endpoint():
+    """
+    Render a textual output from analysis data using our templates.
+
+    Request body:
+    {
+        "output_type": "deep_dive",
+        "analysis_data": {...},
+        "visual_summary": "Optional description of visual output",
+        "topic": "Optional topic/title",
+        "run_complementarity_check": true
+    }
+
+    Returns:
+        Generated textual output with metadata
+    """
+    try:
+        data = request.get_json()
+        output_type = data.get('output_type', 'deep_dive')
+        analysis_data = data.get('analysis_data', {})
+        visual_summary = data.get('visual_summary')
+        topic = data.get('topic')
+        run_complementarity_check = data.get('run_complementarity_check', True)
+        llm_keys = data.get('llm_keys', {})
+
+        # Get API key from request or environment
+        api_key = llm_keys.get('anthropic') or os.environ.get('ANTHROPIC_API_KEY')
+
+        if not api_key:
+            return jsonify({"error": "Anthropic API key required"}), 400
+
+        from analyzer.renderer import TextualOutputRenderer
+
+        renderer = TextualOutputRenderer(api_key=api_key)
+        result = renderer.render(
+            output_type=output_type,
+            analysis_data=analysis_data,
+            visual_summary=visual_summary,
+            topic=topic,
+            run_complementarity_check=run_complementarity_check,
+        )
+
+        return jsonify({
+            "output_type": result.output_type,
+            "content": result.content,
+            "title": result.title,
+            "metadata": result.metadata,
+            "word_count": result.word_count,
+            "generation_model": result.generation_model,
+            "complementarity_note": result.complementarity_note,
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Textual render failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyzer/analyze-complementarity', methods=['POST'])
+def analyze_complementarity_endpoint():
+    """
+    Analyze what a visual output shows to guide text generation.
+
+    Request body:
+    {
+        "visual_summary": "Description of visual output",
+        "output_type": "deep_dive"
+    }
+
+    Returns:
+        Complementarity analysis with focus areas for text
+    """
+    try:
+        data = request.get_json()
+        visual_summary = data.get('visual_summary', '')
+        output_type = data.get('output_type', 'deep_dive')
+        llm_keys = data.get('llm_keys', {})
+
+        api_key = llm_keys.get('anthropic') or os.environ.get('ANTHROPIC_API_KEY')
+
+        if not api_key:
+            return jsonify({"error": "Anthropic API key required"}), 400
+
+        from analyzer.renderer import TextualOutputRenderer
+
+        renderer = TextualOutputRenderer(api_key=api_key)
+        result = renderer.analyze_complementarity(visual_summary, output_type)
+
+        return jsonify({
+            "visual_shows": result.visual_shows,
+            "text_should_add": result.text_should_add,
+            "avoid_duplicating": result.avoid_duplicating,
+            "focus_areas": result.focus_areas,
+        })
+    except Exception as e:
+        logger.error(f"Complementarity analysis failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analyzer/curator/recommend', methods=['POST'])
 def curator_recommend():
     """Get engine recommendations from the Curator AI."""
@@ -8858,7 +9035,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Toggle Engine selection (multi-select with multi-output-format support)
-        function selectEngine(key) {
+        async function selectEngine(key) {
             selectedBundle = null;
             selectedPipeline = null;
 
@@ -8869,8 +9046,24 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Remove ALL entries for this engine
                 selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== key; });
             } else {
+                // Fetch recommendations for this engine (async, but don't block)
+                fetchOutputRecommendations(key).then(function(recs) {
+                    // Update the panel once recommendations are loaded
+                    renderSelectedEnginesPanel();
+                });
+
                 // Add one entry per selected output mode
+                // If no modes selected, use the recommended output or gemini_image
                 var modesToAdd = selectedOutputModes.length > 0 ? selectedOutputModes : ['gemini_image'];
+
+                // If using default, check for cached recommendation
+                if (selectedOutputModes.length === 0) {
+                    var cachedRec = getRecommendedOutput(key);
+                    if (cachedRec && cachedRec !== 'deep_dive') {
+                        modesToAdd = [cachedRec];
+                    }
+                }
+
                 modesToAdd.forEach(function(mode) {
                     selectedEngines.push({
                         engine_key: key,
@@ -8898,6 +9091,37 @@ HTML_PAGE = '''<!DOCTYPE html>
             renderSelectedEnginesPanel();
             renderOutputModes();
             updateAnalyzeButton();
+        }
+
+        // Cache for engine output recommendations
+        var engineOutputRecommendations = {};
+
+        // Fetch recommended outputs for an engine
+        async function fetchOutputRecommendations(engineKey) {
+            if (engineOutputRecommendations[engineKey]) {
+                return engineOutputRecommendations[engineKey];
+            }
+
+            try {
+                const response = await fetch('/api/analyzer/output-recommendations/' + engineKey);
+                if (response.ok) {
+                    const data = await response.json();
+                    engineOutputRecommendations[engineKey] = data.recommendations || [];
+                    return engineOutputRecommendations[engineKey];
+                }
+            } catch (e) {
+                console.warn('Failed to fetch recommendations for', engineKey, e);
+            }
+            return [];
+        }
+
+        // Get recommended output for an engine (sync, from cache)
+        function getRecommendedOutput(engineKey) {
+            var recs = engineOutputRecommendations[engineKey];
+            if (recs && recs.length > 0) {
+                return recs[0].output_type;
+            }
+            return 'deep_dive';  // Default
         }
 
         // Update output mode for a specific selected engine (by index)
@@ -8965,12 +9189,22 @@ HTML_PAGE = '''<!DOCTYPE html>
                 'market': '#84cc16'
             };
 
-            // Output mode options
+            // Output mode options - organized by category
             var modeOptions = [
-                { key: 'gemini_image', label: '🖼️ Visual', short: '🖼️' },
-                { key: 'structured_text_report', label: '📝 Text', short: '📝' },
-                { key: 'comparative_matrix_table', label: '📊 Table', short: '📊' },
-                { key: 'executive_memo', label: '📋 Memo', short: '📋' }
+                // Visual
+                { key: 'gemini_image', label: '🖼️ Visual (4K)', short: '🖼️', category: 'visual' },
+                // Analysis Reports (8 differentiated types)
+                { key: 'snapshot', label: '⚡ Snapshot', short: '⚡', category: 'analysis' },
+                { key: 'deep_dive', label: '🔬 Deep Dive', short: '🔬', category: 'analysis' },
+                { key: 'evidence_pack', label: '📁 Evidence Pack', short: '📁', category: 'analysis' },
+                { key: 'signal_report', label: '📡 Signal Report', short: '📡', category: 'analysis' },
+                { key: 'status_brief', label: '📋 Status Brief', short: '📋', category: 'analysis' },
+                { key: 'stakeholder_profile', label: '👤 Stakeholder Profile', short: '👤', category: 'analysis' },
+                { key: 'gap_analysis', label: '🎯 Gap Analysis', short: '🎯', category: 'analysis' },
+                { key: 'options_brief', label: '⚖️ Options Brief', short: '⚖️', category: 'analysis' },
+                // Data formats
+                { key: 'smart_table', label: '📊 Smart Table', short: '📊', category: 'data' },
+                { key: 'comparative_matrix_table', label: '📊 Matrix Table', short: '📊', category: 'data' },
             ];
 
             // Count unique engines
@@ -8986,7 +9220,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
             html += '<div class="selected-engines-actions">';
             html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'gemini_image\\')">All Visual</button>';
-            html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'structured_text_report\\')">All Text</button>';
+            html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'deep_dive\\')">All Deep Dive</button>';
+            html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'snapshot\\')">All Snapshot</button>';
             html += '<button class="btn-small btn-danger" onclick="clearSelectedEngines()">Clear All</button>';
             html += '</div></div>';
 
@@ -8998,15 +9233,44 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var category = engineInfo ? engineInfo.category : 'other';
                 var badgeColor = categoryColors[category] || '#6b7280';
 
+                // Get recommendations for this engine (if cached)
+                var recs = engineOutputRecommendations[sel.engine_key] || [];
+                var recKeys = recs.map(function(r) { return r.output_type; });
+
                 var currentModeInfo = modeOptions.find(function(m) { return m.key === sel.output_mode; }) || modeOptions[0];
 
                 html += '<div class="selected-engine-chip">';
                 html += '<span class="engine-category-dot" style="background:' + badgeColor + '"></span>';
                 html += '<span class="engine-name">' + displayName + '</span>';
                 html += '<select class="mode-select" onchange="updateEngineOutputMode(' + index + ', this.value)">';
-                modeOptions.forEach(function(opt) {
-                    html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
-                });
+
+                // Group options: Recommended first, then others
+                if (recs.length > 0) {
+                    html += '<optgroup label="★ Recommended">';
+                    recs.forEach(function(rec) {
+                        var opt = modeOptions.find(function(m) { return m.key === rec.output_type; });
+                        if (opt) {
+                            var affinityBadge = rec.affinity === 3 ? '★★★' : rec.affinity === 2 ? '★★' : '★';
+                            html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + ' ' + affinityBadge + '</option>';
+                        }
+                    });
+                    html += '</optgroup>';
+
+                    // Other options
+                    html += '<optgroup label="Other Formats">';
+                    modeOptions.forEach(function(opt) {
+                        if (!recKeys.includes(opt.key)) {
+                            html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
+                        }
+                    });
+                    html += '</optgroup>';
+                } else {
+                    // No recommendations yet, show all options
+                    modeOptions.forEach(function(opt) {
+                        html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
+                    });
+                }
+
                 html += '</select>';
                 html += '<button class="remove-btn" onclick="removeSelectedEngine(' + index + ')">×</button>';
                 html += '</div>';

@@ -3498,6 +3498,45 @@ HTML_PAGE = '''<!DOCTYPE html>
             cursor: pointer;
         }
 
+        /* Output Groups (for intent mode) */
+        .output-group {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .output-group-header {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .output-hint {
+            font-weight: 400;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .analysis-reports-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem 1rem;
+        }
+
+        .analysis-reports-grid .output-checkbox {
+            font-size: 0.8rem;
+            padding: 0.25rem 0;
+        }
+
+        @media (max-width: 600px) {
+            .analysis-reports-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Curator Section */
         .curator-section {
             background: linear-gradient(135deg, rgba(45,125,70,0.05) 0%, rgba(45,125,70,0.02) 100%);
@@ -3855,6 +3894,48 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: white;
             border-radius: 3px;
             margin-top: 0.2rem;
+        }
+
+        /* Output mode sections (grouped by category) */
+        .output-mode-section {
+            margin-bottom: 1rem;
+        }
+
+        .output-mode-section-header {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .output-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.5rem;
+        }
+
+        /* Analysis report cards (new differentiated types) */
+        .output-mode-card.analysis {
+            border-left: 3px solid #27ae60;
+            position: relative;
+        }
+
+        .output-mode-card.analysis:hover {
+            border-left-color: #2ecc71;
+        }
+
+        .output-mode-card .mode-desc {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         /* View mode toggle for category vs flat */
@@ -6812,17 +6893,57 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 </div>
 
                                 <div class="intent-outputs">
-                                    <span class="section-label">Output Formats (select all that apply)</span>
-                                    <div class="output-checkboxes">
-                                        <label class="output-checkbox">
-                                            <input type="checkbox" id="output-image" checked> 🖼️ Visual (4K image)
-                                        </label>
-                                        <label class="output-checkbox">
-                                            <input type="checkbox" id="output-table" checked> 📊 Smart Table
-                                        </label>
-                                        <label class="output-checkbox">
-                                            <input type="checkbox" id="output-text" checked> 📝 Text Report
-                                        </label>
+                                    <span class="section-label">Output Formats</span>
+
+                                    <!-- Visual output -->
+                                    <div class="output-group">
+                                        <div class="output-group-header">🖼️ Visual</div>
+                                        <div class="output-checkboxes">
+                                            <label class="output-checkbox">
+                                                <input type="checkbox" id="output-image" checked> 4K Image
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Analysis Reports (new differentiated types) -->
+                                    <div class="output-group">
+                                        <div class="output-group-header">📊 Analysis Reports <span class="output-hint">(choose one or more)</span></div>
+                                        <div class="output-checkboxes analysis-reports-grid">
+                                            <label class="output-checkbox" title="1-page executive summary for immediate awareness">
+                                                <input type="checkbox" id="output-snapshot" name="analysis-report"> ⚡ Snapshot
+                                            </label>
+                                            <label class="output-checkbox" title="Comprehensive synthesis with calibrated confidence">
+                                                <input type="checkbox" id="output-deep-dive" name="analysis-report" checked> 🔬 Deep Dive
+                                            </label>
+                                            <label class="output-checkbox" title="Complete source documentation with reliability ratings">
+                                                <input type="checkbox" id="output-evidence-pack" name="analysis-report"> 📁 Evidence Pack
+                                            </label>
+                                            <label class="output-checkbox" title="Early indicators and emerging patterns">
+                                                <input type="checkbox" id="output-signal-report" name="analysis-report"> 📡 Signal Report
+                                            </label>
+                                            <label class="output-checkbox" title="Current state summary with recent developments">
+                                                <input type="checkbox" id="output-status-brief" name="analysis-report"> 📋 Status Brief
+                                            </label>
+                                            <label class="output-checkbox" title="Deep analysis of key actors and motivations">
+                                                <input type="checkbox" id="output-stakeholder-profile" name="analysis-report"> 👤 Stakeholder Profile
+                                            </label>
+                                            <label class="output-checkbox" title="Systematic identification of weaknesses">
+                                                <input type="checkbox" id="output-gap-analysis" name="analysis-report"> 🎯 Gap Analysis
+                                            </label>
+                                            <label class="output-checkbox" title="Decision framework with trade-offs">
+                                                <input type="checkbox" id="output-options-brief" name="analysis-report"> ⚖️ Options Brief
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Data formats -->
+                                    <div class="output-group">
+                                        <div class="output-group-header">📝 Data Formats</div>
+                                        <div class="output-checkboxes">
+                                            <label class="output-checkbox">
+                                                <input type="checkbox" id="output-table"> 📊 Smart Table
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -8204,9 +8325,26 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Output mode icons mapping
         var outputModeIcons = {
+            // New 8 differentiated textual outputs
+            'snapshot': '⚡',
+            'deep_dive': '🔬',
+            'evidence_pack': '📁',
+            'signal_report': '📡',
+            'status_brief': '📋',
+            'stakeholder_profile': '👤',
+            'gap_analysis': '🎯',
+            'options_brief': '⚖️',
+            // Legacy textual formats
             'structured_text_report': '📝',
+            'executive_memo': '📋',
             'table': '📊',
-            'comparative_matrix_table': '📋',
+            'smart_table': '📊',
+            'comparative_matrix_table': '📊',
+            'mermaid': '🔷',
+            'd3_interactive': '📈',
+            'text_qna': '❓',
+            // Visual formats
+            'gemini_image': '🖼️',
             'gemini_network_graph': '🕸️',
             'gemini_timeline': '📅',
             'gemini_concept_tree': '🌳',
@@ -8221,9 +8359,26 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Human-readable names
         var outputModeNames = {
+            // New 8 differentiated textual outputs
+            'snapshot': 'Snapshot',
+            'deep_dive': 'Deep Dive',
+            'evidence_pack': 'Evidence Pack',
+            'signal_report': 'Signal Report',
+            'status_brief': 'Status Brief',
+            'stakeholder_profile': 'Stakeholder Profile',
+            'gap_analysis': 'Gap Analysis',
+            'options_brief': 'Options Brief',
+            // Legacy textual formats
             'structured_text_report': 'Text Report',
+            'executive_memo': 'Executive Memo',
             'table': 'Data Table',
+            'smart_table': 'Smart Table',
             'comparative_matrix_table': 'Matrix Table',
+            'mermaid': 'Mermaid Diagram',
+            'd3_interactive': 'D3 Interactive',
+            'text_qna': 'Q&A Format',
+            // Visual formats
+            'gemini_image': 'Image',
             'gemini_network_graph': 'Network Graph',
             'gemini_timeline': 'Timeline',
             'gemini_concept_tree': 'Concept Tree',
@@ -8236,6 +8391,21 @@ HTML_PAGE = '''<!DOCTYPE html>
             'gemini_heatmap': 'Heat Map'
         };
 
+        // Descriptions for new textual output types
+        var outputModeDescriptions = {
+            'snapshot': '1-page executive summary for immediate awareness',
+            'deep_dive': 'Comprehensive synthesis with calibrated confidence',
+            'evidence_pack': 'Complete source documentation with reliability ratings',
+            'signal_report': 'Early indicators and emerging patterns',
+            'status_brief': 'Current state summary with recent developments',
+            'stakeholder_profile': 'Deep analysis of key actors and motivations',
+            'gap_analysis': 'Systematic identification of weaknesses',
+            'options_brief': 'Decision framework with trade-offs'
+        };
+
+        // New differentiated analysis report types
+        var analysisReportTypes = ['snapshot', 'deep_dive', 'evidence_pack', 'signal_report', 'status_brief', 'stakeholder_profile', 'gap_analysis', 'options_brief'];
+
         // Render output modes as visual cards
         function renderOutputModeCards() {
             var container = $('output-mode-cards');
@@ -8246,9 +8416,15 @@ HTML_PAGE = '''<!DOCTYPE html>
             // With multi-engine selection, show all modes (each engine has its own mode)
             var compatibleModes = outputModes;
 
-            // Separate visual (Gemini) from textual modes
+            // Separate into three categories:
+            // 1. Analysis Reports (new 8 differentiated types)
+            // 2. Visual modes (Gemini)
+            // 3. Legacy text modes (table, mermaid, etc.)
+            var analysisReports = compatibleModes.filter(function(m) { return analysisReportTypes.includes(m.mode_key); });
             var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
-            var textModes = compatibleModes.filter(function(m) { return !m.mode_key.startsWith('gemini_'); });
+            var legacyTextModes = compatibleModes.filter(function(m) {
+                return !m.mode_key.startsWith('gemini_') && !analysisReportTypes.includes(m.mode_key);
+            });
 
             // Update count - show selected format count
             var countEl = $('output-mode-count');
@@ -8260,6 +8436,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Auto-select default: Visual (gemini_image) for new UI
             if (selectedOutputModes.length === 0) {
                 var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'gemini_image'; });
+                if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'deep_dive'; });
                 if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
                 if (!defaultMode) defaultMode = compatibleModes[0];
                 if (defaultMode) selectedOutputModes.push(defaultMode.mode_key);
@@ -8272,28 +8449,61 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             var html = '';
 
-            // Text modes first
-            textModes.forEach(function(m) {
-                var icon = outputModeIcons[m.mode_key] || '📄';
-                var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
-                var isSelected = selectedOutputModes.includes(m.mode_key);
-                html += '<div class="output-mode-card ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
-                html += '<div class="mode-icon">' + icon + '</div>';
-                html += '<div class="mode-name">' + name + '</div>';
-                html += '</div>';
-            });
+            // Analysis Reports section (new differentiated types)
+            if (analysisReports.length > 0) {
+                html += '<div class="output-mode-section">';
+                html += '<div class="output-mode-section-header">📊 Analysis Reports</div>';
+                html += '<div class="output-mode-grid">';
+                analysisReports.forEach(function(m) {
+                    var icon = outputModeIcons[m.mode_key] || '📄';
+                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
+                    var desc = outputModeDescriptions[m.mode_key] || '';
+                    var isSelected = selectedOutputModes.includes(m.mode_key);
+                    html += '<div class="output-mode-card analysis ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')" title="' + desc + '">';
+                    html += '<div class="mode-icon">' + icon + '</div>';
+                    html += '<div class="mode-name">' + name + '</div>';
+                    if (desc) {
+                        html += '<div class="mode-desc">' + desc.substring(0, 40) + (desc.length > 40 ? '...' : '') + '</div>';
+                    }
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
 
-            // Visual modes with Gemini badge
-            visualModes.forEach(function(m) {
-                var icon = outputModeIcons[m.mode_key] || '🖼️';
-                var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
-                var isSelected = selectedOutputModes.includes(m.mode_key);
-                html += '<div class="output-mode-card visual ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
-                html += '<div class="mode-icon">' + icon + '</div>';
-                html += '<div class="mode-name">' + name + '</div>';
-                html += '<div class="gemini-badge">4K Visual</div>';
-                html += '</div>';
-            });
+            // Visual modes section with Gemini badge
+            if (visualModes.length > 0) {
+                html += '<div class="output-mode-section">';
+                html += '<div class="output-mode-section-header">🖼️ Visual Outputs</div>';
+                html += '<div class="output-mode-grid">';
+                visualModes.forEach(function(m) {
+                    var icon = outputModeIcons[m.mode_key] || '🖼️';
+                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
+                    var isSelected = selectedOutputModes.includes(m.mode_key);
+                    html += '<div class="output-mode-card visual ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
+                    html += '<div class="mode-icon">' + icon + '</div>';
+                    html += '<div class="mode-name">' + name + '</div>';
+                    html += '<div class="gemini-badge">4K Visual</div>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
+
+            // Legacy text modes section
+            if (legacyTextModes.length > 0) {
+                html += '<div class="output-mode-section">';
+                html += '<div class="output-mode-section-header">📝 Data Formats</div>';
+                html += '<div class="output-mode-grid">';
+                legacyTextModes.forEach(function(m) {
+                    var icon = outputModeIcons[m.mode_key] || '📄';
+                    var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
+                    var isSelected = selectedOutputModes.includes(m.mode_key);
+                    html += '<div class="output-mode-card ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
+                    html += '<div class="mode-icon">' + icon + '</div>';
+                    html += '<div class="mode-name">' + name + '</div>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
 
             container.innerHTML = html || '<div style="padding:0.5rem; color:var(--text-muted);">No output modes available</div>';
         }
@@ -9473,9 +9683,22 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     // Get selected output modes
                     const outputModes = [];
-                    if ($('output-image').checked) outputModes.push('gemini_image');
-                    if ($('output-table').checked) outputModes.push('comparative_matrix_table');
-                    if ($('output-text').checked) outputModes.push('structured_text_report');
+
+                    // Visual output
+                    if ($('output-image') && $('output-image').checked) outputModes.push('gemini_image');
+
+                    // Analysis Reports (new differentiated types)
+                    if ($('output-snapshot') && $('output-snapshot').checked) outputModes.push('snapshot');
+                    if ($('output-deep-dive') && $('output-deep-dive').checked) outputModes.push('deep_dive');
+                    if ($('output-evidence-pack') && $('output-evidence-pack').checked) outputModes.push('evidence_pack');
+                    if ($('output-signal-report') && $('output-signal-report').checked) outputModes.push('signal_report');
+                    if ($('output-status-brief') && $('output-status-brief').checked) outputModes.push('status_brief');
+                    if ($('output-stakeholder-profile') && $('output-stakeholder-profile').checked) outputModes.push('stakeholder_profile');
+                    if ($('output-gap-analysis') && $('output-gap-analysis').checked) outputModes.push('gap_analysis');
+                    if ($('output-options-brief') && $('output-options-brief').checked) outputModes.push('options_brief');
+
+                    // Data formats
+                    if ($('output-table') && $('output-table').checked) outputModes.push('smart_table');
 
                     const payload = {
                         intent: intentText,

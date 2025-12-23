@@ -7037,7 +7037,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let engineSearchTerm = '';
         let expandedCategories = new Set();  // Track which categories are expanded
         let recentEngines = JSON.parse(localStorage.getItem('recentEngines') || '[]');  // Last 5 used
-        let selectedOutputMode = null;  // Track selected output mode card
+        let selectedOutputModes = [];  // Track selected output mode cards (multi-select)
         let quickStartHidden = false;
         let libraryItems = [];
         let currentLightboxIndex = 0;
@@ -8250,24 +8250,24 @@ HTML_PAGE = '''<!DOCTYPE html>
             var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
             var textModes = compatibleModes.filter(function(m) { return !m.mode_key.startsWith('gemini_'); });
 
-            // Update count - show selected engine count
+            // Update count - show selected format count
             var countEl = $('output-mode-count');
             if (countEl) {
-                countEl.textContent = selectedEngines.length > 0 ?
-                    '(' + selectedEngines.length + ' engine' + (selectedEngines.length > 1 ? 's' : '') + ')' : '';
+                countEl.textContent = selectedOutputModes.length > 0 ?
+                    '(' + selectedOutputModes.length + ' format' + (selectedOutputModes.length > 1 ? 's' : '') + ')' : '';
             }
 
             // Auto-select default: Visual (gemini_image) for new UI
-            if (!selectedOutputMode) {
+            if (selectedOutputModes.length === 0) {
                 var defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'gemini_image'; });
                 if (!defaultMode) defaultMode = compatibleModes.find(function(m) { return m.mode_key === 'structured_text_report'; });
                 if (!defaultMode) defaultMode = compatibleModes[0];
-                selectedOutputMode = defaultMode ? defaultMode.mode_key : null;
+                if (defaultMode) selectedOutputModes.push(defaultMode.mode_key);
             }
 
-            // Sync to hidden dropdown
-            if (dropdown && selectedOutputMode) {
-                dropdown.value = selectedOutputMode;
+            // Sync first selected to hidden dropdown (for backwards compatibility)
+            if (dropdown && selectedOutputModes.length > 0) {
+                dropdown.value = selectedOutputModes[0];
             }
 
             var html = '';
@@ -8276,7 +8276,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             textModes.forEach(function(m) {
                 var icon = outputModeIcons[m.mode_key] || '📄';
                 var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key);
-                var isSelected = selectedOutputMode === m.mode_key;
+                var isSelected = selectedOutputModes.includes(m.mode_key);
                 html += '<div class="output-mode-card ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
                 html += '<div class="mode-icon">' + icon + '</div>';
                 html += '<div class="mode-name">' + name + '</div>';
@@ -8287,7 +8287,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             visualModes.forEach(function(m) {
                 var icon = outputModeIcons[m.mode_key] || '🖼️';
                 var name = outputModeNames[m.mode_key] || formatEngineName(m.mode_key.replace('gemini_', ''));
-                var isSelected = selectedOutputMode === m.mode_key;
+                var isSelected = selectedOutputModes.includes(m.mode_key);
                 html += '<div class="output-mode-card visual ' + (isSelected ? 'selected' : '') + '" onclick="selectOutputMode(\\'' + m.mode_key + '\\')">';
                 html += '<div class="mode-icon">' + icon + '</div>';
                 html += '<div class="mode-name">' + name + '</div>';
@@ -8298,11 +8298,20 @@ HTML_PAGE = '''<!DOCTYPE html>
             container.innerHTML = html || '<div style="padding:0.5rem; color:var(--text-muted);">No output modes available</div>';
         }
 
-        // Select output mode card
+        // Toggle output mode card selection (multi-select)
         function selectOutputMode(modeKey) {
-            selectedOutputMode = modeKey;
+            var index = selectedOutputModes.indexOf(modeKey);
+            if (index >= 0) {
+                // Remove if already selected (but keep at least one)
+                if (selectedOutputModes.length > 1) {
+                    selectedOutputModes.splice(index, 1);
+                }
+            } else {
+                // Add to selection
+                selectedOutputModes.push(modeKey);
+            }
             var dropdown = $('output-mode');
-            if (dropdown) dropdown.value = modeKey;
+            if (dropdown && selectedOutputModes.length > 0) dropdown.value = selectedOutputModes[0];
             renderOutputModeCards();
             updateAnalyzeButton();
         }
@@ -8638,22 +8647,25 @@ HTML_PAGE = '''<!DOCTYPE html>
             renderOutputModeCards();
         }
 
-        // Toggle Engine selection (multi-select)
+        // Toggle Engine selection (multi-select with multi-output-format support)
         function selectEngine(key) {
             selectedBundle = null;
             selectedPipeline = null;
 
-            // Check if engine is already selected
-            var existingIndex = selectedEngines.findIndex(function(e) { return e.engine_key === key; });
+            // Check if engine is already selected (any output mode)
+            var existingEntries = selectedEngines.filter(function(e) { return e.engine_key === key; });
 
-            if (existingIndex >= 0) {
-                // Remove if already selected
-                selectedEngines.splice(existingIndex, 1);
+            if (existingEntries.length > 0) {
+                // Remove ALL entries for this engine
+                selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== key; });
             } else {
-                // Add with default output mode (Visual)
-                selectedEngines.push({
-                    engine_key: key,
-                    output_mode: selectedOutputMode || 'gemini_image'
+                // Add one entry per selected output mode
+                var modesToAdd = selectedOutputModes.length > 0 ? selectedOutputModes : ['gemini_image'];
+                modesToAdd.forEach(function(mode) {
+                    selectedEngines.push({
+                        engine_key: key,
+                        output_mode: mode
+                    });
                 });
             }
 
@@ -8678,18 +8690,17 @@ HTML_PAGE = '''<!DOCTYPE html>
             updateAnalyzeButton();
         }
 
-        // Update output mode for a specific selected engine
-        function updateEngineOutputMode(engineKey, newMode) {
-            var engine = selectedEngines.find(function(e) { return e.engine_key === engineKey; });
-            if (engine) {
-                engine.output_mode = newMode;
+        // Update output mode for a specific selected engine (by index)
+        function updateEngineOutputMode(index, newMode) {
+            if (selectedEngines[index]) {
+                selectedEngines[index].output_mode = newMode;
             }
             renderSelectedEnginesPanel();
         }
 
-        // Remove engine from selection
-        function removeSelectedEngine(engineKey) {
-            selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== engineKey; });
+        // Remove engine from selection (by index)
+        function removeSelectedEngine(index) {
+            selectedEngines.splice(index, 1);
             // Re-render views
             if (engineViewMode === 'category') {
                 renderEnginesByCategory();
@@ -8752,8 +8763,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                 { key: 'executive_memo', label: '📋 Memo', short: '📋' }
             ];
 
+            // Count unique engines
+            var uniqueEngineKeys = [...new Set(selectedEngines.map(e => e.engine_key))];
+            var uniqueCount = uniqueEngineKeys.length;
+            var totalJobs = selectedEngines.length;
+
             var html = '<div class="selected-engines-header">';
-            html += '<span class="selected-count">' + selectedEngines.length + ' Engine' + (selectedEngines.length > 1 ? 's' : '') + ' Selected</span>';
+            if (totalJobs > uniqueCount) {
+                html += '<span class="selected-count">' + totalJobs + ' Job' + (totalJobs > 1 ? 's' : '') + ' (' + uniqueCount + ' engine' + (uniqueCount > 1 ? 's' : '') + ')</span>';
+            } else {
+                html += '<span class="selected-count">' + uniqueCount + ' Engine' + (uniqueCount > 1 ? 's' : '') + ' Selected</span>';
+            }
             html += '<div class="selected-engines-actions">';
             html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'gemini_image\\')">All Visual</button>';
             html += '<button class="btn-small" onclick="setAllEnginesOutputMode(\\'structured_text_report\\')">All Text</button>';
@@ -8762,7 +8782,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             html += '<div class="selected-engines-list">';
 
-            selectedEngines.forEach(function(sel) {
+            selectedEngines.forEach(function(sel, index) {
                 var engineInfo = engines.find(function(e) { return e.engine_key === sel.engine_key; });
                 var displayName = engineInfo ? (engineInfo.engine_name || formatEngineName(sel.engine_key)) : formatEngineName(sel.engine_key);
                 var category = engineInfo ? engineInfo.category : 'other';
@@ -8773,12 +8793,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                 html += '<div class="selected-engine-chip">';
                 html += '<span class="engine-category-dot" style="background:' + badgeColor + '"></span>';
                 html += '<span class="engine-name">' + displayName + '</span>';
-                html += '<select class="mode-select" onchange="updateEngineOutputMode(\\'' + sel.engine_key + '\\', this.value)">';
+                html += '<select class="mode-select" onchange="updateEngineOutputMode(' + index + ', this.value)">';
                 modeOptions.forEach(function(opt) {
                     html += '<option value="' + opt.key + '"' + (sel.output_mode === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
                 });
                 html += '</select>';
-                html += '<button class="remove-btn" onclick="removeSelectedEngine(\\'' + sel.engine_key + '\\')">×</button>';
+                html += '<button class="remove-btn" onclick="removeSelectedEngine(' + index + ')">×</button>';
                 html += '</div>';
             });
 
@@ -8976,9 +8996,17 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (engineMode === 'intent') {
                     btn.textContent = '🎯 Analyze with Intent (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
                 } else if (engineMode === 'engine') {
-                    // Show engine count in button
-                    var engineCount = selectedEngines.length;
-                    btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                    // Show engine count in button, accounting for multiple output formats
+                    var uniqueEngines = [...new Set(selectedEngines.map(e => e.engine_key))];
+                    var engineCount = uniqueEngines.length;
+                    var formatCount = selectedOutputModes.length;
+                    var jobCount = selectedEngines.length;
+
+                    if (formatCount > 1) {
+                        btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' × ' + formatCount + ' Formats (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                    } else {
+                        btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                    }
                 } else {
                     btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
                 }
@@ -9236,8 +9264,6 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Run Analysis
         async function runAnalysis() {
-            const outputMode = $('output-mode').value;
-
             $('analyze-btn').disabled = true;
             $('analyze-btn').textContent = 'Preparing...';
             $('progress-section').classList.add('show');
@@ -9274,8 +9300,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     // Track engines for recent engines list
                     selectedEngines.forEach(function(e) { trackEngineUsage(e.engine_key); });
 
+                    // Check if we have duplicate engine keys (same engine with multiple output modes)
+                    var uniqueEngineKeys = [...new Set(selectedEngines.map(e => e.engine_key))];
+                    var hasDuplicateEngines = uniqueEngineKeys.length < selectedEngines.length;
+
                     if (selectedEngines.length === 1) {
-                        // Single engine - use existing endpoint
+                        // Single engine, single output mode - use existing endpoint
                         const payload = {
                             engine: selectedEngines[0].engine_key,
                             output_mode: selectedEngines[0].output_mode,
@@ -9294,8 +9324,52 @@ HTML_PAGE = '''<!DOCTYPE html>
                             headers: getApiHeaders(),
                             body: JSON.stringify(payload)
                         });
+                    } else if (hasDuplicateEngines) {
+                        // Same engine with multiple output modes - make parallel single-engine calls
+                        var parallelPromises = selectedEngines.map(function(engineEntry) {
+                            const payload = {
+                                engine: engineEntry.engine_key,
+                                output_mode: engineEntry.output_mode,
+                                collection_mode: collectionMode,
+                                collection_name: currentCollectionName
+                            };
+
+                            if (docData.type === 'paths') {
+                                payload.file_paths = docData.file_paths;
+                            } else {
+                                payload.documents = docData.documents;
+                            }
+
+                            return fetch('/api/analyzer/analyze', {
+                                method: 'POST',
+                                headers: getApiHeaders(),
+                                body: JSON.stringify(payload)
+                            });
+                        });
+
+                        // Wait for all parallel requests
+                        var parallelResponses = await Promise.all(parallelPromises);
+
+                        // Collect all job IDs from the responses
+                        var allJobIds = [];
+                        for (var resp of parallelResponses) {
+                            if (resp.ok) {
+                                var respData = await resp.json();
+                                if (respData.job_ids) {
+                                    allJobIds = allJobIds.concat(respData.job_ids);
+                                } else if (respData.job_id) {
+                                    allJobIds.push(respData.job_id);
+                                }
+                            }
+                        }
+
+                        // Create a synthetic response with combined job IDs
+                        response = {
+                            ok: true,
+                            json: async function() { return { job_ids: allJobIds }; }
+                        };
                     } else {
-                        // Multiple engines - use multi endpoint
+                        // Multiple different engines - use multi endpoint
                         var multiOutputModes = {};
                         selectedEngines.forEach(function(e) {
                             multiOutputModes[e.engine_key] = e.output_mode;
@@ -9321,29 +9395,78 @@ HTML_PAGE = '''<!DOCTYPE html>
                         });
                     }
                 } else if (engineMode === 'bundle') {
-                    var outputModes = {};
                     var bundle = bundles.find(function(b) { return b.bundle_key === selectedBundle; });
-                    if (bundle) {
-                        bundle.member_engines.forEach(function(e) { outputModes[e] = outputMode; });
-                    }
+                    var modesToUse = selectedOutputModes.length > 0 ? selectedOutputModes : ['gemini_image'];
 
-                    const payload = {
-                        bundle: selectedBundle,
-                        output_modes: outputModes,
-                        collection_name: currentCollectionName
-                    };
+                    if (modesToUse.length === 1) {
+                        // Single output mode - use existing bundle endpoint
+                        var outputModes = {};
+                        if (bundle) {
+                            bundle.member_engines.forEach(function(e) { outputModes[e] = modesToUse[0]; });
+                        }
 
-                    if (docData.type === 'paths') {
-                        payload.file_paths = docData.file_paths;
+                        const payload = {
+                            bundle: selectedBundle,
+                            output_modes: outputModes,
+                            collection_name: currentCollectionName
+                        };
+
+                        if (docData.type === 'paths') {
+                            payload.file_paths = docData.file_paths;
+                        } else {
+                            payload.documents = docData.documents;
+                        }
+
+                        response = await fetch('/api/analyzer/analyze/bundle', {
+                            method: 'POST',
+                            headers: getApiHeaders(),
+                            body: JSON.stringify(payload)
+                        });
                     } else {
-                        payload.documents = docData.documents;
-                    }
+                        // Multiple output modes - make parallel bundle API calls
+                        var bundlePromises = modesToUse.map(function(mode) {
+                            var outputModes = {};
+                            if (bundle) {
+                                bundle.member_engines.forEach(function(e) { outputModes[e] = mode; });
+                            }
 
-                    response = await fetch('/api/analyzer/analyze/bundle', {
-                        method: 'POST',
-                        headers: getApiHeaders(),
-                        body: JSON.stringify(payload)
-                    });
+                            const payload = {
+                                bundle: selectedBundle,
+                                output_modes: outputModes,
+                                collection_name: currentCollectionName
+                            };
+
+                            if (docData.type === 'paths') {
+                                payload.file_paths = docData.file_paths;
+                            } else {
+                                payload.documents = docData.documents;
+                            }
+
+                            return fetch('/api/analyzer/analyze/bundle', {
+                                method: 'POST',
+                                headers: getApiHeaders(),
+                                body: JSON.stringify(payload)
+                            });
+                        });
+
+                        var bundleResponses = await Promise.all(bundlePromises);
+                        var allJobIds = [];
+                        for (var resp of bundleResponses) {
+                            if (resp.ok) {
+                                var respData = await resp.json();
+                                if (respData.job_ids) {
+                                    allJobIds = allJobIds.concat(respData.job_ids);
+                                } else if (respData.job_id) {
+                                    allJobIds.push(respData.job_id);
+                                }
+                            }
+                        }
+
+                        response = {
+                            ok: true,
+                            json: async function() { return { job_ids: allJobIds }; }
+                        };
+                    }
                 } else if (engineMode === 'intent') {
                     // Intent-Based Analysis
                     const intentText = $('intent-input').value.trim();
@@ -9372,25 +9495,70 @@ HTML_PAGE = '''<!DOCTYPE html>
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    // Pipeline mode
-                    const payload = {
-                        pipeline: selectedPipeline,
-                        output_mode: outputMode,
-                        include_intermediate_outputs: true,
-                        collection_name: currentCollectionName
-                    };
+                    // Pipeline mode - use first selected output mode
+                    var pipelineMode = selectedOutputModes.length > 0 ? selectedOutputModes[0] : 'gemini_image';
 
-                    if (docData.type === 'paths') {
-                        payload.file_paths = docData.file_paths;
+                    if (selectedOutputModes.length === 1) {
+                        // Single output mode
+                        const payload = {
+                            pipeline: selectedPipeline,
+                            output_mode: pipelineMode,
+                            include_intermediate_outputs: true,
+                            collection_name: currentCollectionName
+                        };
+
+                        if (docData.type === 'paths') {
+                            payload.file_paths = docData.file_paths;
+                        } else {
+                            payload.documents = docData.documents;
+                        }
+
+                        response = await fetch('/api/analyzer/analyze/pipeline', {
+                            method: 'POST',
+                            headers: getApiHeaders(),
+                            body: JSON.stringify(payload)
+                        });
                     } else {
-                        payload.documents = docData.documents;
-                    }
+                        // Multiple output modes - make parallel pipeline API calls
+                        var pipelinePromises = selectedOutputModes.map(function(mode) {
+                            const payload = {
+                                pipeline: selectedPipeline,
+                                output_mode: mode,
+                                include_intermediate_outputs: true,
+                                collection_name: currentCollectionName
+                            };
 
-                    response = await fetch('/api/analyzer/analyze/pipeline', {
-                        method: 'POST',
-                        headers: getApiHeaders(),
-                        body: JSON.stringify(payload)
-                    });
+                            if (docData.type === 'paths') {
+                                payload.file_paths = docData.file_paths;
+                            } else {
+                                payload.documents = docData.documents;
+                            }
+
+                            return fetch('/api/analyzer/analyze/pipeline', {
+                                method: 'POST',
+                                headers: getApiHeaders(),
+                                body: JSON.stringify(payload)
+                            });
+                        });
+
+                        var pipelineResponses = await Promise.all(pipelinePromises);
+                        var allJobIds = [];
+                        for (var resp of pipelineResponses) {
+                            if (resp.ok) {
+                                var respData = await resp.json();
+                                if (respData.job_ids) {
+                                    allJobIds = allJobIds.concat(respData.job_ids);
+                                } else if (respData.job_id) {
+                                    allJobIds.push(respData.job_id);
+                                }
+                            }
+                        }
+
+                        response = {
+                            ok: true,
+                            json: async function() { return { job_ids: allJobIds, success: true }; }
+                        };
+                    }
                 }
 
                 const data = await response.json();

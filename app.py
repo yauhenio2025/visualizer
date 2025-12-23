@@ -8018,6 +8018,22 @@ HTML_PAGE = '''<!DOCTYPE html>
                 const outputModesRes = await fetch('/api/analyzer/output-modes');
                 if (outputModesRes.ok) {
                     outputModes = await outputModesRes.json();
+
+                    // Inject our 8 analysis report types (local feature, not from API)
+                    // These are differentiated textual outputs that complement visual outputs
+                    var analysisReportModes = [
+                        { mode_key: 'snapshot', name: 'Snapshot', description: '1-page executive summary for immediate situational awareness' },
+                        { mode_key: 'deep_dive', name: 'Deep Dive', description: 'Comprehensive synthesis with calibrated confidence levels' },
+                        { mode_key: 'evidence_pack', name: 'Evidence Pack', description: 'Complete source documentation for verification and audit' },
+                        { mode_key: 'signal_report', name: 'Signal Report', description: 'Alert to emerging patterns requiring attention' },
+                        { mode_key: 'status_brief', name: 'Status Brief', description: 'Comprehensive update on current situation' },
+                        { mode_key: 'stakeholder_profile', name: 'Stakeholder Profile', description: 'Deep understanding of key actors for engagement' },
+                        { mode_key: 'gap_analysis', name: 'Gap Analysis', description: 'Systematic identification of weaknesses' },
+                        { mode_key: 'options_brief', name: 'Options Brief', description: 'Decision support with clear trade-offs' }
+                    ];
+                    // Prepend analysis reports so they appear first
+                    outputModes = analysisReportModes.concat(outputModes);
+
                     renderOutputModes();
                 }
             } catch (e) {

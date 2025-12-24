@@ -687,6 +687,128 @@ def get_ai_recommendations(
 
 
 @mcp.tool()
+def recommend_engines_for_folder(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents to analyze")],
+    intent: Annotated[Optional[str], Field(description="Optional: What you want to understand (e.g., 'map stakeholders', 'trace evolution')")] = None,
+    file_types: Annotated[str, Field(description="Comma-separated extensions (default: 'pdf,txt,md')")] = "pdf,txt,md",
+    max_sample_docs: Annotated[int, Field(description="Maximum documents to sample for recommendations (default: 5)")] = 5,
+    max_recommendations: Annotated[int, Field(description="Maximum engine recommendations to return (default: 5)")] = 5,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key")] = None
+) -> str:
+    """
+    Get AI-powered engine recommendations for a folder of documents.
+
+    This is the FIRST STEP before batch analysis. It:
+    1. Samples documents from the folder
+    2. Optionally considers your analysis intent
+    3. Returns engine recommendations with rationale
+
+    WORKFLOW:
+    1. Call this tool first to get recommendations
+    2. Review the suggested engines
+    3. Call submit_batch_analysis() with your chosen engine_keys
+
+    Returns: JSON with recommended engines and next steps.
+    """
+    logger.info(f"Recommending engines for folder: {folder_path}")
+
+    # Scan folder for documents
+    scan_result = _scan_folder_impl(folder_path, file_types)
+    if scan_result.get("files_found", 0) == 0:
+        return json.dumps({
+            "error": f"No documents found in {folder_path} with extensions {file_types}",
+            "suggestion": "Check the folder path and file extensions"
+        }, indent=2)
+
+    files = scan_result.get("files", [])
+    total_docs = len(files)
+
+    # Sample documents for analysis
+    sample_files = files[:max_sample_docs]
+    sample_texts = []
+    sampled_titles = []
+
+    for file_info in sample_files:
+        doc = read_document(file_info["path"])
+        if doc and "error" not in doc:
+            # Get extracted text or content, limit per doc
+            text = doc.get("extracted_text", doc.get("content", ""))[:500]
+            sample_texts.append(f"[{doc['title']}]\n{text}")
+            sampled_titles.append(doc["title"])
+
+    if not sample_texts:
+        return json.dumps({
+            "error": "Could not read any documents from folder",
+            "files_found": total_docs
+        }, indent=2)
+
+    # Combine samples
+    combined_sample = "\n\n---\n\n".join(sample_texts)
+
+    # Build llm_keys
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+    headers = build_llm_headers(llm_keys)
+
+    # Build request data
+    request_data = {
+        "sample_text": combined_sample,
+        "max_recommendations": max_recommendations,
+        "llm_keys": llm_keys
+    }
+
+    # Add intent if provided (this guides the recommendations)
+    if intent:
+        request_data["analysis_goal"] = intent
+
+    # Call curator endpoint
+    result = api_request(
+        VISUALIZER_API_URL,
+        'POST',
+        '/api/analyzer/curator/recommend',
+        data=request_data,
+        headers=headers,
+        timeout=120
+    )
+
+    if "error" in result:
+        return json.dumps({"error": result["error"], "details": result.get("details", "")})
+
+    # Extract engine keys for easy copy-paste
+    recommended_engine_keys = [
+        rec.get("engine_key") for rec in result.get("primary_recommendations", [])
+        if rec.get("engine_key")
+    ]
+
+    # Format response with clear next steps
+    output = {
+        "folder": folder_path,
+        "total_documents": total_docs,
+        "documents_sampled": len(sample_texts),
+        "sampled_titles": sampled_titles,
+        "intent": intent,
+
+        # Main recommendations
+        "recommended_engines": result.get("primary_recommendations", []),
+        "bundle_recommendations": result.get("bundle_recommendations", []),
+        "pipeline_recommendations": result.get("pipeline_recommendations", []),
+
+        # Document characteristics from AI
+        "document_characteristics": result.get("document_characteristics", {}),
+        "analysis_strategy": result.get("analysis_strategy", ""),
+
+        # CLEAR NEXT STEPS
+        "engine_keys_for_batch": recommended_engine_keys,
+        "next_step": f"Call submit_batch_analysis(folder_path='{folder_path}', engine_keys={recommended_engine_keys})",
+
+        "note": "Review the recommendations above. You can use all suggested engines or pick specific ones for submit_batch_analysis()."
+    }
+
+    logger.info(f"Recommended {len(recommended_engine_keys)} engines for {total_docs} documents")
+    return json.dumps(output, indent=2)
+
+
+@mcp.tool()
 def list_available_engines(
     category: Annotated[Optional[str], Field(description="Filter by category (optional)")] = None
 ) -> str:
@@ -1262,6 +1384,11 @@ def submit_batch_analysis(
 ) -> str:
     """
     Submit an entire folder of documents for batch analysis.
+
+    RECOMMENDED WORKFLOW:
+    1. First call recommend_engines_for_folder() to get AI-powered engine suggestions
+    2. Review the recommendations
+    3. Then call this tool with your chosen engine_keys
 
     Each document will be analyzed with ALL selected engines, generating N × M jobs
     (N documents × M engines).

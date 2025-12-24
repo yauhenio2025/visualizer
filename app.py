@@ -7925,7 +7925,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Primary recommendation
             if (data.primary_recommendation) {
                 var primary = data.primary_recommendation;
-                recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\'' + primary.format_key + '\', \'' + primary.category + '\')">' +
+                recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\\'' + primary.format_key + '\\', \\'' + primary.category + '\\')">' +
                     '<div class="curator-rec-header">' +
                         '<span class="curator-rec-badge primary">Primary</span>' +
                         '<span class="curator-rec-name">' + (primary.name || primary.format_key) + '</span>' +
@@ -7948,7 +7948,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Secondary recommendations
             if (data.secondary_recommendations && data.secondary_recommendations.length > 0) {
                 data.secondary_recommendations.forEach(function(rec) {
-                    recsHtml += '<div class="curator-rec secondary" onclick="selectRecommendedFormat(\'' + rec.format_key + '\', \'' + rec.category + '\')">' +
+                    recsHtml += '<div class="curator-rec secondary" onclick="selectRecommendedFormat(\\'' + rec.format_key + '\\', \\'' + rec.category + '\\')">' +
                         '<div class="curator-rec-header">' +
                             '<span class="curator-rec-badge secondary">Alt</span>' +
                             '<span class="curator-rec-name">' + (rec.name || rec.format_key) + '</span>' +

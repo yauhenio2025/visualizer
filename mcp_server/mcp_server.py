@@ -1528,6 +1528,131 @@ def submit_batch_analysis(
     return json.dumps(output, indent=2)
 
 
+@mcp.tool()
+def analyze_collection(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents")],
+    engine_keys: Annotated[List[str], Field(description="List of engine keys to run (from recommend_engines_for_folder)")],
+    output_mode: Annotated[str, Field(description="Output mode: 'visual' for 4K images, 'textual' for reports")] = "visual",
+    file_types: Annotated[str, Field(description="Comma-separated extensions to process (default: 'pdf,txt,md')")] = "pdf,txt,md",
+    max_documents: Annotated[int, Field(description="Maximum number of documents to process (default: 20)")] = 20,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key (required for visual mode)")] = None
+) -> str:
+    """
+    Analyze a folder of documents AS A COLLECTION (not individually).
+
+    This tool reads all documents in the folder, then sends them together to the
+    analysis API with collection_mode="collection". The engine extracts from each
+    document and synthesizes across ALL documents to produce unified outputs.
+
+    WORKFLOW:
+    1. Call recommend_engines_for_folder() to get engine recommendations
+    2. Call this tool with your chosen engine_keys
+    3. Results auto-download when complete
+
+    Returns: One job per engine (not per document). Each job synthesizes the entire collection.
+    """
+    logger.info(f"Collection analysis: {folder_path} with {len(engine_keys)} engines")
+
+    # Scan the folder
+    scan_result = _scan_folder_impl(folder_path, file_types)
+    if "error" in scan_result:
+        return json.dumps(scan_result)
+
+    files = scan_result.get("files", [])
+    if not files:
+        return json.dumps({"error": f"No matching files found in {folder_path}"})
+
+    # Limit number of documents
+    if len(files) > max_documents:
+        logger.warning(f"Limiting to {max_documents} documents (found {len(files)})")
+        files = files[:max_documents]
+
+    # Read ALL documents into a single list
+    all_documents = []
+    read_errors = []
+    for file_info in files:
+        doc = read_document(file_info["path"])
+        if doc and "error" not in doc:
+            all_documents.append({
+                "id": doc["id"],
+                "title": doc["title"],
+                "content": doc["content"],
+                "encoding": doc["encoding"]
+            })
+        else:
+            read_errors.append(file_info["name"])
+
+    if not all_documents:
+        return json.dumps({"error": "No documents could be read", "failed_files": read_errors})
+
+    # Build llm_keys
+    llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
+
+    # Determine API output mode
+    api_output_mode = "gemini_image" if output_mode == "visual" else "executive_memo"
+
+    # Submit ONE job per engine with ALL documents (collection mode)
+    jobs = []
+    errors = []
+    for engine_key in engine_keys:
+        try:
+            result = api_request(
+                VISUALIZER_API_URL,
+                'POST',
+                '/api/analyzer/analyze',
+                data={
+                    "documents": all_documents,  # ALL docs together
+                    "engine": engine_key,
+                    "output_mode": api_output_mode,
+                    "collection_mode": "collection",  # KEY: process as collection
+                    "llm_keys": llm_keys
+                },
+                timeout=120
+            )
+
+            if "error" in result:
+                errors.append(f"{engine_key}: {result['error']}")
+            elif result.get("job_id"):
+                jobs.append({
+                    "engine": engine_key,
+                    "job_id": result["job_id"]
+                })
+            else:
+                errors.append(f"{engine_key}: No job ID returned")
+
+        except Exception as e:
+            errors.append(f"{engine_key}: {str(e)}")
+
+    # Spawn background poller for auto-download
+    job_ids = [j["job_id"] for j in jobs]
+    if job_ids:
+        spawn_job_poller(job_ids)
+
+    # Send notification
+    send_notification(
+        "📊 Collection Analysis Started",
+        f"Analyzing {len(all_documents)} documents as collection with {len(jobs)} engine(s)",
+        "visualizer,collection,started",
+        sound=False
+    )
+
+    output = {
+        "status": "submitted",
+        "folder": folder_path,
+        "documents_in_collection": len(all_documents),
+        "engines": len(engine_keys),
+        "jobs": jobs,
+        "errors": errors if errors else None,
+        "read_errors": read_errors if read_errors else None,
+        "message": f"Submitted {len(jobs)} collection analysis job(s) for {len(all_documents)} documents. Results will auto-download when complete.",
+        "auto_monitor": True if job_ids else False
+    }
+
+    logger.info(f"Collection analysis submitted: {len(jobs)} jobs for {len(all_documents)} documents")
+    return json.dumps(output, indent=2)
+
+
 # =============================================================================
 # PIPELINE ANALYSIS TOOLS
 # =============================================================================

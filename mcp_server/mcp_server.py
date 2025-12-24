@@ -183,6 +183,10 @@ def get_llm_keys(anthropic_api_key: Optional[str] = None, gemini_api_key: Option
 def build_llm_headers(llm_keys: Dict[str, str]) -> Dict[str, str]:
     """Build HTTP headers from llm_keys dict."""
     headers = {}
+    # Add analyzer API key for authentication
+    analyzer_api_key = os.environ.get('ANALYZER_API_KEY', 'dev-key-12345')
+    headers['X-API-Key'] = analyzer_api_key
+    # Add LLM keys for forwarding
     if llm_keys.get('anthropic_api_key'):
         headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
     if llm_keys.get('gemini_api_key'):

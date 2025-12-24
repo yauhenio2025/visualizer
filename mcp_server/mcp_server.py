@@ -1191,27 +1191,17 @@ def list_pipelines() -> str:
 # BATCH ANALYSIS TOOLS
 # =============================================================================
 
-@mcp.tool()
-def scan_folder(
-    folder_path: Annotated[str, Field(description="Path to folder containing documents to analyze")],
-    file_types: Annotated[str, Field(description="Comma-separated file extensions to include (default: 'pdf,txt,md')")] = "pdf,txt,md"
-) -> str:
-    """
-    Scan a folder and list all documents available for batch analysis.
-
-    Use this to preview what files would be processed before submitting a batch.
-
-    Returns: JSON with list of files found, sizes, and types.
-    """
+def _scan_folder_impl(folder_path: str, file_types: str = "pdf,txt,md") -> dict:
+    """Internal helper function for scanning folders. Not an MCP tool."""
     logger.info(f"Scanning folder: {folder_path}")
 
     path = Path(folder_path).expanduser().resolve()
 
     if not path.exists():
-        return json.dumps({"error": f"Folder not found: {folder_path}"})
+        return {"error": f"Folder not found: {folder_path}"}
 
     if not path.is_dir():
-        return json.dumps({"error": f"Not a directory: {folder_path}"})
+        return {"error": f"Not a directory: {folder_path}"}
 
     # Parse file types
     extensions = {f".{ext.strip().lower().lstrip('.')}" for ext in file_types.split(",")}
@@ -1234,7 +1224,7 @@ def scan_folder(
     # Sort by name
     files.sort(key=lambda x: x["name"])
 
-    output = {
+    return {
         "folder": str(path),
         "file_types_searched": list(extensions),
         "files_found": len(files),
@@ -1243,7 +1233,21 @@ def scan_folder(
         "files": files
     }
 
-    return json.dumps(output, indent=2)
+
+@mcp.tool()
+def scan_folder(
+    folder_path: Annotated[str, Field(description="Path to folder containing documents to analyze")],
+    file_types: Annotated[str, Field(description="Comma-separated file extensions to include (default: 'pdf,txt,md')")] = "pdf,txt,md"
+) -> str:
+    """
+    Scan a folder and list all documents available for batch analysis.
+
+    Use this to preview what files would be processed before submitting a batch.
+
+    Returns: JSON with list of files found, sizes, and types.
+    """
+    result = _scan_folder_impl(folder_path, file_types)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -1266,8 +1270,8 @@ def submit_batch_analysis(
     """
     logger.info(f"Batch analysis: {folder_path} with {len(engine_keys)} engines")
 
-    # First scan the folder
-    scan_result = json.loads(scan_folder(folder_path, file_types))
+    # First scan the folder (use internal helper, not the MCP tool)
+    scan_result = _scan_folder_impl(folder_path, file_types)
     if "error" in scan_result:
         return json.dumps(scan_result)
 
@@ -1581,34 +1585,17 @@ def classify_intent(
         }, indent=2)
 
 
-@mcp.tool()
-def analyze_collection_with_intent(
-    document_paths: Annotated[List[str], Field(description="List of document paths to analyze")],
-    intent: Annotated[str, Field(description="What you want to understand (e.g., 'Map the key players')")],
-    output_modes: Annotated[Optional[List[str]], Field(description="Output formats: ['gemini_image', 'smart_table', 'text']. Default: all three.")] = None,
-    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
-    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key for visual output")] = None
+def _analyze_collection_with_intent_impl(
+    document_paths: List[str],
+    intent: str,
+    output_modes: Optional[List[str]] = None,
+    anthropic_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> str:
     """
-    Analyze a collection of documents based on what you want to understand.
+    Internal helper function for intent-based collection analysis.
 
-    Instead of selecting engines, describe your intent:
-    - "Map the key players and their relationships"
-    - "Trace how this concept evolved over time"
-    - "Compare approaches across different jurisdictions"
-    - "Find gaps in the current research"
-    - "Track the money flows"
-    - "Evaluate the strength of the arguments"
-    - "Synthesize the main themes"
-
-    The AI will:
-    1. Sample the collection to detect what analyses it supports
-    2. Classify your intent into verb+noun taxonomy
-    3. Select the best engine for your intent
-    4. Extract from each document, synthesize across collection
-    5. Generate outputs in multiple formats (image, table, text)
-
-    Returns: Job ID for tracking. Results auto-download when complete.
+    Not an MCP tool - can be called directly from other functions.
     """
     # Default output modes
     if output_modes is None:
@@ -1748,6 +1735,45 @@ def analyze_collection_with_intent(
 
 
 @mcp.tool()
+def analyze_collection_with_intent(
+    document_paths: Annotated[List[str], Field(description="List of document paths to analyze")],
+    intent: Annotated[str, Field(description="What you want to understand (e.g., 'Map the key players')")],
+    output_modes: Annotated[Optional[List[str]], Field(description="Output formats: ['gemini_image', 'smart_table', 'text']. Default: all three.")] = None,
+    anthropic_api_key: Annotated[Optional[str], Field(description="Anthropic API key")] = None,
+    gemini_api_key: Annotated[Optional[str], Field(description="Gemini API key for visual output")] = None
+) -> str:
+    """
+    Analyze a collection of documents based on what you want to understand.
+
+    Instead of selecting engines, describe your intent:
+    - "Map the key players and their relationships"
+    - "Trace how this concept evolved over time"
+    - "Compare approaches across different jurisdictions"
+    - "Find gaps in the current research"
+    - "Track the money flows"
+    - "Evaluate the strength of the arguments"
+    - "Synthesize the main themes"
+
+    The AI will:
+    1. Sample the collection to detect what analyses it supports
+    2. Classify your intent into verb+noun taxonomy
+    3. Select the best engine for your intent
+    4. Extract from each document, synthesize across collection
+    5. Generate outputs in multiple formats (image, table, text)
+
+    Returns: Job ID for tracking. Results auto-download when complete.
+    """
+    # Call the internal helper function
+    return _analyze_collection_with_intent_impl(
+        document_paths=document_paths,
+        intent=intent,
+        output_modes=output_modes,
+        anthropic_api_key=anthropic_api_key,
+        gemini_api_key=gemini_api_key,
+    )
+
+
+@mcp.tool()
 def analyze_folder_with_intent(
     folder_path: Annotated[str, Field(description="Path to folder containing documents")],
     intent: Annotated[str, Field(description="What you want to understand")],
@@ -1783,8 +1809,8 @@ def analyze_folder_with_intent(
             "error": f"No documents found in {folder_path} with extensions {file_types}",
         }, indent=2)
 
-    # Call the main intent analysis function
-    return analyze_collection_with_intent(
+    # Call the internal helper directly (not the MCP tool)
+    return _analyze_collection_with_intent_impl(
         document_paths=[str(p) for p in document_paths],
         intent=intent,
         output_modes=output_modes,

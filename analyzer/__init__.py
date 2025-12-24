@@ -6,6 +6,7 @@ This module provides:
 - Textual output renderer using Claude API
 - Engine-to-output affinity mapping
 - Complementarity analysis for visual-text pairing
+- Output Curator agent (Opus 4.5 with extended thinking)
 """
 
 from .renderer import (
@@ -27,6 +28,14 @@ from .prompts.textual_output_templates import (
     format_template,
 )
 
+from .output_curator import (
+    OutputCurator,
+    CuratorOutput,
+    FormatRecommendation,
+    OutputCategory,
+    curate_output,
+)
+
 __all__ = [
     # Renderer
     "TextualOutputRenderer",
@@ -43,4 +52,10 @@ __all__ = [
     "get_output_metadata",
     "get_recommended_outputs",
     "format_template",
+    # Output Curator
+    "OutputCurator",
+    "CuratorOutput",
+    "FormatRecommendation",
+    "OutputCategory",
+    "curate_output",
 ]

@@ -1378,6 +1378,96 @@ def get_output_recommendations_for_engine(engine_key):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/curate-output', methods=['POST'])
+def curate_output_endpoint():
+    """
+    Use the Output Curator (Opus 4.5 with extended thinking) to recommend
+    optimal output formats based on extracted data.
+
+    Request body:
+    {
+        "engine_key": "stakeholder_power_interest",
+        "extracted_data": {...},
+        "audience": "analyst|executive|researcher",
+        "context": "Optional additional context",
+        "thinking_budget": 16000
+    }
+
+    Returns:
+        Curator recommendations with rationale and Gemini prompts
+    """
+    try:
+        data = request.get_json()
+        engine_key = data.get('engine_key')
+        extracted_data = data.get('extracted_data', {})
+        audience = data.get('audience', 'analyst')
+        context = data.get('context')
+        thinking_budget = data.get('thinking_budget', 16000)
+        llm_keys = data.get('llm_keys', {})
+
+        if not engine_key:
+            return jsonify({"error": "engine_key required"}), 400
+
+        if not extracted_data:
+            return jsonify({"error": "extracted_data required"}), 400
+
+        # Get API key from request or environment
+        api_key = llm_keys.get('anthropic') or os.environ.get('ANTHROPIC_API_KEY')
+
+        if not api_key:
+            return jsonify({"error": "Anthropic API key required for Output Curator"}), 400
+
+        from analyzer.output_curator import OutputCurator
+        from dataclasses import asdict
+
+        curator = OutputCurator(api_key=api_key, thinking_budget=thinking_budget)
+        result = curator.curate(
+            engine_key=engine_key,
+            extracted_data=extracted_data,
+            audience=audience,
+            context=context,
+        )
+
+        # Convert to JSON-serializable dict
+        output = {
+            "data_structure_analysis": result.data_structure_analysis,
+            "primary_recommendation": {
+                "format_key": result.primary_recommendation.format_key,
+                "category": result.primary_recommendation.category,
+                "name": result.primary_recommendation.name,
+                "confidence": result.primary_recommendation.confidence,
+                "rationale": result.primary_recommendation.rationale,
+                "gemini_prompt": result.primary_recommendation.gemini_prompt,
+                "data_mapping": result.primary_recommendation.data_mapping,
+            },
+            "secondary_recommendations": [
+                {
+                    "format_key": rec.format_key,
+                    "category": rec.category,
+                    "name": rec.name,
+                    "confidence": rec.confidence,
+                    "rationale": rec.rationale,
+                    "gemini_prompt": rec.gemini_prompt,
+                    "data_mapping": rec.data_mapping,
+                }
+                for rec in result.secondary_recommendations
+            ],
+            "audience_considerations": result.audience_considerations,
+            "thinking_summary": result.thinking_summary,
+        }
+
+        # Optionally include raw thinking (can be large)
+        if data.get('include_thinking', False) and result.raw_thinking:
+            output["raw_thinking"] = result.raw_thinking
+
+        return jsonify(output)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analyzer/render-textual', methods=['POST'])
 def render_textual_output_endpoint():
     """

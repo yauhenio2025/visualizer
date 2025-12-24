@@ -1756,7 +1756,7 @@ def _analyze_collection_with_intent_impl(
     documents = []
     for path in document_paths:
         doc = read_document(path)
-        if doc:
+        if doc and "error" not in doc:
             documents.append(doc)
 
     if not documents:

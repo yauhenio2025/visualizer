@@ -180,6 +180,16 @@ def get_llm_keys(anthropic_api_key: Optional[str] = None, gemini_api_key: Option
     return llm_keys
 
 
+def build_llm_headers(llm_keys: Dict[str, str]) -> Dict[str, str]:
+    """Build HTTP headers from llm_keys dict."""
+    headers = {}
+    if llm_keys.get('anthropic_api_key'):
+        headers['X-Anthropic-Api-Key'] = llm_keys['anthropic_api_key']
+    if llm_keys.get('gemini_api_key'):
+        headers['X-Gemini-Api-Key'] = llm_keys['gemini_api_key']
+    return headers
+
+
 def api_request(
     base_url: str,
     method: str,
@@ -746,7 +756,7 @@ def recommend_engines_for_folder(
     # Combine samples
     combined_sample = "\n\n---\n\n".join(sample_texts)
 
-    # Build llm_keys
+    # Build llm_keys and headers
     llm_keys = get_llm_keys(anthropic_api_key, gemini_api_key)
     headers = build_llm_headers(llm_keys)
 

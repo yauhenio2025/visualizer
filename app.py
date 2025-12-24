@@ -4233,6 +4233,305 @@ HTML_PAGE = '''<!DOCTYPE html>
             border-bottom: 1px solid var(--border);
         }
 
+        /* ============================================================
+           OUTPUT CURATOR PANEL - AI recommendations
+           ============================================================ */
+        .curator-panel {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .curator-panel.loading {
+            opacity: 0.7;
+        }
+
+        .curator-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .curator-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .curator-title .opus-badge {
+            font-size: 0.55rem;
+            padding: 0.1rem 0.3rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 3px;
+        }
+
+        .curator-loading {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .curator-analysis {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            padding: 0.4rem;
+            background: var(--bg-input);
+            border-radius: 3px;
+            line-height: 1.4;
+        }
+
+        .curator-recommendations {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .curator-rec {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .curator-rec:hover {
+            border-color: var(--accent-muted);
+        }
+
+        .curator-rec.primary {
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        .curator-rec.selected {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .curator-rec-badge {
+            font-size: 0.55rem;
+            font-weight: 600;
+            padding: 0.15rem 0.3rem;
+            border-radius: 2px;
+            white-space: nowrap;
+        }
+
+        .curator-rec.primary .curator-rec-badge {
+            background: var(--accent);
+            color: white;
+        }
+
+        .curator-rec.secondary .curator-rec-badge {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        .curator-rec.selected .curator-rec-badge {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .curator-rec-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .curator-rec-name {
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .curator-rec-confidence {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+        }
+
+        .curator-rec.selected .curator-rec-confidence {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .curator-rec-rationale {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-top: 0.2rem;
+            line-height: 1.3;
+        }
+
+        .curator-rec.selected .curator-rec-rationale {
+            color: rgba(255,255,255,0.85);
+        }
+
+        .curator-thinking {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            padding-top: 0.4rem;
+            border-top: 1px solid var(--border);
+            font-style: italic;
+        }
+
+        .curator-thinking-toggle {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* Audience selector */
+        .audience-selector {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .audience-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.65rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .audience-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .audience-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* Curator sections */
+        .curator-section {
+            margin-bottom: 0.5rem;
+        }
+
+        .curator-section-title {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .curator-section-content {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            padding: 0.4rem;
+            background: var(--bg-input);
+            border-radius: 3px;
+        }
+
+        .curator-error {
+            color: var(--color-error, #ef4444);
+            font-size: 0.7rem;
+            padding: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 3px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .curator-rec-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            width: 100%;
+        }
+
+        .curator-rec-category {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 0.15rem;
+        }
+
+        .curator-rec-badge.primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .curator-rec-badge.secondary {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        /* Curator thinking (collapsible) */
+        .curator-thinking-details {
+            margin-top: 0.5rem;
+        }
+
+        .curator-thinking-summary {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.3rem 0;
+        }
+
+        .curator-thinking-summary:hover {
+            color: var(--accent);
+        }
+
+        .curator-thinking-content {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            background: var(--bg-input);
+            border-radius: 3px;
+            margin-top: 0.3rem;
+            line-height: 1.4;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Gemini prompt preview */
+        .gemini-prompt-preview {
+            font-size: 0.6rem;
+            background: #1a1a2e;
+            color: #a0a0c0;
+            padding: 0.4rem;
+            border-radius: 3px;
+            margin-top: 0.3rem;
+            max-height: 80px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .gemini-prompt-label {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            margin-bottom: 0.2rem;
+            display: block;
+        }
+
+        .gemini-prompt-preview code {
+            display: block;
+        }
+
+        .curator-rec.selected .gemini-prompt-preview {
+            background: rgba(0,0,0,0.3);
+            color: rgba(255,255,255,0.8);
+        }
 
         /* View mode toggle for category vs flat */
         .view-mode-toggle {
@@ -7283,7 +7582,30 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <!-- Output Mode (hidden for intent mode) -->
                         <div class="output-select" id="output-mode-section">
                             <span class="section-label">Output Format <span id="output-mode-count" style="color: #666; font-size: 11px;"></span></span>
-                            <!-- Visual output mode cards -->
+
+                            <!-- Audience Selector -->
+                            <div class="audience-selector" id="audience-selector">
+                                <span style="font-size: 0.65rem; color: var(--text-muted); margin-right: 0.3rem;">Audience:</span>
+                                <button class="audience-btn active" data-audience="analyst" onclick="setAudience('analyst')">Analyst</button>
+                                <button class="audience-btn" data-audience="executive" onclick="setAudience('executive')">Executive</button>
+                                <button class="audience-btn" data-audience="researcher" onclick="setAudience('researcher')">Researcher</button>
+                            </div>
+
+                            <!-- Output Curator Panel (AI recommendations) -->
+                            <div id="curator-panel" class="curator-panel" style="display:none;">
+                                <div class="curator-header">
+                                    <div class="curator-title">
+                                        🧠 Output Curator
+                                        <span class="opus-badge">Opus 4.5</span>
+                                    </div>
+                                    <span id="curator-status" class="curator-loading"></span>
+                                </div>
+                                <div id="curator-analysis" class="curator-analysis"></div>
+                                <div id="curator-recommendations" class="curator-recommendations"></div>
+                                <div id="curator-thinking" class="curator-thinking"></div>
+                            </div>
+
+                            <!-- Visual output mode cards (manual selection fallback) -->
                             <div id="output-mode-cards" class="output-mode-cards"></div>
                             <!-- Fallback dropdown (hidden, used for submission) -->
                             <select id="output-mode" style="display:none;">
@@ -7458,6 +7780,232 @@ HTML_PAGE = '''<!DOCTYPE html>
         let quickStartHidden = false;
         let libraryItems = [];
         let currentLightboxIndex = 0;
+
+        // Output Curator state
+        let currentAudience = 'analyst';  // analyst, executive, researcher
+        let curatorCache = {};  // Cache curator responses by engine_key + audience
+        let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
+
+        // ==================== OUTPUT CURATOR FUNCTIONS ====================
+
+        // Set audience and update UI
+        function setAudience(audience) {
+            currentAudience = audience;
+
+            // Update button states
+            document.querySelectorAll('.audience-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.audience === audience);
+            });
+
+            // Re-call curator if we have selected engines
+            if (selectedEngines.length > 0) {
+                // Use the first selected engine for curator
+                var firstEngine = selectedEngines[0].engine_key;
+                callOutputCurator(firstEngine);
+            }
+        }
+
+        // Call the Output Curator API
+        async function callOutputCurator(engineKey, extractedData) {
+            var panel = document.getElementById('curator-panel');
+            var status = document.getElementById('curator-status');
+            var analysisDiv = document.getElementById('curator-analysis');
+            var recsDiv = document.getElementById('curator-recommendations');
+            var thinkingDiv = document.getElementById('curator-thinking');
+
+            // Show panel and loading state
+            panel.style.display = 'block';
+            panel.classList.add('loading');
+            status.textContent = 'Analyzing with Opus 4.5...';
+            analysisDiv.innerHTML = '';
+            recsDiv.innerHTML = '';
+            thinkingDiv.innerHTML = '';
+
+            // Check cache first
+            var cacheKey = engineKey + '_' + currentAudience;
+            if (curatorCache[cacheKey]) {
+                renderCuratorRecommendations(curatorCache[cacheKey]);
+                panel.classList.remove('loading');
+                status.textContent = '(cached)';
+                return curatorCache[cacheKey];
+            }
+
+            // If no extracted data, create mock data based on engine type
+            if (!extractedData) {
+                extractedData = generateMockExtractedData(engineKey);
+            }
+
+            try {
+                var keys = getStoredKeys();
+
+                var response = await fetch('/api/analyzer/curate-output', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        engine_key: engineKey,
+                        extracted_data: extractedData,
+                        audience: currentAudience,
+                        thinking_budget: 16000,
+                        llm_keys: { anthropic: keys.anthropic }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Curator API error: ' + response.status);
+                }
+
+                var data = await response.json();
+
+                // Cache the result
+                curatorCache[cacheKey] = data;
+
+                // Store Gemini prompt if available
+                if (data.primary_recommendation && data.primary_recommendation.gemini_prompt) {
+                    curatorGeminiPrompts[engineKey] = data.primary_recommendation.gemini_prompt;
+                }
+
+                // Render recommendations
+                renderCuratorRecommendations(data);
+                panel.classList.remove('loading');
+                status.textContent = '';
+
+                return data;
+
+            } catch (error) {
+                console.error('Curator error:', error);
+                panel.classList.remove('loading');
+                status.textContent = 'Error';
+                analysisDiv.innerHTML = '<div class="curator-error">Failed to get recommendations: ' + error.message + '</div>';
+                return null;
+            }
+        }
+
+        // Generate mock extracted data for demo/testing
+        function generateMockExtractedData(engineKey) {
+            // Engine type patterns
+            var patterns = {
+                power: { nodes: ['Actor A', 'Actor B', 'Actor C'], edges: [{from: 'A', to: 'B', weight: 0.8}], power_scores: [0.9, 0.6, 0.3] },
+                temporal: { events: [{date: '2024-01', event: 'Start'}, {date: '2024-06', event: 'Midpoint'}], timeline: [] },
+                argument: { claims: ['Main thesis', 'Sub-claim 1'], premises: ['Evidence 1', 'Evidence 2'], logical_structure: {} },
+                flow: { sources: ['A', 'B'], targets: ['C', 'D'], values: [100, 50, 30, 20] },
+                comparison: { items: ['Option A', 'Option B', 'Option C'], scores: [0.9, 0.7, 0.5], dimensions: ['Cost', 'Speed', 'Quality'] }
+            };
+
+            // Determine pattern based on engine key
+            if (engineKey.includes('power') || engineKey.includes('stakeholder') || engineKey.includes('actor')) {
+                return patterns.power;
+            } else if (engineKey.includes('temporal') || engineKey.includes('timeline') || engineKey.includes('evolution')) {
+                return patterns.temporal;
+            } else if (engineKey.includes('argument') || engineKey.includes('dialectical') || engineKey.includes('hypothesis')) {
+                return patterns.argument;
+            } else if (engineKey.includes('flow') || engineKey.includes('resource') || engineKey.includes('sankey')) {
+                return patterns.flow;
+            } else {
+                return patterns.comparison;
+            }
+        }
+
+        // Render curator recommendations in the UI
+        function renderCuratorRecommendations(data) {
+            var analysisDiv = document.getElementById('curator-analysis');
+            var recsDiv = document.getElementById('curator-recommendations');
+            var thinkingDiv = document.getElementById('curator-thinking');
+
+            // Data structure analysis
+            if (data.data_structure_analysis) {
+                analysisDiv.innerHTML = '<div class="curator-section">' +
+                    '<div class="curator-section-title">📊 Data Structure</div>' +
+                    '<div class="curator-section-content">' + data.data_structure_analysis + '</div>' +
+                '</div>';
+            }
+
+            // Recommendations
+            var recsHtml = '<div class="curator-section"><div class="curator-section-title">✨ Recommended Formats</div>';
+
+            // Primary recommendation
+            if (data.primary_recommendation) {
+                var primary = data.primary_recommendation;
+                recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\'' + primary.format_key + '\', \'' + primary.category + '\')">' +
+                    '<div class="curator-rec-header">' +
+                        '<span class="curator-rec-badge primary">Primary</span>' +
+                        '<span class="curator-rec-name">' + (primary.name || primary.format_key) + '</span>' +
+                        '<span class="curator-rec-confidence">' + Math.round((primary.confidence || 0.8) * 100) + '%</span>' +
+                    '</div>' +
+                    '<div class="curator-rec-category">' + primary.category + '</div>' +
+                    '<div class="curator-rec-rationale">' + primary.rationale + '</div>';
+
+                // Show Gemini prompt preview if visual
+                if (primary.category === 'visual' && primary.gemini_prompt) {
+                    recsHtml += '<div class="gemini-prompt-preview">' +
+                        '<span class="gemini-prompt-label">Gemini Prompt:</span>' +
+                        '<code>' + primary.gemini_prompt.substring(0, 150) + '...</code>' +
+                    '</div>';
+                }
+
+                recsHtml += '</div>';
+            }
+
+            // Secondary recommendations
+            if (data.secondary_recommendations && data.secondary_recommendations.length > 0) {
+                data.secondary_recommendations.forEach(function(rec) {
+                    recsHtml += '<div class="curator-rec secondary" onclick="selectRecommendedFormat(\'' + rec.format_key + '\', \'' + rec.category + '\')">' +
+                        '<div class="curator-rec-header">' +
+                            '<span class="curator-rec-badge secondary">Alt</span>' +
+                            '<span class="curator-rec-name">' + (rec.name || rec.format_key) + '</span>' +
+                            '<span class="curator-rec-confidence">' + Math.round((rec.confidence || 0.5) * 100) + '%</span>' +
+                        '</div>' +
+                        '<div class="curator-rec-category">' + rec.category + '</div>' +
+                        '<div class="curator-rec-rationale">' + rec.rationale + '</div>' +
+                    '</div>';
+                });
+            }
+
+            recsHtml += '</div>';
+            recsDiv.innerHTML = recsHtml;
+
+            // Audience considerations
+            if (data.audience_considerations) {
+                recsHtml = '<div class="curator-section">' +
+                    '<div class="curator-section-title">👥 Audience Considerations</div>' +
+                    '<div class="curator-section-content">' + data.audience_considerations + '</div>' +
+                '</div>';
+                recsDiv.innerHTML += recsHtml;
+            }
+
+            // Thinking summary (collapsed by default)
+            if (data.thinking_summary) {
+                thinkingDiv.innerHTML = '<details class="curator-thinking-details">' +
+                    '<summary class="curator-thinking-summary">🧠 Reasoning Process</summary>' +
+                    '<div class="curator-thinking-content">' + data.thinking_summary + '</div>' +
+                '</details>';
+            }
+        }
+
+        // Select a recommended format (clicked from curator panel)
+        function selectRecommendedFormat(formatKey, category) {
+            // Map curator format_key to our output modes
+            var modeKey = formatKey;
+
+            // Find and toggle the output mode
+            var modeCards = document.querySelectorAll('.output-format-chip');
+            modeCards.forEach(function(card) {
+                if (card.dataset.key === modeKey) {
+                    // Toggle selection
+                    if (selectedOutputModes.includes(modeKey)) {
+                        selectedOutputModes = selectedOutputModes.filter(function(m) { return m !== modeKey; });
+                    } else {
+                        selectedOutputModes.push(modeKey);
+                    }
+                    renderOutputModes();
+
+                    // Update selected engines to use this format
+                    selectedEngines.forEach(function(eng) {
+                        eng.output_mode = modeKey;
+                    });
+                    renderSelectedEnginesPanel();
+                }
+            });
+        }
 
         // Lightbox functions
         function openLightbox(index) {
@@ -9167,12 +9715,21 @@ HTML_PAGE = '''<!DOCTYPE html>
             if (existingEntries.length > 0) {
                 // Remove ALL entries for this engine
                 selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== key; });
+
+                // Hide curator panel if no engines selected
+                if (selectedEngines.length === 0) {
+                    var curatorPanel = document.getElementById('curator-panel');
+                    if (curatorPanel) curatorPanel.style.display = 'none';
+                }
             } else {
                 // Fetch recommendations for this engine (async, but don't block)
                 fetchOutputRecommendations(key).then(function(recs) {
                     // Update the panel once recommendations are loaded
                     renderSelectedEnginesPanel();
                 });
+
+                // 🧠 Trigger Output Curator (Opus 4.5) for intelligent format recommendations
+                callOutputCurator(key);
 
                 // Add one entry per selected output mode
                 // If no modes selected, use the recommended output or gemini_image

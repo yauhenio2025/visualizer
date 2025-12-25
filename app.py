@@ -1656,6 +1656,7 @@ def submit_analysis():
     output_mode = data.get('output_mode', 'structured_text_report')
     collection_mode = data.get('collection_mode', 'single')
     llm_keys = data.get('llm_keys')  # Forward user-provided API keys
+    format_key = data.get('format_key')  # Curator-recommended visualization format (e.g., 'matrix_heatmap')
 
     if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
@@ -1737,6 +1738,9 @@ def submit_analysis():
                     "engine": engine,
                     "output_mode": output_mode
                 }
+                # Add format_key if provided (curator-recommended visualization format)
+                if format_key:
+                    payload["format_key"] = format_key
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
                     headers=get_analyzer_headers(llm_keys),
@@ -1772,6 +1776,9 @@ def submit_analysis():
                 "engine": engine,
                 "output_mode": output_mode
             }
+            # Add format_key if provided (curator-recommended visualization format)
+            if format_key:
+                payload["format_key"] = format_key
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
                 headers=get_analyzer_headers(llm_keys),
@@ -7783,6 +7790,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Output Curator state
         let currentAudience = 'analyst';  // analyst, executive, researcher
+        let curatorFormatKey = null;  // Curator-recommended visualization format (e.g., 'matrix_heatmap')
         let curatorCache = {};  // Cache curator responses by engine_key + audience
         let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
 
@@ -7925,6 +7933,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Primary recommendation
             if (data.primary_recommendation) {
                 var primary = data.primary_recommendation;
+                // Auto-set the format_key from primary recommendation
+                curatorFormatKey = primary.format_key;
+                console.log('[Curator] Auto-selected format_key from primary:', primary.format_key);
                 recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\\'' + primary.format_key + '\\', \\'' + primary.category + '\\')">' +
                     '<div class="curator-rec-header">' +
                         '<span class="curator-rec-badge primary">Primary</span>' +
@@ -7983,6 +7994,10 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Select a recommended format (clicked from curator panel)
         function selectRecommendedFormat(formatKey, category) {
+            // Store the curator's format recommendation for submission
+            curatorFormatKey = formatKey;
+            console.log('[Curator] Selected format_key:', formatKey);
+
             // Map curator format_key to our output modes
             var modeKey = formatKey;
 
@@ -10466,6 +10481,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                             collection_name: currentCollectionName
                         };
 
+                        // Add curator's format_key if available (for visualization format control)
+                        if (curatorFormatKey) {
+                            payload.format_key = curatorFormatKey;
+                            console.log('[Submit] Including curator format_key:', curatorFormatKey);
+                        }
+
                         if (docData.type === 'paths') {
                             payload.file_paths = docData.file_paths;
                         } else {
@@ -10486,6 +10507,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 collection_mode: collectionMode,
                                 collection_name: currentCollectionName
                             };
+
+                            // Add curator's format_key if available
+                            if (curatorFormatKey) {
+                                payload.format_key = curatorFormatKey;
+                            }
 
                             if (docData.type === 'paths') {
                                 payload.file_paths = docData.file_paths;
@@ -10534,6 +10560,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                             collection_mode: collectionMode,
                             collection_name: currentCollectionName
                         };
+
+                        // Add curator's format_key if available
+                        if (curatorFormatKey) {
+                            payload.format_key = curatorFormatKey;
+                        }
 
                         if (docData.type === 'paths') {
                             payload.file_paths = docData.file_paths;

@@ -7901,6 +7901,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let curatorFormatKeys = {};  // Map of engine_key -> format_key (e.g., {'stakeholder_power_interest': 'quadrant_chart'})
         let curatorCache = {};  // Cache curator responses by engine_key + audience
         let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
+        let curatorLoading = false;  // Track if curator is in progress (to prevent race condition)
 
         // ==================== OUTPUT CURATOR FUNCTIONS ====================
 
@@ -7942,8 +7943,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                 renderCuratorRecommendations(curatorCache[cacheKey]);
                 panel.classList.remove('loading');
                 status.textContent = '(cached)';
+                // Restore format_key from cached data
+                if (curatorCache[cacheKey].primary_recommendation) {
+                    curatorFormatKeys[engineKey] = curatorCache[cacheKey].primary_recommendation.format_key;
+                }
                 return curatorCache[cacheKey];
             }
+
+            // Track that curator is loading (to prevent race condition with submission)
+            curatorLoading = true;
+            updateAnalyzeButton();
 
             // If no extracted data, create mock data based on engine type
             if (!extractedData) {
@@ -7988,6 +7997,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = '';
 
+                // Curator finished loading - update button
+                curatorLoading = false;
+                updateAnalyzeButton();
+
                 return data;
 
             } catch (error) {
@@ -7995,6 +8008,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = 'Error';
                 analysisDiv.innerHTML = '<div class="curator-error">Failed to get recommendations: ' + error.message + '</div>';
+
+                // Curator failed but we're no longer loading - still allow submission
+                curatorLoading = false;
+                updateAnalyzeButton();
+
                 return null;
             }
         }
@@ -8021,6 +8039,10 @@ HTML_PAGE = '''<!DOCTYPE html>
             status.textContent = 'Analyzing ' + engineKeys.length + ' engines with Opus 4.5...';
             analysisDiv.innerHTML = '';
             recsDiv.innerHTML = '';
+
+            // Track that curator is loading (to prevent race condition with submission)
+            curatorLoading = true;
+            updateAnalyzeButton();
 
             try {
                 var keys = getStoredKeys();
@@ -8062,6 +8084,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = '';
 
+                // Curator finished loading - update button
+                curatorLoading = false;
+                updateAnalyzeButton();
+
                 return data;
 
             } catch (error) {
@@ -8069,6 +8095,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = 'Error';
                 analysisDiv.innerHTML = '<div class="curator-error">Failed to get batch recommendations: ' + error.message + '</div>';
+
+                // Curator failed but we're no longer loading - still allow submission
+                curatorLoading = false;
+                updateAnalyzeButton();
+
                 return null;
             }
         }
@@ -10393,10 +10424,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                     var formatCount = selectedOutputModes.length;
                     var jobCount = selectedEngines.length;
 
-                    if (formatCount > 1) {
+                    // Check if curator is still loading - show status in button
+                    if (curatorLoading) {
+                        btn.textContent = '⏳ Optimizing formats... (Analyze now with defaults)';
+                        btn.title = 'AI curator is finding optimal visualization formats. Click now to use defaults, or wait for optimized formats.';
+                    } else if (formatCount > 1) {
                         btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' × ' + formatCount + ' Formats (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                        btn.title = '';
                     } else {
                         btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
+                        btn.title = '';
                     }
                 } else {
                     btn.textContent = 'Analyze ' + selectedDocs.size + ' Document' + (selectedDocs.size > 1 ? 's' : '');
@@ -10789,6 +10826,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         if (Object.keys(curatorFormatKeys).length > 0) {
                             payload.format_keys = curatorFormatKeys;
                             console.log('[Submit] Including per-engine format_keys:', curatorFormatKeys);
+                        } else {
+                            console.warn('[Submit] No format_keys available! Curator may still be loading or failed. Using defaults.');
                         }
 
                         if (docData.type === 'paths') {

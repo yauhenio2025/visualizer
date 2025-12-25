@@ -1731,6 +1731,11 @@ def submit_analysis():
     llm_keys = data.get('llm_keys')  # Forward user-provided API keys
     format_key = data.get('format_key')  # Curator-recommended visualization format (e.g., 'matrix_heatmap')
 
+    # Log the incoming request parameters for debugging
+    print(f"[SUBMIT] Engine: {engine}, Output mode: {output_mode}, Collection mode: {collection_mode}")
+    print(f"[SUBMIT] format_key from request: {format_key or 'NOT PROVIDED'}")
+    print(f"[SUBMIT] Files: {len(file_paths)} paths, {len(inline_documents)} inline docs")
+
     if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
 
@@ -1814,6 +1819,10 @@ def submit_analysis():
                 # Add format_key if provided (curator-recommended visualization format)
                 if format_key:
                     payload["format_key"] = format_key
+
+                # Log what we're sending to the analyzer
+                print(f"[SUBMIT-INDIVIDUAL] Sending job for doc={doc['title']}, engine={engine}, format_key={format_key or 'NOT SET'}")
+
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
                     headers=get_analyzer_headers(llm_keys),
@@ -1852,6 +1861,10 @@ def submit_analysis():
             # Add format_key if provided (curator-recommended visualization format)
             if format_key:
                 payload["format_key"] = format_key
+
+            # Log what we're sending to the analyzer
+            print(f"[SUBMIT] Sending job for engine={engine}, format_key={format_key or 'NOT SET'}")
+
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
                 headers=get_analyzer_headers(llm_keys),
@@ -1917,6 +1930,11 @@ def submit_bundle_analysis():
 
     if not bundle:
         return jsonify({"success": False, "error": "No bundle selected"})
+
+    # Log the incoming request parameters for debugging
+    print(f"[SUBMIT-BUNDLE] Bundle: {bundle}")
+    print(f"[SUBMIT-BUNDLE] Output modes: {output_modes}")
+    print(f"[SUBMIT-BUNDLE] Files: {len(file_paths)} paths, {len(inline_documents)} inline docs")
 
     documents = []
     errors = []
@@ -2029,6 +2047,13 @@ def submit_multi_engine_analysis():
     collection_name = data.get('collection_name')
     llm_keys = data.get('llm_keys')
 
+    # Log the incoming request parameters for debugging
+    print(f"[SUBMIT-MULTI] Engines: {engine_list}")
+    print(f"[SUBMIT-MULTI] Output modes: {output_modes}")
+    print(f"[SUBMIT-MULTI] format_keys from request: {format_keys or 'NOT PROVIDED'}")
+    print(f"[SUBMIT-MULTI] Collection mode: {collection_mode}, name: {collection_name}")
+    print(f"[SUBMIT-MULTI] Files: {len(file_paths)} paths, {len(inline_documents)} inline docs")
+
     if not file_paths and not inline_documents:
         return jsonify({"success": False, "error": "No files provided"})
 
@@ -2105,6 +2130,9 @@ def submit_multi_engine_analysis():
             # Add format_key if provided for this engine
             if engine_format_key:
                 payload["format_key"] = engine_format_key
+
+            # Log what we're sending to the analyzer
+            print(f"[SUBMIT-MULTI] Sending job for engine={engine_key}, format_key={engine_format_key or 'NOT SET'}")
 
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",

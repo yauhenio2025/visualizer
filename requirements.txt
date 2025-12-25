@@ -14,6 +14,9 @@ pymupdf>=1.23.0
 # Gemini API (for image generation)
 google-genai>=1.0.0
 
+# Anthropic API (for Output Curator)
+anthropic>=0.40.0
+
 # Environment
 python-dotenv>=1.0.0
 

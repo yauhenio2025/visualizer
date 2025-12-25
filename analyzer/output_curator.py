@@ -452,6 +452,204 @@ Think deeply about the data structure and what visualization would best reveal i
                 )
         return results
 
+    def curate_batch_by_engines(
+        self,
+        engine_keys: list[str],
+        audience: str = "analyst",
+        context: Optional[str] = None,
+        sample_data: Optional[dict[str, Any]] = None,
+    ) -> dict[str, FormatRecommendation]:
+        """
+        Recommend visualization formats for multiple engines in ONE API call.
+
+        Unlike curate() which needs extracted data, this method recommends formats
+        based on engine knowledge - what kind of output each engine typically produces.
+
+        Args:
+            engine_keys: List of engine keys to get recommendations for
+            audience: Target audience (analyst, executive, researcher)
+            context: Optional context about the analysis
+            sample_data: Optional sample data to help inform recommendations
+
+        Returns:
+            Dict mapping engine_key -> FormatRecommendation (primary only)
+        """
+        if not engine_keys:
+            return {}
+
+        logger.info(f"Batch curating formats for {len(engine_keys)} engines: {engine_keys}")
+
+        # Build the batch prompt
+        prompt = self._build_batch_prompt(engine_keys, audience, context, sample_data)
+
+        # Call Opus 4.5 with extended thinking (streaming required)
+        thinking_content = ""
+        response_content = ""
+
+        max_tokens = self.thinking_budget + 8000
+
+        with self.client.messages.stream(
+            model=self.model,
+            max_tokens=max_tokens,
+            thinking={
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget
+            },
+            messages=[{"role": "user", "content": prompt}]
+        ) as stream:
+            for event in stream:
+                if event.type == "content_block_delta":
+                    if hasattr(event.delta, "thinking"):
+                        thinking_content += event.delta.thinking
+                    elif hasattr(event.delta, "text"):
+                        response_content += event.delta.text
+
+        logger.info(f"Batch curator thinking: {len(thinking_content)} chars")
+        logger.info(f"Batch curator response: {len(response_content)} chars")
+
+        # Parse the batch response
+        return self._parse_batch_response(response_content, engine_keys)
+
+    def _build_batch_prompt(
+        self,
+        engine_keys: list[str],
+        audience: str,
+        context: Optional[str],
+        sample_data: Optional[dict[str, Any]],
+    ) -> str:
+        """Build prompt for batch format recommendation."""
+
+        engines_list = "\n".join([f"- {key}" for key in engine_keys])
+
+        sample_str = ""
+        if sample_data:
+            sample_str = f"\nSample data from documents:\n```json\n{json.dumps(sample_data, indent=2, default=str)[:3000]}\n```\n"
+
+        prompt = f"""You are the Output Curator, an expert in information visualization.
+
+Your task: Recommend the BEST visualization format for EACH of these analysis engines.
+
+## KNOWLEDGE BASE
+
+{VISUAL_FORMAT_KNOWLEDGE}
+
+## ENGINES TO RECOMMEND FOR
+
+{engines_list}
+
+## TARGET AUDIENCE: {audience}
+{f"Context: {context}" if context else ""}
+{sample_str}
+
+## ENGINE OUTPUT PATTERNS
+
+Based on your knowledge, these engines typically produce:
+
+- stakeholder_power_interest → 2D positioning data (power vs interest scores per actor)
+- resource_flow_asymmetry → flow data (source → target with values)
+- event_timeline_causal → temporal data (events with dates and causal links)
+- argument_architecture → logical structure (claims, premises, evidence)
+- thematic_synthesis → categorical data (themes with supporting quotes)
+- opportunity_vulnerability_matrix → comparative data (options × criteria scores)
+- competitive_landscape → positioning data (players × dimensions)
+- concept_evolution → temporal data (concept changes over time)
+- dialectical_structure → thesis-antithesis-synthesis patterns
+- citation_network → relational data (nodes and citation edges)
+- intellectual_genealogy → hierarchical/temporal lineage
+- metaphor_analogy_network → relational data (source-target mappings)
+
+## YOUR TASK
+
+For EACH engine listed above, recommend the SINGLE BEST visualization format.
+
+Consider:
+1. What data structure does this engine typically output?
+2. What visualization best reveals insights from that structure?
+3. How does the audience preference affect the choice?
+
+## OUTPUT FORMAT
+
+Respond with a JSON object mapping each engine_key to its recommended format:
+
+```json
+{{
+  "engine_key_1": {{
+    "format_key": "quadrant_chart",
+    "name": "Power-Interest Quadrant",
+    "confidence": 0.9,
+    "rationale": "Stakeholder data naturally maps to 2D positioning..."
+  }},
+  "engine_key_2": {{
+    "format_key": "sankey",
+    "name": "Resource Flow Diagram",
+    "confidence": 0.85,
+    "rationale": "Flow data best shown as Sankey..."
+  }}
+}}
+```
+
+Recommend formats for ALL {len(engine_keys)} engines: {', '.join(engine_keys)}
+"""
+        return prompt
+
+    def _parse_batch_response(
+        self,
+        response_content: str,
+        engine_keys: list[str],
+    ) -> dict[str, FormatRecommendation]:
+        """Parse batch curator response into per-engine recommendations."""
+
+        results = {}
+
+        try:
+            # Extract JSON from response
+            if "```json" in response_content:
+                json_str = response_content.split("```json")[1].split("```")[0]
+            elif "```" in response_content:
+                json_str = response_content.split("```")[1].split("```")[0]
+            else:
+                json_str = response_content
+
+            data = json.loads(json_str.strip())
+
+            for engine_key in engine_keys:
+                if engine_key in data:
+                    rec_data = data[engine_key]
+                    results[engine_key] = FormatRecommendation(
+                        format_key=rec_data.get("format_key", "network_graph"),
+                        category="visual",  # Batch mode focuses on visual formats
+                        name=rec_data.get("name", rec_data.get("format_key", "").replace("_", " ").title()),
+                        confidence=rec_data.get("confidence", 0.7),
+                        rationale=rec_data.get("rationale", ""),
+                        gemini_prompt=rec_data.get("gemini_prompt"),
+                        data_mapping=rec_data.get("data_mapping"),
+                    )
+                else:
+                    # Engine not in response - use default
+                    results[engine_key] = FormatRecommendation(
+                        format_key="network_graph",
+                        category="visual",
+                        name="Network Graph",
+                        confidence=0.5,
+                        rationale="Default recommendation - engine not specifically analyzed",
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to parse batch response: {e}")
+            logger.error(f"Response was: {response_content[:500]}...")
+
+            # Return defaults for all engines
+            for engine_key in engine_keys:
+                results[engine_key] = FormatRecommendation(
+                    format_key="network_graph",
+                    category="visual",
+                    name="Network Graph",
+                    confidence=0.3,
+                    rationale=f"Default due to parsing error: {str(e)}",
+                )
+
+        return results
+
     def generate_gemini_prompt(
         self,
         format_key: str,

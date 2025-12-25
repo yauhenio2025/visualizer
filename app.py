@@ -1468,6 +1468,79 @@ def curate_output_endpoint():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/curate-output/batch', methods=['POST'])
+def curate_output_batch_endpoint():
+    """
+    Batch curator: Recommend visualization formats for MULTIPLE engines in ONE API call.
+
+    Request body:
+    {
+        "engine_keys": ["stakeholder_power_interest", "resource_flow_asymmetry", "event_timeline_causal"],
+        "audience": "analyst|executive|researcher",
+        "context": "Optional additional context",
+        "sample_data": {...}  // Optional sample data from documents
+    }
+
+    Returns:
+        Dict mapping each engine_key to its format recommendation:
+        {
+            "stakeholder_power_interest": {"format_key": "quadrant_chart", "confidence": 0.9, ...},
+            "resource_flow_asymmetry": {"format_key": "sankey", "confidence": 0.85, ...}
+        }
+    """
+    try:
+        data = request.get_json()
+        engine_keys = data.get('engine_keys', [])
+        audience = data.get('audience', 'analyst')
+        context = data.get('context')
+        sample_data = data.get('sample_data')
+        thinking_budget = data.get('thinking_budget', 16000)
+        llm_keys = data.get('llm_keys', {})
+
+        if not engine_keys:
+            return jsonify({"error": "engine_keys required (list of engine keys)"}), 400
+
+        # Get API key from request or environment
+        api_key = llm_keys.get('anthropic') or os.environ.get('ANTHROPIC_API_KEY')
+
+        if not api_key:
+            return jsonify({"error": "Anthropic API key required for Output Curator"}), 400
+
+        from analyzer.output_curator import OutputCurator
+
+        curator = OutputCurator(api_key=api_key, thinking_budget=thinking_budget)
+        results = curator.curate_batch_by_engines(
+            engine_keys=engine_keys,
+            audience=audience,
+            context=context,
+            sample_data=sample_data,
+        )
+
+        # Convert FormatRecommendation dataclasses to dicts
+        output = {}
+        for engine_key, rec in results.items():
+            output[engine_key] = {
+                "format_key": rec.format_key,
+                "category": rec.category,
+                "name": rec.name,
+                "confidence": rec.confidence,
+                "rationale": rec.rationale,
+                "gemini_prompt": rec.gemini_prompt,
+                "data_mapping": rec.data_mapping,
+            }
+
+        return jsonify({
+            "recommendations": output,
+            "engine_count": len(engine_keys),
+            "audience": audience,
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analyzer/render-textual', methods=['POST'])
 def render_textual_output_endpoint():
     """
@@ -1951,6 +2024,7 @@ def submit_multi_engine_analysis():
     inline_documents = data.get('documents', [])
     engine_list = data.get('engines', [])  # List of engine keys
     output_modes = data.get('output_modes', {})  # Dict: {engine_key: output_mode}
+    format_keys = data.get('format_keys', {})  # Dict: {engine_key: format_key} from curator
     collection_mode = data.get('collection_mode', 'single')
     collection_name = data.get('collection_name')
     llm_keys = data.get('llm_keys')
@@ -2018,18 +2092,24 @@ def submit_multi_engine_analysis():
 
     for engine_key in engine_list:
         engine_output_mode = output_modes.get(engine_key, 'gemini_image')
+        engine_format_key = format_keys.get(engine_key)  # Per-engine format from curator
 
         try:
+            payload = {
+                "documents": documents,
+                "engine": engine_key,
+                "output_mode": engine_output_mode,
+                "collection_mode": collection_mode,
+                "collection_name": collection_name
+            }
+            # Add format_key if provided for this engine
+            if engine_format_key:
+                payload["format_key"] = engine_format_key
+
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
                 headers=get_analyzer_headers(llm_keys),
-                json={
-                    "documents": documents,
-                    "engine": engine_key,
-                    "output_mode": engine_output_mode,
-                    "collection_mode": collection_mode,
-                    "collection_name": collection_name
-                },
+                json=payload,
                 timeout=60.0,
             )
             response.raise_for_status()
@@ -7790,7 +7870,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
         // Output Curator state
         let currentAudience = 'analyst';  // analyst, executive, researcher
-        let curatorFormatKey = null;  // Curator-recommended visualization format (e.g., 'matrix_heatmap')
+        let curatorFormatKeys = {};  // Map of engine_key -> format_key (e.g., {'stakeholder_power_interest': 'quadrant_chart'})
         let curatorCache = {};  // Cache curator responses by engine_key + audience
         let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
 
@@ -7807,9 +7887,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Re-call curator if we have selected engines
             if (selectedEngines.length > 0) {
-                // Use the first selected engine for curator
-                var firstEngine = selectedEngines[0].engine_key;
-                callOutputCurator(firstEngine);
+                var engineKeys = selectedEngines.map(function(e) { return e.engine_key; });
+                callBatchOutputCurator(engineKeys);
             }
         }
 
@@ -7867,9 +7946,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Cache the result
                 curatorCache[cacheKey] = data;
 
-                // Store Gemini prompt if available
-                if (data.primary_recommendation && data.primary_recommendation.gemini_prompt) {
-                    curatorGeminiPrompts[engineKey] = data.primary_recommendation.gemini_prompt;
+                // Store format_key and Gemini prompt in the maps
+                if (data.primary_recommendation) {
+                    curatorFormatKeys[engineKey] = data.primary_recommendation.format_key;
+                    console.log('[Curator] Stored format_key for', engineKey, ':', data.primary_recommendation.format_key);
+                    if (data.primary_recommendation.gemini_prompt) {
+                        curatorGeminiPrompts[engineKey] = data.primary_recommendation.gemini_prompt;
+                    }
                 }
 
                 // Render recommendations
@@ -7886,6 +7969,111 @@ HTML_PAGE = '''<!DOCTYPE html>
                 analysisDiv.innerHTML = '<div class="curator-error">Failed to get recommendations: ' + error.message + '</div>';
                 return null;
             }
+        }
+
+        // Call the Batch Output Curator API (for multiple engines in ONE call)
+        async function callBatchOutputCurator(engineKeys) {
+            if (!engineKeys || engineKeys.length === 0) {
+                return null;
+            }
+
+            // For single engine, use the regular curator for richer output
+            if (engineKeys.length === 1) {
+                return callOutputCurator(engineKeys[0]);
+            }
+
+            var panel = document.getElementById('curator-panel');
+            var status = document.getElementById('curator-status');
+            var analysisDiv = document.getElementById('curator-analysis');
+            var recsDiv = document.getElementById('curator-recommendations');
+
+            // Show panel and loading state
+            panel.style.display = 'block';
+            panel.classList.add('loading');
+            status.textContent = 'Analyzing ' + engineKeys.length + ' engines with Opus 4.5...';
+            analysisDiv.innerHTML = '';
+            recsDiv.innerHTML = '';
+
+            try {
+                var keys = getStoredKeys();
+
+                var response = await fetch('/api/analyzer/curate-output/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        engine_keys: engineKeys,
+                        audience: currentAudience,
+                        thinking_budget: 16000,
+                        llm_keys: { anthropic: keys.anthropic }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Batch Curator API error: ' + response.status);
+                }
+
+                var data = await response.json();
+                console.log('[Curator] Batch recommendations:', data);
+
+                // Store format_keys for each engine
+                if (data.recommendations) {
+                    curatorFormatKeys = {};
+                    for (var engineKey in data.recommendations) {
+                        var rec = data.recommendations[engineKey];
+                        curatorFormatKeys[engineKey] = rec.format_key;
+                        if (rec.gemini_prompt) {
+                            curatorGeminiPrompts[engineKey] = rec.gemini_prompt;
+                        }
+                    }
+                    console.log('[Curator] Stored format_keys:', curatorFormatKeys);
+                }
+
+                // Render batch recommendations
+                renderBatchCuratorRecommendations(data.recommendations, engineKeys);
+
+                panel.classList.remove('loading');
+                status.textContent = '';
+
+                return data;
+
+            } catch (error) {
+                console.error('Batch Curator error:', error);
+                panel.classList.remove('loading');
+                status.textContent = 'Error';
+                analysisDiv.innerHTML = '<div class="curator-error">Failed to get batch recommendations: ' + error.message + '</div>';
+                return null;
+            }
+        }
+
+        // Render batch curator recommendations (multiple engines)
+        function renderBatchCuratorRecommendations(recommendations, engineKeys) {
+            var analysisDiv = document.getElementById('curator-analysis');
+            var recsDiv = document.getElementById('curator-recommendations');
+
+            analysisDiv.innerHTML = '<div class="curator-section">' +
+                '<div class="curator-section-title">📊 Format Recommendations for ' + engineKeys.length + ' Engines</div>' +
+                '<div class="curator-section-content">Each engine will use its optimal visualization format.</div>' +
+            '</div>';
+
+            var recsHtml = '<div class="curator-section"><div class="curator-section-title">✨ Per-Engine Formats</div>';
+
+            engineKeys.forEach(function(engineKey) {
+                var rec = recommendations[engineKey];
+                if (rec) {
+                    var engineName = engineKey.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) { return l.toUpperCase(); });
+                    recsHtml += '<div class="curator-rec secondary">' +
+                        '<div class="curator-rec-header">' +
+                            '<span class="curator-rec-badge secondary">' + engineName.substring(0, 15) + '</span>' +
+                            '<span class="curator-rec-name">' + (rec.name || rec.format_key) + '</span>' +
+                            '<span class="curator-rec-confidence">' + Math.round((rec.confidence || 0.7) * 100) + '%</span>' +
+                        '</div>' +
+                        '<div class="curator-rec-rationale" style="font-size: 11px;">' + (rec.rationale || '').substring(0, 100) + '</div>' +
+                    '</div>';
+                }
+            });
+
+            recsHtml += '</div>';
+            recsDiv.innerHTML = recsHtml;
         }
 
         // Generate mock extracted data for demo/testing
@@ -7933,9 +8121,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Primary recommendation
             if (data.primary_recommendation) {
                 var primary = data.primary_recommendation;
-                // Auto-set the format_key from primary recommendation
-                curatorFormatKey = primary.format_key;
-                console.log('[Curator] Auto-selected format_key from primary:', primary.format_key);
+                // Note: format_key is stored in curatorFormatKeys map by callOutputCurator/callBatchOutputCurator
                 recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\\'' + primary.format_key + '\\', \\'' + primary.category + '\\')">' +
                     '<div class="curator-rec-header">' +
                         '<span class="curator-rec-badge primary">Primary</span>' +
@@ -7993,10 +8179,15 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Select a recommended format (clicked from curator panel)
+        // This OVERRIDES the AI recommendations for ALL selected engines
         function selectRecommendedFormat(formatKey, category) {
-            // Store the curator's format recommendation for submission
-            curatorFormatKey = formatKey;
-            console.log('[Curator] Selected format_key:', formatKey);
+            console.log('[Curator] User selected format_key:', formatKey, '- applying to all engines');
+
+            // Update format_key for ALL selected engines (user override)
+            selectedEngines.forEach(function(eng) {
+                curatorFormatKeys[eng.engine_key] = formatKey;
+            });
+            console.log('[Curator] Updated curatorFormatKeys:', curatorFormatKeys);
 
             // Map curator format_key to our output modes
             var modeKey = formatKey;
@@ -9743,9 +9934,6 @@ HTML_PAGE = '''<!DOCTYPE html>
                     renderSelectedEnginesPanel();
                 });
 
-                // 🧠 Trigger Output Curator (Opus 4.5) for intelligent format recommendations
-                callOutputCurator(key);
-
                 // Add one entry per selected output mode
                 // If no modes selected, use the recommended output or gemini_image
                 var modesToAdd = selectedOutputModes.length > 0 ? selectedOutputModes : ['gemini_image'];
@@ -9775,6 +9963,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             renderSelectedEnginesPanel();  // Update the selected engines panel
             renderOutputModes();
             updateAnalyzeButton();
+
+            // 🧠 Trigger Output Curator (Opus 4.5) for intelligent format recommendations
+            // Uses batch API when multiple engines are selected (ONE API call for all)
+            if (selectedEngines.length > 0) {
+                var allEngineKeys = [...new Set(selectedEngines.map(function(e) { return e.engine_key; }))];
+                callBatchOutputCurator(allEngineKeys);
+            }
         }
 
         // Select Bundle
@@ -10474,17 +10669,18 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     if (selectedEngines.length === 1) {
                         // Single engine, single output mode - use existing endpoint
+                        var engineKey = selectedEngines[0].engine_key;
                         const payload = {
-                            engine: selectedEngines[0].engine_key,
+                            engine: engineKey,
                             output_mode: selectedEngines[0].output_mode,
                             collection_mode: collectionMode,
                             collection_name: currentCollectionName
                         };
 
-                        // Add curator's format_key if available (for visualization format control)
-                        if (curatorFormatKey) {
-                            payload.format_key = curatorFormatKey;
-                            console.log('[Submit] Including curator format_key:', curatorFormatKey);
+                        // Add curator's format_key for this engine (from per-engine map)
+                        if (curatorFormatKeys[engineKey]) {
+                            payload.format_key = curatorFormatKeys[engineKey];
+                            console.log('[Submit] Including curator format_key for', engineKey, ':', curatorFormatKeys[engineKey]);
                         }
 
                         if (docData.type === 'paths') {
@@ -10508,9 +10704,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 collection_name: currentCollectionName
                             };
 
-                            // Add curator's format_key if available
-                            if (curatorFormatKey) {
-                                payload.format_key = curatorFormatKey;
+                            // Add curator's format_key for this engine (from per-engine map)
+                            if (curatorFormatKeys[engineEntry.engine_key]) {
+                                payload.format_key = curatorFormatKeys[engineEntry.engine_key];
                             }
 
                             if (docData.type === 'paths') {
@@ -10561,9 +10757,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             collection_name: currentCollectionName
                         };
 
-                        // Add curator's format_key if available
-                        if (curatorFormatKey) {
-                            payload.format_key = curatorFormatKey;
+                        // Add curator's format_keys map for per-engine visualization control
+                        if (Object.keys(curatorFormatKeys).length > 0) {
+                            payload.format_keys = curatorFormatKeys;
+                            console.log('[Submit] Including per-engine format_keys:', curatorFormatKeys);
                         }
 
                         if (docData.type === 'paths') {

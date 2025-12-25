@@ -205,9 +205,12 @@ class OutputCurator:
         thinking_content = ""
         response_content = ""
 
+        # max_tokens must be greater than thinking.budget_tokens
+        max_tokens = self.thinking_budget + 8000  # thinking budget + room for response
+
         with self.client.messages.stream(
             model=self.model,
-            max_tokens=16000,
+            max_tokens=max_tokens,
             thinking={
                 "type": "enabled",
                 "budget_tokens": self.thinking_budget

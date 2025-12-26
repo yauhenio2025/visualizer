@@ -7857,7 +7857,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <span class="tab-label">By Input</span>
                     </button>
                 </div>
-                <button class="btn btn-sm" onclick="loadRecentJobs()">Load Recent Jobs</button>
+                <button class="btn btn-sm" onclick="loadRecentJobs(true)">Load Recent Jobs</button>
             </div>
             <div class="library-empty" id="library-empty">
                 <div class="library-empty-icon">&#128218;</div>
@@ -12861,10 +12861,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Clear cache for fresh fetch
                 recentJobsCache.jobs = [];
 
-                // Fetch results for each completed job
+                // Fetch results for each completed job (increased limit)
                 let loaded = 0;
-                for (const job of data.jobs.slice(0, 10)) {
-                    if (btn) btn.textContent = 'Loading ' + (++loaded) + '/10...';
+                var maxJobs = Math.min(data.jobs.length, 30);  // Increased from 10 to 30
+                for (const job of data.jobs.slice(0, maxJobs)) {
+                    if (btn) btn.textContent = 'Loading ' + (++loaded) + '/' + maxJobs + '...';
                     console.log('Fetching result for job:', job.job_id);
                     try {
                         const resultRes = await fetch('/api/analyzer/jobs/' + job.job_id + '/result');

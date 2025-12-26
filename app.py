@@ -1763,10 +1763,12 @@ def submit_analysis():
     collection_mode = data.get('collection_mode', 'single')
     llm_keys = data.get('llm_keys')  # Forward user-provided API keys
     format_key = data.get('format_key')  # Curator-recommended visualization format (e.g., 'matrix_heatmap')
+    gemini_prompt = data.get('gemini_prompt')  # Curator's styled Gemini prompt (contains style instructions)
 
     # Log the incoming request parameters for debugging
     print(f"[SUBMIT] Engine: {engine}, Output mode: {output_mode}, Collection mode: {collection_mode}")
     print(f"[SUBMIT] format_key from request: {format_key or 'NOT PROVIDED'}")
+    print(f"[SUBMIT] gemini_prompt from request: {'YES (' + str(len(gemini_prompt)) + ' chars)' if gemini_prompt else 'NOT PROVIDED'}")
     print(f"[SUBMIT] Files: {len(file_paths)} paths, {len(inline_documents)} inline docs")
 
     if not file_paths and not inline_documents:
@@ -1852,9 +1854,12 @@ def submit_analysis():
                 # Add format_key if provided (curator-recommended visualization format)
                 if format_key:
                     payload["format_key"] = format_key
+                # Add gemini_prompt if provided (curator's styled prompt with style instructions)
+                if gemini_prompt:
+                    payload["gemini_prompt"] = gemini_prompt
 
                 # Log what we're sending to the analyzer
-                print(f"[SUBMIT-INDIVIDUAL] Sending job for doc={doc['title']}, engine={engine}, format_key={format_key or 'NOT SET'}")
+                print(f"[SUBMIT-INDIVIDUAL] Sending job for doc={doc['title']}, engine={engine}, format_key={format_key or 'NOT SET'}, gemini_prompt={'YES' if gemini_prompt else 'NO'}")
 
                 response = httpx.post(
                     f"{ANALYZER_API_URL}/v1/analyze",
@@ -1894,9 +1899,12 @@ def submit_analysis():
             # Add format_key if provided (curator-recommended visualization format)
             if format_key:
                 payload["format_key"] = format_key
+            # Add gemini_prompt if provided (curator's styled prompt with style instructions)
+            if gemini_prompt:
+                payload["gemini_prompt"] = gemini_prompt
 
             # Log what we're sending to the analyzer
-            print(f"[SUBMIT] Sending job for engine={engine}, format_key={format_key or 'NOT SET'}")
+            print(f"[SUBMIT] Sending job for engine={engine}, format_key={format_key or 'NOT SET'}, gemini_prompt={'YES' if gemini_prompt else 'NO'}")
 
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
@@ -2076,6 +2084,7 @@ def submit_multi_engine_analysis():
     engine_list = data.get('engines', [])  # List of engine keys
     output_modes = data.get('output_modes', {})  # Dict: {engine_key: output_mode}
     format_keys = data.get('format_keys', {})  # Dict: {engine_key: format_key} from curator
+    gemini_prompts = data.get('gemini_prompts', {})  # Dict: {engine_key: styled_gemini_prompt} from curator
     collection_mode = data.get('collection_mode', 'single')
     collection_name = data.get('collection_name')
     llm_keys = data.get('llm_keys')
@@ -2084,6 +2093,7 @@ def submit_multi_engine_analysis():
     print(f"[SUBMIT-MULTI] Engines: {engine_list}")
     print(f"[SUBMIT-MULTI] Output modes: {output_modes}")
     print(f"[SUBMIT-MULTI] format_keys from request: {format_keys or 'NOT PROVIDED'}")
+    print(f"[SUBMIT-MULTI] gemini_prompts from request: {len(gemini_prompts)} engines with styled prompts" if gemini_prompts else "[SUBMIT-MULTI] gemini_prompts: NOT PROVIDED")
     print(f"[SUBMIT-MULTI] Collection mode: {collection_mode}, name: {collection_name}")
     print(f"[SUBMIT-MULTI] Files: {len(file_paths)} paths, {len(inline_documents)} inline docs")
 
@@ -2151,6 +2161,7 @@ def submit_multi_engine_analysis():
     for engine_key in engine_list:
         engine_output_mode = output_modes.get(engine_key, 'gemini_image')
         engine_format_key = format_keys.get(engine_key)  # Per-engine format from curator
+        engine_gemini_prompt = gemini_prompts.get(engine_key)  # Per-engine styled prompt from curator
 
         try:
             payload = {
@@ -2163,9 +2174,12 @@ def submit_multi_engine_analysis():
             # Add format_key if provided for this engine
             if engine_format_key:
                 payload["format_key"] = engine_format_key
+            # Add gemini_prompt if provided for this engine (curator's styled prompt)
+            if engine_gemini_prompt:
+                payload["gemini_prompt"] = engine_gemini_prompt
 
             # Log what we're sending to the analyzer
-            print(f"[SUBMIT-MULTI] Sending job for engine={engine_key}, format_key={engine_format_key or 'NOT SET'}")
+            print(f"[SUBMIT-MULTI] Sending job for engine={engine_key}, format_key={engine_format_key or 'NOT SET'}, gemini_prompt={'YES' if engine_gemini_prompt else 'NO'}")
 
             response = httpx.post(
                 f"{ANALYZER_API_URL}/v1/analyze",
@@ -10923,6 +10937,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                             console.log('[Submit] Including curator format_key for', engineKey, ':', curatorFormatKeys[engineKey]);
                         }
 
+                        // Add curator's styled gemini_prompt if available (contains style instructions)
+                        if (curatorGeminiPrompts[engineKey]) {
+                            payload.gemini_prompt = curatorGeminiPrompts[engineKey];
+                            console.log('[Submit] Including styled gemini_prompt for', engineKey, '(length:', curatorGeminiPrompts[engineKey].length, ')');
+                        }
+
                         if (docData.type === 'paths') {
                             payload.file_paths = docData.file_paths;
                         } else {
@@ -10947,6 +10967,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                             // Add curator's format_key for this engine (from per-engine map)
                             if (curatorFormatKeys[engineEntry.engine_key]) {
                                 payload.format_key = curatorFormatKeys[engineEntry.engine_key];
+                            }
+
+                            // Add curator's styled gemini_prompt if available (contains style instructions)
+                            if (curatorGeminiPrompts[engineEntry.engine_key]) {
+                                payload.gemini_prompt = curatorGeminiPrompts[engineEntry.engine_key];
                             }
 
                             if (docData.type === 'paths') {
@@ -11003,6 +11028,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                             console.log('[Submit] Including per-engine format_keys:', curatorFormatKeys);
                         } else {
                             console.warn('[Submit] No format_keys available! Curator may still be loading or failed. Using defaults.');
+                        }
+
+                        // Add curator's styled gemini_prompts map (contains style instructions)
+                        if (Object.keys(curatorGeminiPrompts).length > 0) {
+                            payload.gemini_prompts = curatorGeminiPrompts;
+                            console.log('[Submit] Including styled gemini_prompts for', Object.keys(curatorGeminiPrompts).length, 'engines');
                         }
 
                         if (docData.type === 'paths') {

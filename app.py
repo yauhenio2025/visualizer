@@ -3532,6 +3532,57 @@ HTML_PAGE = '''<!DOCTYPE html>
             padding: 0.5rem;
         }
 
+        /* Batch Jobs Panel (Multi-Engine Submission Summary) */
+        .batch-jobs-panel {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #7dd3fc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .batch-jobs-header {
+            font-size: 0.95rem;
+            color: #0369a1;
+            margin-bottom: 0.75rem;
+        }
+        .batch-jobs-header .batch-icon {
+            font-size: 1.1rem;
+        }
+        .batch-jobs-header .batch-hint {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: normal;
+        }
+        .batch-jobs-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .batch-job-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.4rem 0.8rem;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #334155;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .batch-job-link:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+        }
+        .batch-job-link.success .status-icon {
+            color: #16a34a;
+        }
+        .batch-job-link.failed .status-icon {
+            color: #dc2626;
+        }
+
         /* Engine Results Sections (Multi-Engine Results Display) */
         .engine-results-section {
             margin-bottom: 1rem;
@@ -8663,6 +8714,29 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var progressSection = document.getElementById('progress-section');
                 if (progressSection) progressSection.classList.add('show');
 
+                // Check if this job is part of a batch (stored in localStorage)
+                var batchInfo = localStorage.getItem('visualizer_batch_' + jobId);
+                if (batchInfo) {
+                    try {
+                        batchInfo = JSON.parse(batchInfo);
+                        // If batch is less than 24 hours old, try to load all sibling jobs
+                        if (batchInfo.engines && (Date.now() - batchInfo.timestamp) < 24 * 60 * 60 * 1000) {
+                            console.log('[Batch] Found sibling jobs for', jobId, ':', Object.keys(batchInfo.engines));
+                            // Reconstruct engine_jobs mapping
+                            var engineJobs = batchInfo.engines;
+                            var jobIds = Object.values(engineJobs);
+                            window.multiEngineJobs = engineJobs;
+                            currentJobId = jobId;
+                            updateJobUrl(jobId);
+                            // Poll all sibling jobs
+                            pollMultiEngineJobs(jobIds, engineJobs);
+                            return;
+                        }
+                    } catch (e) {
+                        console.log('[Batch] Failed to parse batch info:', e);
+                    }
+                }
+
                 // First check job status
                 const statusRes = await fetch('/api/analyzer/jobs/' + jobId, { headers: getApiHeaders() });
                 if (!statusRes.ok) {
@@ -11235,6 +11309,27 @@ HTML_PAGE = '''<!DOCTYPE html>
         function displayMultiEngineResults(resultsByEngine) {
             allResults = [];  // Reset results
 
+            // Build batch jobs panel first - shows links to all jobs
+            var batchHtml = '<div class="batch-jobs-panel">';
+            batchHtml += '<div class="batch-jobs-header">';
+            batchHtml += '<span class="batch-icon">📦</span> ';
+            batchHtml += '<strong>' + Object.keys(resultsByEngine).length + ' Analysis Jobs</strong>';
+            batchHtml += '<span class="batch-hint"> (click to view each job separately)</span>';
+            batchHtml += '</div>';
+            batchHtml += '<div class="batch-jobs-list">';
+            for (var engineKey in resultsByEngine) {
+                var engineData = resultsByEngine[engineKey];
+                var engineInfo = engines.find(function(e) { return e.engine_key === engineKey; });
+                var engineName = engineInfo ? (engineInfo.engine_name || formatEngineName(engineKey)) : formatEngineName(engineKey);
+                var statusIcon = engineData.status === 'completed' ? '✓' : '✗';
+                var statusClass = engineData.status === 'completed' ? 'success' : 'failed';
+                batchHtml += '<a href="/job/' + engineData.job_id + '" class="batch-job-link ' + statusClass + '" target="_blank">';
+                batchHtml += '<span class="status-icon">' + statusIcon + '</span> ';
+                batchHtml += engineName;
+                batchHtml += '</a>';
+            }
+            batchHtml += '</div></div>';
+
             // Category colors for badges
             var categoryColors = {
                 'epistemology': '#8b5cf6',
@@ -11351,7 +11446,19 @@ HTML_PAGE = '''<!DOCTYPE html>
                 html += '</div>';  // engine-results-section
             }
 
-            resultContainer.innerHTML = html;
+            // Prepend batch panel, then engine results
+            resultContainer.innerHTML = batchHtml + html;
+
+            // Store batch info for page refresh recovery
+            var batchInfo = {
+                timestamp: Date.now(),
+                primaryJobId: currentJobId,
+                engines: {}
+            };
+            for (var ek in resultsByEngine) {
+                batchInfo.engines[ek] = resultsByEngine[ek].job_id;
+            }
+            localStorage.setItem('visualizer_batch_' + currentJobId, JSON.stringify(batchInfo));
         }
 
         // Toggle engine result section collapse

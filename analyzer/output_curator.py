@@ -183,6 +183,7 @@ class OutputCurator:
         extracted_data: dict[str, Any],
         audience: str = "analyst",
         context: Optional[str] = None,
+        compatible_formats: Optional[list[str]] = None,
     ) -> CuratorOutput:
         """
         Analyze extracted data and recommend output formats.
@@ -192,14 +193,18 @@ class OutputCurator:
             extracted_data: The structured data from the engine
             audience: Target audience (analyst, executive, researcher, etc.)
             context: Optional additional context about the analysis
+            compatible_formats: Optional list of format_keys to constrain recommendations to.
+                               First format is the primary recommendation if provided.
 
         Returns:
             CuratorOutput with recommendations and rationale
         """
         logger.info(f"Curating output for engine: {engine_key}, audience: {audience}")
+        if compatible_formats:
+            logger.info(f"Constraining to compatible formats: {compatible_formats}")
 
         # Build the prompt
-        prompt = self._build_prompt(engine_key, extracted_data, audience, context)
+        prompt = self._build_prompt(engine_key, extracted_data, audience, context, compatible_formats)
 
         # Call Opus 4.5 with extended thinking (streaming required)
         thinking_content = ""
@@ -236,6 +241,7 @@ class OutputCurator:
         extracted_data: dict[str, Any],
         audience: str,
         context: Optional[str],
+        compatible_formats: Optional[list[str]] = None,
     ) -> str:
         """Build the prompt for the curator."""
 
@@ -244,6 +250,22 @@ class OutputCurator:
         if len(data_str) > 10000:
             # Truncate but show structure
             data_str = data_str[:10000] + "\n... [truncated, total keys: " + str(len(extracted_data)) + "]"
+
+        # Build compatible formats constraint section
+        format_constraint = ""
+        if compatible_formats:
+            format_list = ", ".join(compatible_formats)
+            format_constraint = f"""
+## COMPATIBLE FORMATS CONSTRAINT
+
+IMPORTANT: For visual formats, you MUST choose ONLY from these compatible formats:
+{format_list}
+
+These formats have been pre-selected as appropriate for the "{engine_key}" engine's output structure.
+The first format ({compatible_formats[0]}) is the primary recommendation based on archetype analysis.
+
+Do NOT recommend visual formats outside this list.
+"""
 
         prompt = f"""You are the Output Curator, an expert in information visualization and document intelligence.
 
@@ -256,7 +278,7 @@ Your task: Analyze the extracted data from an analysis engine and recommend the 
 {TEXTUAL_FORMAT_KNOWLEDGE}
 
 {STRUCTURED_FORMAT_KNOWLEDGE}
-
+{format_constraint}
 ## INPUT
 
 Engine: {engine_key}
@@ -277,8 +299,8 @@ Extracted Data:
    - What dimensions can be visualized?
 
 2. RECOMMEND output formats:
-   - PRIMARY: The single best format for this data + audience
-   - SECONDARY: 2-3 alternative formats that would also work well
+   - PRIMARY: The single best format for this data + audience{" (from compatible formats list)" if compatible_formats else ""}
+   - SECONDARY: 2-3 alternative formats that would also work well{" (from compatible formats list for visual)" if compatible_formats else ""}
    - For each, explain WHY it fits this data structure
 
 3. For VISUAL formats, generate a specific Gemini prompt:
@@ -458,6 +480,7 @@ Think deeply about the data structure and what visualization would best reveal i
         audience: str = "analyst",
         context: Optional[str] = None,
         sample_data: Optional[dict[str, Any]] = None,
+        compatible_formats_map: Optional[dict[str, list[str]]] = None,
     ) -> dict[str, FormatRecommendation]:
         """
         Recommend visualization formats for multiple engines in ONE API call.
@@ -470,6 +493,8 @@ Think deeply about the data structure and what visualization would best reveal i
             audience: Target audience (analyst, executive, researcher)
             context: Optional context about the analysis
             sample_data: Optional sample data to help inform recommendations
+            compatible_formats_map: Dict mapping engine_key -> list of compatible format_keys.
+                                   If provided, recommendations will be constrained to these formats.
 
         Returns:
             Dict mapping engine_key -> FormatRecommendation (primary only)
@@ -478,9 +503,11 @@ Think deeply about the data structure and what visualization would best reveal i
             return {}
 
         logger.info(f"Batch curating formats for {len(engine_keys)} engines: {engine_keys}")
+        if compatible_formats_map:
+            logger.info(f"Constraining to compatible formats per engine")
 
         # Build the batch prompt
-        prompt = self._build_batch_prompt(engine_keys, audience, context, sample_data)
+        prompt = self._build_batch_prompt(engine_keys, audience, context, sample_data, compatible_formats_map)
 
         # Call Opus 4.5 with extended thinking (streaming required)
         thinking_content = ""
@@ -516,14 +543,36 @@ Think deeply about the data structure and what visualization would best reveal i
         audience: str,
         context: Optional[str],
         sample_data: Optional[dict[str, Any]],
+        compatible_formats_map: Optional[dict[str, list[str]]] = None,
     ) -> str:
         """Build prompt for batch format recommendation."""
 
-        engines_list = "\n".join([f"- {key}" for key in engine_keys])
+        # Build engine list with compatible formats constraints
+        engines_with_constraints = []
+        for key in engine_keys:
+            if compatible_formats_map and key in compatible_formats_map:
+                formats = compatible_formats_map[key]
+                engines_with_constraints.append(
+                    f"- {key} → MUST choose from: [{', '.join(formats)}]"
+                )
+            else:
+                engines_with_constraints.append(f"- {key}")
+        engines_list = "\n".join(engines_with_constraints)
 
         sample_str = ""
         if sample_data:
             sample_str = f"\nSample data from documents:\n```json\n{json.dumps(sample_data, indent=2, default=str)[:3000]}\n```\n"
+
+        # Add constraint section if we have compatible formats
+        format_constraint = ""
+        if compatible_formats_map:
+            format_constraint = """
+## COMPATIBLE FORMATS CONSTRAINT
+
+IMPORTANT: For each engine, you MUST choose ONLY from the compatible formats listed next to it.
+These have been pre-selected based on each engine's archetype and typical output structure.
+Do NOT recommend formats outside the allowed list for each engine.
+"""
 
         prompt = f"""You are the Output Curator, an expert in information visualization.
 
@@ -532,7 +581,7 @@ Your task: Recommend the BEST visualization format for EACH of these analysis en
 ## KNOWLEDGE BASE
 
 {VISUAL_FORMAT_KNOWLEDGE}
-
+{format_constraint}
 ## ENGINES TO RECOMMEND FOR
 
 {engines_list}
@@ -560,7 +609,7 @@ Based on your knowledge, these engines typically produce:
 
 ## YOUR TASK
 
-For EACH engine listed above, recommend the SINGLE BEST visualization format.
+For EACH engine listed above, recommend the SINGLE BEST visualization format{" from its allowed list" if compatible_formats_map else ""}.
 
 Consider:
 1. What data structure does this engine typically output?
@@ -695,6 +744,7 @@ def curate_output(
     context: Optional[str] = None,
     api_key: Optional[str] = None,
     thinking_budget: int = 16000,
+    compatible_formats: Optional[list[str]] = None,
 ) -> CuratorOutput:
     """
     Convenience function to curate output formats for engine results.
@@ -706,6 +756,7 @@ def curate_output(
         context: Optional context
         api_key: Anthropic API key
         thinking_budget: Token budget for extended thinking
+        compatible_formats: Optional list of format_keys to constrain recommendations to
 
     Returns:
         CuratorOutput with recommendations
@@ -716,6 +767,7 @@ def curate_output(
         extracted_data=extracted_data,
         audience=audience,
         context=context,
+        compatible_formats=compatible_formats,
     )
 
 

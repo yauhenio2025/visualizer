@@ -11378,6 +11378,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                     // Helper to render a single output
                     function renderOutput(outputKey, output, modeKey) {
+                        // Get S3 input key for re-analysis later
+                        var s3Key = (window.jobS3Keys && window.jobS3Keys[engineData.job_id]) || null;
                         var resultData = {
                             key: outputKey,
                             title: formatEngineName(modeKey || outputKey),
@@ -11386,6 +11388,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             engine_category: category,
                             job_id: engineData.job_id,
                             output: output,
+                            s3_input_key: s3Key,
+                            metadata: result.metadata || null,
                             isImage: !!output.image_url,
                             imageUrl: output.image_url || null,
                             content: output.content || output.html_content || '',
@@ -11393,6 +11397,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                             modeKey: modeKey
                         };
                         allResults.push(resultData);
+
+                        // Add to library for persistence
+                        try { addToLibrary(resultData); } catch (e) { console.warn('Failed to add to library:', e); }
 
                         // Render this output
                         if (resultData.isImage && resultData.imageUrl) {

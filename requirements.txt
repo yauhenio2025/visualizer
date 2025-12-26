@@ -1,6 +1,7 @@
 # Web Framework
 flask>=3.0.0
 gunicorn>=21.0.0
+gevent>=24.0.0  # Async workers for handling slow uploads
 
 # HTTP Client
 httpx>=0.26.0

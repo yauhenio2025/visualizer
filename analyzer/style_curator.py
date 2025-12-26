@@ -1023,6 +1023,188 @@ def get_quick_style(
     return curator.get_quick_style(engine_key, format_key, audience)
 
 
+# Format-to-prompt templates for generating base Gemini prompts
+FORMAT_BASE_PROMPTS = {
+    "network_graph": """Create a professional network graph visualization.
+
+LAYOUT: Force-directed or hierarchical layout showing nodes and their connections.
+- Nodes represent entities (actors, concepts, organizations)
+- Edges represent relationships with clear labels
+- Node size can encode importance/centrality
+- Edge thickness can encode relationship strength
+
+REQUIREMENTS:
+- Clear visual hierarchy with most important nodes prominent
+- Readable labels on all nodes and significant edges
+- Legend explaining node colors/sizes if used
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "sankey": """Create a professional Sankey flow diagram.
+
+LAYOUT: Left-to-right flow showing how quantities move between categories.
+- Nodes as vertical bars representing sources/destinations
+- Flows as curved bands whose width encodes quantity
+- Color-coded by source or category
+
+REQUIREMENTS:
+- Clear flow direction from left to right
+- Readable labels on all nodes
+- Flow widths proportional to values
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "quadrant_chart": """Create a professional 2x2 quadrant matrix visualization.
+
+LAYOUT: Four quadrants with labeled axes.
+- X-axis and Y-axis clearly labeled with the two dimensions
+- Items positioned based on their scores on both dimensions
+- Quadrant labels in each section
+
+REQUIREMENTS:
+- Clear axis labels and scale
+- Items as labeled points or bubbles
+- Distinct quadrant backgrounds or borders
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "timeline": """Create a professional timeline visualization.
+
+LAYOUT: Horizontal or vertical timeline showing events in sequence.
+- Time axis with clear markers
+- Events as labeled points or cards
+- Connections between related events if applicable
+
+REQUIREMENTS:
+- Clear chronological flow
+- Readable event labels and dates
+- Visual hierarchy for major vs minor events
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "matrix_heatmap": """Create a professional matrix heatmap visualization.
+
+LAYOUT: Grid showing values across two dimensions.
+- Rows and columns clearly labeled
+- Color intensity encoding values
+- Optional annotations in cells
+
+REQUIREMENTS:
+- Clear row and column headers
+- Color legend showing value scale
+- Readable cell values if needed
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "radar_chart": """Create a professional radar/spider chart visualization.
+
+LAYOUT: Radial chart showing multiple dimensions from center.
+- Axes radiating from center, one per dimension
+- Area or line connecting values across dimensions
+- Multiple series can be overlaid
+
+REQUIREMENTS:
+- All axis labels readable
+- Clear scale on each axis
+- Legend if multiple series
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "tree_hierarchy": """Create a professional hierarchical tree visualization.
+
+LAYOUT: Top-down or left-right tree showing parent-child relationships.
+- Root at top/left
+- Branches connecting parent to children
+- Node labels clearly visible
+
+REQUIREMENTS:
+- Clear hierarchical structure
+- No overlapping labels
+- Consistent spacing between levels
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "bubble_chart": """Create a professional bubble chart visualization.
+
+LAYOUT: 2D scatter plot with sized circles.
+- X and Y axes showing two dimensions
+- Bubble size encoding a third dimension
+- Color can encode a fourth dimension
+
+REQUIREMENTS:
+- Clear axis labels and scales
+- Legend for size and color if used
+- Labels on major bubbles
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "parallel_coordinates": """Create a professional parallel coordinates visualization.
+
+LAYOUT: Vertical parallel axes with lines connecting values.
+- Each axis represents one dimension
+- Lines trace each item across all dimensions
+- Color can encode category or value
+
+REQUIREMENTS:
+- All axis labels readable
+- Lines clearly distinguishable
+- Legend for color coding
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "chord_diagram": """Create a professional chord diagram visualization.
+
+LAYOUT: Circular layout showing flows between categories.
+- Arcs around circle for each category
+- Chords connecting categories with flow between them
+- Chord width encodes flow magnitude
+
+REQUIREMENTS:
+- Category labels around perimeter
+- Clear color coding
+- Legend explaining colors
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+}
+
+# Default prompt for unknown formats
+DEFAULT_FORMAT_PROMPT = """Create a professional data visualization.
+
+LAYOUT: Choose the most appropriate layout for the data structure.
+- Clear visual hierarchy
+- Readable labels and annotations
+- Logical organization of elements
+
+REQUIREMENTS:
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic
+- Clear legend if needed
+- All text readable"""
+
+
+def generate_base_prompt(format_key: str, format_name: str = None) -> str:
+    """
+    Generate a base Gemini prompt for a given format.
+
+    This is used when the LLM curator doesn't provide a gemini_prompt
+    (e.g., in batch mode where prompts aren't generated).
+
+    Args:
+        format_key: The format key (e.g., 'network_graph', 'sankey')
+        format_name: Optional human-readable name for the format
+
+    Returns:
+        Base Gemini prompt for the format
+    """
+    base = FORMAT_BASE_PROMPTS.get(format_key, DEFAULT_FORMAT_PROMPT)
+
+    # Add format name header if provided
+    if format_name and format_name.lower() != format_key.replace("_", " "):
+        return f"## {format_name}\n\n{base}"
+
+    return base
+
+
 # Exports
 __all__ = [
     "StyleSchool",

@@ -1519,7 +1519,7 @@ def curate_output_batch_endpoint():
             return jsonify({"error": "Anthropic API key required for Output Curator"}), 400
 
         from analyzer.output_curator import OutputCurator
-        from analyzer.style_curator import get_quick_style, merge_gemini_prompt_with_style
+        from analyzer.style_curator import get_quick_style, merge_gemini_prompt_with_style, generate_base_prompt
 
         # Use quick style for batch mode (LLM style would be too expensive)
         curator = OutputCurator(
@@ -1538,11 +1538,16 @@ def curate_output_batch_endpoint():
         # Convert FormatRecommendation dataclasses to dicts with style info
         output = {}
         for engine_key, rec in results.items():
-            # Apply quick style to batch recommendations
-            if rec.category == "visual" and rec.gemini_prompt:
+            # Apply quick style to ALL visual batch recommendations
+            # Generate base prompt from format if LLM didn't provide one
+            if rec.category == "visual":
+                # Get base prompt - either from LLM or generate from format
+                base_prompt = rec.gemini_prompt or generate_base_prompt(rec.format_key, rec.name)
+
+                # Apply style to the base prompt
                 style_rec = get_quick_style(engine_key, rec.format_key, audience)
                 styled_prompt = merge_gemini_prompt_with_style(
-                    rec.gemini_prompt,
+                    base_prompt,
                     style_rec.gemini_style_instructions,
                 )
             else:
@@ -1555,7 +1560,7 @@ def curate_output_batch_endpoint():
                 "name": rec.name,
                 "confidence": rec.confidence,
                 "rationale": rec.rationale,
-                "gemini_prompt": styled_prompt or rec.gemini_prompt,
+                "gemini_prompt": styled_prompt,  # Now always has styled prompt for visual
                 "data_mapping": rec.data_mapping,
                 # Style information
                 "style_school": style_rec.school.value if style_rec else None,

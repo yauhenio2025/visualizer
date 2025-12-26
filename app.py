@@ -1428,6 +1428,10 @@ def curate_output_endpoint():
             context=context,
         )
 
+        # Helper to get the best gemini prompt (styled or original)
+        def get_best_prompt(rec):
+            return rec.styled_gemini_prompt or rec.gemini_prompt
+
         # Convert to JSON-serializable dict
         output = {
             "data_structure_analysis": result.data_structure_analysis,
@@ -1437,8 +1441,11 @@ def curate_output_endpoint():
                 "name": result.primary_recommendation.name,
                 "confidence": result.primary_recommendation.confidence,
                 "rationale": result.primary_recommendation.rationale,
-                "gemini_prompt": result.primary_recommendation.gemini_prompt,
+                "gemini_prompt": get_best_prompt(result.primary_recommendation),
                 "data_mapping": result.primary_recommendation.data_mapping,
+                # Style information
+                "style_school": result.primary_recommendation.style_school,
+                "style_name": result.primary_recommendation.style_name,
             },
             "secondary_recommendations": [
                 {
@@ -1447,13 +1454,18 @@ def curate_output_endpoint():
                     "name": rec.name,
                     "confidence": rec.confidence,
                     "rationale": rec.rationale,
-                    "gemini_prompt": rec.gemini_prompt,
+                    "gemini_prompt": get_best_prompt(rec),
                     "data_mapping": rec.data_mapping,
+                    # Style information
+                    "style_school": rec.style_school,
+                    "style_name": rec.style_name,
                 }
                 for rec in result.secondary_recommendations
             ],
             "audience_considerations": result.audience_considerations,
             "thinking_summary": result.thinking_summary,
+            # Style curation info
+            "style_rationale": result.style_rationale,
         }
 
         # Optionally include raw thinking (can be large)
@@ -1507,8 +1519,15 @@ def curate_output_batch_endpoint():
             return jsonify({"error": "Anthropic API key required for Output Curator"}), 400
 
         from analyzer.output_curator import OutputCurator
+        from analyzer.style_curator import get_quick_style, merge_gemini_prompt_with_style
 
-        curator = OutputCurator(api_key=api_key, thinking_budget=thinking_budget)
+        # Use quick style for batch mode (LLM style would be too expensive)
+        curator = OutputCurator(
+            api_key=api_key,
+            thinking_budget=thinking_budget,
+            enable_style_curation=True,
+            use_quick_style=True,  # Fast affinity-based style for batch
+        )
         results = curator.curate_batch_by_engines(
             engine_keys=engine_keys,
             audience=audience,
@@ -1516,17 +1535,31 @@ def curate_output_batch_endpoint():
             sample_data=sample_data,
         )
 
-        # Convert FormatRecommendation dataclasses to dicts
+        # Convert FormatRecommendation dataclasses to dicts with style info
         output = {}
         for engine_key, rec in results.items():
+            # Apply quick style to batch recommendations
+            if rec.category == "visual" and rec.gemini_prompt:
+                style_rec = get_quick_style(engine_key, rec.format_key, audience)
+                styled_prompt = merge_gemini_prompt_with_style(
+                    rec.gemini_prompt,
+                    style_rec.gemini_style_instructions,
+                )
+            else:
+                style_rec = None
+                styled_prompt = rec.gemini_prompt
+
             output[engine_key] = {
                 "format_key": rec.format_key,
                 "category": rec.category,
                 "name": rec.name,
                 "confidence": rec.confidence,
                 "rationale": rec.rationale,
-                "gemini_prompt": rec.gemini_prompt,
+                "gemini_prompt": styled_prompt or rec.gemini_prompt,
                 "data_mapping": rec.data_mapping,
+                # Style information
+                "style_school": style_rec.school.value if style_rec else None,
+                "style_name": style_rec.style_guide.name if style_rec else None,
             }
 
         return jsonify({
@@ -4639,6 +4672,54 @@ HTML_PAGE = '''<!DOCTYPE html>
         .curator-rec-badge.secondary {
             background: var(--bg-hover);
             color: var(--text-secondary);
+        }
+
+        /* Style curator badges */
+        .curator-style-info {
+            margin-top: 0.4rem;
+            padding-top: 0.4rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .style-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 500;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        /* Style-specific colors */
+        .style-tufte {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .style-nyt_cox {
+            background: #f7f7f5;
+            color: #333;
+            border-left: 3px solid #d63232;
+        }
+
+        .style-ft_burn_murdoch {
+            background: #fff1e5;
+            color: #333;
+            border-left: 3px solid #0f5499;
+        }
+
+        .style-lupi_data_humanism {
+            background: #faf7f2;
+            color: #2c2c2c;
+            border-left: 3px solid #c41e3a;
+        }
+
+        .style-stefaner_truth_beauty {
+            background: #ecf0f1;
+            color: #2c3e50;
+            border-left: 3px solid #3498db;
         }
 
         /* Curator thinking (collapsible) */
@@ -8241,6 +8322,14 @@ HTML_PAGE = '''<!DOCTYPE html>
                     '<div class="curator-rec-category">' + primary.category + '</div>' +
                     '<div class="curator-rec-rationale">' + primary.rationale + '</div>';
 
+                // Show style information if available
+                if (primary.style_school && primary.style_name) {
+                    var styleEmoji = getStyleEmoji(primary.style_school);
+                    recsHtml += '<div class="curator-style-info">' +
+                        '<span class="style-badge style-' + primary.style_school + '">' + styleEmoji + ' ' + primary.style_name + '</span>' +
+                    '</div>';
+                }
+
                 // Show Gemini prompt preview if visual
                 if (primary.category === 'visual' && primary.gemini_prompt) {
                     recsHtml += '<div class="gemini-prompt-preview">' +
@@ -8250,6 +8339,18 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
 
                 recsHtml += '</div>';
+            }
+
+            // Helper function for style emojis
+            function getStyleEmoji(school) {
+                var emojis = {
+                    'tufte': '📐',
+                    'nyt_cox': '📰',
+                    'ft_burn_murdoch': '📈',
+                    'lupi_data_humanism': '🎨',
+                    'stefaner_truth_beauty': '✨'
+                };
+                return emojis[school] || '🎯';
             }
 
             // Secondary recommendations

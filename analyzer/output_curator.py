@@ -8,19 +8,37 @@ The curator:
 1. Detects data structure from engine output
 2. Recommends visual, textual, and structured formats
 3. Generates optimized Gemini prompts for visual outputs
-4. Explains its reasoning
+4. Applies style curation from 5 major dataviz schools
+5. Explains its reasoning
 
 Uses streaming for extended thinking support.
+
+Style Schools (integrated via style_curator.py):
+- Tufte: Maximum data-ink ratio, no chartjunk
+- NYT/Cox: Explanatory, annotated, reader-friendly
+- FT/Burn-Murdoch: Restrained elegance, high-signal
+- Lupi/Data Humanism: Ornate but rigorous, emotional
+- Stefaner/Truth+Beauty: Complex, cultural, artistic
 """
 
 import os
 import json
 import logging
 from typing import Optional, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
 
 import anthropic
+
+# Import style curator for integration
+from .style_curator import (
+    StyleCurator,
+    StyleRecommendation,
+    StyleSchool,
+    get_quick_style,
+    merge_gemini_prompt_with_style,
+    STYLE_GUIDES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +60,10 @@ class FormatRecommendation:
     rationale: str
     gemini_prompt: Optional[str] = None  # Only for visual formats
     data_mapping: Optional[dict] = None  # How data maps to visual elements
+    # Style integration fields
+    style_school: Optional[str] = None  # e.g., "tufte", "nyt_cox", etc.
+    style_name: Optional[str] = None  # Human-readable style name
+    styled_gemini_prompt: Optional[str] = None  # Gemini prompt with style applied
 
 
 @dataclass
@@ -53,6 +75,9 @@ class CuratorOutput:
     audience_considerations: str
     thinking_summary: str
     raw_thinking: Optional[str] = None
+    # Style curation fields
+    style_rationale: Optional[str] = None
+    style_thinking: Optional[str] = None
 
 
 # Knowledge base summaries for the curator
@@ -155,12 +180,21 @@ class OutputCurator:
     LLM-powered agent that recommends output formats based on extracted data.
 
     Uses Claude Opus 4.5 with extended thinking for deep analysis.
+
+    Now includes style curation from 5 major dataviz schools:
+    - Tufte: Maximum data-ink ratio, no chartjunk
+    - NYT/Cox: Explanatory, annotated, reader-friendly
+    - FT/Burn-Murdoch: Restrained elegance, high-signal
+    - Lupi/Data Humanism: Ornate but rigorous, emotional
+    - Stefaner/Truth+Beauty: Complex, cultural, artistic
     """
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         thinking_budget: int = 16000,  # Generous thinking budget
+        enable_style_curation: bool = True,  # Enable style selection
+        use_quick_style: bool = False,  # Use fast affinity-based style (no LLM)
     ):
         """
         Initialize the Output Curator.
@@ -168,6 +202,8 @@ class OutputCurator:
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
             thinking_budget: Token budget for extended thinking (default 16000)
+            enable_style_curation: Whether to apply dataviz style curation
+            use_quick_style: Use fast affinity-based style selection (no LLM call)
         """
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self.api_key:
@@ -176,6 +212,16 @@ class OutputCurator:
         self.client = anthropic.Anthropic(api_key=self.api_key)
         self.model = "claude-opus-4-5-20251101"
         self.thinking_budget = thinking_budget
+        self.enable_style_curation = enable_style_curation
+        self.use_quick_style = use_quick_style
+
+        # Initialize style curator if enabled (and not using quick mode)
+        self.style_curator = None
+        if enable_style_curation and not use_quick_style:
+            self.style_curator = StyleCurator(
+                api_key=self.api_key,
+                thinking_budget=10000,  # Smaller budget for style
+            )
 
     def curate(
         self,
@@ -233,7 +279,83 @@ class OutputCurator:
         logger.info(f"Curator response: {len(response_content)} chars")
 
         # Parse the response
-        return self._parse_response(response_content, thinking_content)
+        result = self._parse_response(response_content, thinking_content)
+
+        # Apply style curation to visual recommendations
+        if self.enable_style_curation:
+            result = self._apply_style_curation(result, engine_key, audience, extracted_data, context)
+
+        return result
+
+    def _apply_style_curation(
+        self,
+        result: "CuratorOutput",
+        engine_key: str,
+        audience: str,
+        extracted_data: dict[str, Any],
+        context: Optional[str],
+    ) -> "CuratorOutput":
+        """
+        Apply style curation to visual recommendations.
+
+        For each visual format recommendation, selects the optimal style
+        and merges style instructions into the Gemini prompt.
+        """
+        style_thinking = None
+
+        def apply_style_to_recommendation(rec: FormatRecommendation) -> FormatRecommendation:
+            """Apply style to a single recommendation."""
+            if rec.category != "visual" or not rec.gemini_prompt:
+                return rec
+
+            # Get style recommendation
+            if self.use_quick_style:
+                style_rec = get_quick_style(engine_key, rec.format_key, audience)
+                logger.info(f"Quick style for {rec.format_key}: {style_rec.school.value}")
+            elif self.style_curator:
+                try:
+                    style_output = self.style_curator.curate_style(
+                        engine_key=engine_key,
+                        format_key=rec.format_key,
+                        extracted_data=extracted_data,
+                        audience=audience,
+                        document_context=context,
+                    )
+                    style_rec = style_output.primary_style
+                    logger.info(f"LLM style for {rec.format_key}: {style_rec.school.value}")
+                except Exception as e:
+                    logger.warning(f"Style curation failed, using quick style: {e}")
+                    style_rec = get_quick_style(engine_key, rec.format_key, audience)
+            else:
+                style_rec = get_quick_style(engine_key, rec.format_key, audience)
+
+            # Merge style into Gemini prompt
+            styled_prompt = merge_gemini_prompt_with_style(
+                rec.gemini_prompt,
+                style_rec.gemini_style_instructions,
+            )
+
+            # Update recommendation with style info
+            rec.style_school = style_rec.school.value
+            rec.style_name = style_rec.style_guide.name
+            rec.styled_gemini_prompt = styled_prompt
+
+            return rec
+
+        # Apply style to primary recommendation
+        result.primary_recommendation = apply_style_to_recommendation(result.primary_recommendation)
+
+        # Apply style to secondary recommendations
+        result.secondary_recommendations = [
+            apply_style_to_recommendation(rec)
+            for rec in result.secondary_recommendations
+        ]
+
+        # Add style rationale
+        if result.primary_recommendation.style_school:
+            result.style_rationale = f"Applied {result.primary_recommendation.style_name} style based on engine type, format, and audience"
+
+        return result
 
     def _build_prompt(
         self,
@@ -745,6 +867,8 @@ def curate_output(
     api_key: Optional[str] = None,
     thinking_budget: int = 16000,
     compatible_formats: Optional[list[str]] = None,
+    enable_style_curation: bool = True,
+    use_quick_style: bool = False,
 ) -> CuratorOutput:
     """
     Convenience function to curate output formats for engine results.
@@ -757,11 +881,18 @@ def curate_output(
         api_key: Anthropic API key
         thinking_budget: Token budget for extended thinking
         compatible_formats: Optional list of format_keys to constrain recommendations to
+        enable_style_curation: Whether to apply dataviz style curation (default True)
+        use_quick_style: Use fast affinity-based style without LLM call (default False)
 
     Returns:
-        CuratorOutput with recommendations
+        CuratorOutput with recommendations (including style-enhanced Gemini prompts)
     """
-    curator = OutputCurator(api_key=api_key, thinking_budget=thinking_budget)
+    curator = OutputCurator(
+        api_key=api_key,
+        thinking_budget=thinking_budget,
+        enable_style_curation=enable_style_curation,
+        use_quick_style=use_quick_style,
+    )
     return curator.curate(
         engine_key=engine_key,
         extracted_data=extracted_data,
@@ -778,4 +909,11 @@ __all__ = [
     "FormatRecommendation",
     "OutputCategory",
     "curate_output",
+    # Style curation exports (re-exported from style_curator)
+    "StyleCurator",
+    "StyleRecommendation",
+    "StyleSchool",
+    "STYLE_GUIDES",
+    "get_quick_style",
+    "merge_gemini_prompt_with_style",
 ]

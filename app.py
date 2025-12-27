@@ -8088,13 +8088,13 @@ HTML_PAGE = '''<!DOCTYPE html>
             curatorPending = true;
             updateCuratorStatus();
 
-            // Schedule curator call after 3 seconds of inactivity
+            // Schedule curator call after 5 seconds of inactivity
             curatorDebounceTimer = setTimeout(function() {
                 curatorPending = false;
                 if (engineKeys.length > 0) {
                     callBatchOutputCurator(engineKeys);
                 }
-            }, 3000);  // 3 second debounce
+            }, 5000);  // 5 second debounce (user requested)
         }
 
         // Trigger curator immediately (cancels any pending debounce)

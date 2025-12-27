@@ -8053,6 +8053,8 @@ HTML_PAGE = '''<!DOCTYPE html>
         let curatorCache = {};  // Cache curator responses by engine_key + audience
         let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
         let curatorLoading = false;  // Track if curator is in progress (to prevent race condition)
+        let curatorDebounceTimer = null;  // Debounce timer for curator (wait for user to stop selecting)
+        let curatorPending = false;  // Track if curator is scheduled but not yet started
 
         // ==================== OUTPUT CURATOR FUNCTIONS ====================
 
@@ -8065,10 +8067,65 @@ HTML_PAGE = '''<!DOCTYPE html>
                 btn.classList.toggle('active', btn.dataset.audience === audience);
             });
 
-            // Re-call curator if we have selected engines
+            // Re-call curator if we have selected engines (immediate, since audience changed)
             if (selectedEngines.length > 0) {
                 var engineKeys = selectedEngines.map(function(e) { return e.engine_key; });
+                triggerCuratorNow();  // Immediate trigger for audience change
+            }
+        }
+
+        // Schedule curator with debounce (waits 3 seconds of inactivity)
+        function scheduleCurator(engineKeys) {
+            // Clear any existing timer
+            if (curatorDebounceTimer) {
+                clearTimeout(curatorDebounceTimer);
+            }
+
+            // Show the panel in pending state
+            var panel = document.getElementById('curator-panel');
+            if (panel) panel.style.display = 'block';
+
+            curatorPending = true;
+            updateCuratorStatus();
+
+            // Schedule curator call after 3 seconds of inactivity
+            curatorDebounceTimer = setTimeout(function() {
+                curatorPending = false;
+                if (engineKeys.length > 0) {
+                    callBatchOutputCurator(engineKeys);
+                }
+            }, 3000);  // 3 second debounce
+        }
+
+        // Trigger curator immediately (cancels any pending debounce)
+        function triggerCuratorNow() {
+            if (curatorDebounceTimer) {
+                clearTimeout(curatorDebounceTimer);
+                curatorDebounceTimer = null;
+            }
+            curatorPending = false;
+
+            if (selectedEngines.length > 0) {
+                var engineKeys = [...new Set(selectedEngines.map(function(e) { return e.engine_key; }))];
                 callBatchOutputCurator(engineKeys);
+            }
+        }
+
+        // Update curator status indicator
+        function updateCuratorStatus() {
+            var status = document.getElementById('curator-status');
+            var panel = document.getElementById('curator-panel');
+            var curateBtn = document.getElementById('curate-now-btn');
+
+            if (curatorLoading) {
+                if (status) status.innerHTML = '⏳ Curating...';
+                if (curateBtn) curateBtn.disabled = true;
+            } else if (curatorPending) {
+                if (status) status.innerHTML = '⏱️ Waiting... <button class="btn btn-sm btn-primary" onclick="triggerCuratorNow()" style="padding: 2px 8px; font-size: 11px; margin-left: 8px;">Curate Now</button>';
+                if (curateBtn) curateBtn.disabled = false;
+            } else {
+                if (status) status.innerHTML = '';
+                if (curateBtn) curateBtn.disabled = false;
             }
         }
 
@@ -8103,6 +8160,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Track that curator is loading (to prevent race condition with submission)
             curatorLoading = true;
+            updateCuratorStatus();
             updateAnalyzeButton();
 
             // If no extracted data, create mock data based on engine type
@@ -8150,6 +8208,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Curator finished loading - update button
                 curatorLoading = false;
+                updateCuratorStatus();
                 updateAnalyzeButton();
 
                 return data;
@@ -8162,6 +8221,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Curator failed but we're no longer loading - still allow submission
                 curatorLoading = false;
+                updateCuratorStatus();
                 updateAnalyzeButton();
 
                 return null;
@@ -8193,6 +8253,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Track that curator is loading (to prevent race condition with submission)
             curatorLoading = true;
+            updateCuratorStatus();
             updateAnalyzeButton();
 
             try {
@@ -8237,6 +8298,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Curator finished loading - update button
                 curatorLoading = false;
+                updateCuratorStatus();
                 updateAnalyzeButton();
 
                 return data;
@@ -8249,6 +8311,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Curator failed but we're no longer loading - still allow submission
                 curatorLoading = false;
+                updateCuratorStatus();
                 updateAnalyzeButton();
 
                 return null;
@@ -10218,10 +10281,19 @@ HTML_PAGE = '''<!DOCTYPE html>
             updateAnalyzeButton();
 
             // 🧠 Trigger Output Curator (Opus 4.5) for intelligent format recommendations
-            // Uses batch API when multiple engines are selected (ONE API call for all)
+            // Uses debounced batch API - waits 3 seconds for user to stop selecting
+            // User can click "Curate Now" button to trigger immediately
             if (selectedEngines.length > 0) {
                 var allEngineKeys = [...new Set(selectedEngines.map(function(e) { return e.engine_key; }))];
-                callBatchOutputCurator(allEngineKeys);
+                scheduleCurator(allEngineKeys);  // Debounced - waits 3s before calling API
+            } else {
+                // No engines selected - cancel any pending curator and hide panel
+                if (curatorDebounceTimer) {
+                    clearTimeout(curatorDebounceTimer);
+                    curatorDebounceTimer = null;
+                }
+                curatorPending = false;
+                updateCuratorStatus();
             }
         }
 

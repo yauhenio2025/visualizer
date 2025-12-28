@@ -59,14 +59,6 @@ MODELS = {
         "supports_search": True,
         "provider": "gemini"
     },
-    "flash": {
-        "id": "gemini-2.5-flash-image",
-        "name": "Nano Banana Flash",
-        "description": "Fast generation, 1K resolution",
-        "max_resolution": "1K",
-        "supports_search": False,
-        "provider": "gemini"
-    },
     "sonnet": {
         "id": "claude-sonnet-4-5-20250929",
         "name": "Claude Sonnet 4.5",

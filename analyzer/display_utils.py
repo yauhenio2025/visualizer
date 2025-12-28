@@ -248,15 +248,17 @@ LABEL FORMATTING:
 - Example: "argument_architecture" → "Argument Architecture"
 - NEVER display underscores or hyphens in labels visible to users
 
-NUMERIC SCORES - DO NOT DISPLAY:
+NUMERIC SCORES - DO NOT DISPLAY (CRITICAL):
 - NEVER show raw decimal numbers like 0.85, 0.75, 0.9 on the visualization
+- NEVER display "THICKNESS: 0.85" or similar labels on edges - this is FORBIDDEN
+- NEVER include "weight:", "strength:", "confidence:", "score:" with numbers
 - These are internal processing values and should NOT appear on edges, nodes, or labels
-- If edge/relationship strength must be shown, use visual encoding only:
-  * Line thickness (thicker = stronger)
+- If edge/relationship strength must be shown, use visual encoding ONLY:
+  * Line thickness (thicker = stronger) - but NO numeric thickness labels
   * Line style (solid = strong, dashed = moderate, dotted = weak)
   * Color intensity (darker = stronger)
-- If you must show strength as text, use descriptive terms: "Strong", "Moderate", "Weak"
-- NEVER include confidence scores, weights, or probabilities as visible text
+- If you absolutely must show strength as text, use ONLY descriptive terms: "Strong", "Moderate", "Weak"
+- Edge labels should describe the RELATIONSHIP TYPE (e.g., "Influenced", "Derived from") NOT numeric values
 
 FIELD NAME CLEANUP:
 - Replace underscores with spaces in all visible text

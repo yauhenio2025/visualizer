@@ -3618,6 +3618,18 @@ HTML_PAGE = '''<!DOCTYPE html>
             line-height: 1;
         }
         .selected-engine-chip .remove-btn:hover { color: var(--error); }
+        .curator-format-badge {
+            font-size: 0.65rem;
+            color: var(--primary);
+            background: rgba(var(--primary-rgb, 59, 130, 246), 0.1);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .no-engines-selected {
             color: var(--text-muted);
             font-size: 0.85rem;
@@ -8471,10 +8483,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = '';
 
-                // Curator finished loading - update button
+                // Curator finished loading - update button and re-render engines
                 curatorLoading = false;
                 updateCuratorStatus();
                 updateAnalyzeButton();
+                renderSelectedEngines();  // Re-render to show curator format badges
 
                 return data;
 
@@ -8561,10 +8574,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 panel.classList.remove('loading');
                 status.textContent = '';
 
-                // Curator finished loading - update button
+                // Curator finished loading - update button and re-render engines to show formats
                 curatorLoading = false;
                 updateCuratorStatus();
                 updateAnalyzeButton();
+                renderSelectedEngines();  // Re-render to show curator format badges
 
                 return data;
 
@@ -10759,9 +10773,19 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 var currentModeInfo = modeOptions.find(function(m) { return m.key === sel.output_mode; }) || modeOptions[0];
 
+                // Get curator's format recommendation for this engine
+                var curatorFormat = curatorFormatKeys[sel.engine_key];
+                var formatDisplay = curatorFormat ? curatorFormat.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); }) : null;
+
                 html += '<div class="selected-engine-chip">';
                 html += '<span class="engine-category-dot" style="background:' + badgeColor + '"></span>';
                 html += '<span class="engine-name">' + displayName + '</span>';
+
+                // Show curator's format recommendation if available (for visual outputs)
+                if (formatDisplay && sel.output_mode === 'gemini_image') {
+                    html += '<span class="curator-format-badge" title="Curator recommended: ' + formatDisplay + '">→ ' + formatDisplay + '</span>';
+                }
+
                 html += '<select class="mode-select" onchange="updateEngineOutputMode(' + index + ', this.value)">';
 
                 // Group options: Recommended first, then others

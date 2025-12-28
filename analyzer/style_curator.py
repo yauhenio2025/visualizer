@@ -1035,16 +1035,18 @@ FORMAT_BASE_PROMPTS = {
 
 LAYOUT: Force-directed or hierarchical layout showing nodes and their connections.
 - Nodes represent entities (actors, concepts, organizations)
-- Edges represent relationships with descriptive labels (NOT numeric values)
+- Edges represent relationships with descriptive labels (e.g., "Influenced", "Derived from")
 - Node size can encode importance/centrality
-- Edge thickness can encode relationship strength (NOT numeric labels)
+- Edge thickness encodes relationship strength visually (NEVER with numeric labels)
 
-REQUIREMENTS:
-- Clear visual hierarchy with most important nodes prominent
-- Readable labels on all nodes and significant edges
-- NEVER display numeric scores (like 0.85, 0.75) on edges - use line thickness instead
+CRITICAL REQUIREMENTS:
+- NEVER display "THICKNESS: 0.85" or any numeric values on edges - this is FORBIDDEN
+- Edge labels must be relationship TYPES only (e.g., "Conceptual Extension"), NOT numbers
+- NEVER show weight, strength, or confidence scores as text on the graph
+- Use line thickness alone to show strength - no text annotation of thickness values
 - Convert any snake_case identifiers to Title Case with spaces
-- Legend explaining node colors/sizes if used
+- Clear visual hierarchy with most important nodes prominent
+- Legend explaining what edge thickness means (e.g., "Thicker = stronger influence")
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
 
@@ -1179,6 +1181,47 @@ REQUIREMENTS:
 - Clear color coding
 - NEVER show decimal scores on chords - use width only
 - Legend explaining colors
+- 4K resolution (3840 x 2160)
+- Professional, clean aesthetic""",
+
+    "argument_tree": """Create a professional argument tree/map visualization.
+
+LAYOUT: Hierarchical or flow-based structure showing logical argument components.
+- Main CLAIM/THESIS at the top or center
+- GROUNDS (evidence/premises) branching below supporting claims
+- WARRANTS connecting grounds to claims (show reasoning)
+- REBUTTALS/counterarguments shown as opposing branches
+- Use Toulmin model structure: Claim → Grounds → Warrant → Backing → Rebuttal
+
+VISUAL ENCODING:
+- Claims in prominent boxes (bold, larger)
+- Grounds in supporting boxes below
+- Warrants as connecting labels or intermediate nodes
+- Rebuttals in contrasting color (red/orange)
+- Flow arrows showing logical direction
+
+CRITICAL REQUIREMENTS:
+- Show logical FLOW from evidence to conclusion
+- Each argument component should be clearly labeled
+- NO numeric scores or confidence values - use color/size to show strength
+- Convert snake_case identifiers to Title Case
+- Clear visual distinction between supporting and opposing elements
+- 4K resolution (3840 x 2160)
+- Clean, professional aesthetic suitable for academic/analytical context""",
+
+    "flowchart": """Create a professional flowchart visualization.
+
+LAYOUT: Sequential flow showing process, decision tree, or logical progression.
+- Start/end nodes clearly marked
+- Decision nodes as diamonds
+- Process/action nodes as rectangles
+- Clear directional arrows showing flow
+
+REQUIREMENTS:
+- Logical left-to-right or top-to-bottom flow
+- All labels in Title Case (no snake_case)
+- Clear node shapes for different element types
+- NEVER include numeric scores on nodes or edges
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
 }

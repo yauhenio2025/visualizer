@@ -7,6 +7,7 @@ This module provides:
 - Engine-to-output affinity mapping
 - Complementarity analysis for visual-text pairing
 - Output Curator agent (Opus 4.5 with extended thinking)
+- Display utilities for formatting data for visualization
 """
 
 from .renderer import (
@@ -36,6 +37,15 @@ from .output_curator import (
     curate_output,
 )
 
+from .display_utils import (
+    format_label,
+    format_numeric_for_display,
+    sanitize_for_display,
+    should_hide_numeric_field,
+    get_display_instructions,
+    HIDDEN_NUMERIC_FIELDS,
+)
+
 __all__ = [
     # Renderer
     "TextualOutputRenderer",
@@ -58,4 +68,11 @@ __all__ = [
     "FormatRecommendation",
     "OutputCategory",
     "curate_output",
+    # Display Utilities
+    "format_label",
+    "format_numeric_for_display",
+    "sanitize_for_display",
+    "should_hide_numeric_field",
+    "get_display_instructions",
+    "HIDDEN_NUMERIC_FIELDS",
 ]

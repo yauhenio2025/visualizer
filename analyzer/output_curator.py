@@ -40,6 +40,13 @@ from .style_curator import (
     STYLE_GUIDES,
 )
 
+# Import display utilities for data sanitization
+from .display_utils import (
+    sanitize_for_display,
+    format_label,
+    get_display_instructions,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -367,11 +374,21 @@ class OutputCurator:
     ) -> str:
         """Build the prompt for the curator."""
 
-        # Format extracted data for the prompt
-        data_str = json.dumps(extracted_data, indent=2, default=str)
+        # Sanitize extracted data for display:
+        # - Convert snake_case keys to Title Case
+        # - Remove internal score fields that shouldn't appear on visualizations
+        sanitized_data = sanitize_for_display(
+            extracted_data,
+            format_keys=True,
+            convert_scores=True,
+            hide_score_fields=False,  # Keep fields but transform values
+        )
+
+        # Format sanitized data for the prompt
+        data_str = json.dumps(sanitized_data, indent=2, default=str)
         if len(data_str) > 10000:
             # Truncate but show structure
-            data_str = data_str[:10000] + "\n... [truncated, total keys: " + str(len(extracted_data)) + "]"
+            data_str = data_str[:10000] + "\n... [truncated, total keys: " + str(len(sanitized_data)) + "]"
 
         # Build compatible formats constraint section
         format_constraint = ""
@@ -430,6 +447,8 @@ Extracted Data:
    - Map data fields to visual properties (size, color, position)
    - Include styling guidance
    - Request appropriate labels and legends
+   - IMPORTANT: Instruct Gemini to NEVER display raw numeric scores (0.85, 0.75) on the visualization
+   - IMPORTANT: Instruct Gemini to convert any snake_case identifiers to Title Case with spaces
 
 4. Consider the AUDIENCE:
    - Executive: Prefers high-level, actionable (quadrant, snapshot)
@@ -683,7 +702,9 @@ Think deeply about the data structure and what visualization would best reveal i
 
         sample_str = ""
         if sample_data:
-            sample_str = f"\nSample data from documents:\n```json\n{json.dumps(sample_data, indent=2, default=str)[:3000]}\n```\n"
+            # Sanitize sample data to show clean format
+            sanitized_sample = sanitize_for_display(sample_data, format_keys=True, convert_scores=True)
+            sample_str = f"\nSample data from documents:\n```json\n{json.dumps(sanitized_sample, indent=2, default=str)[:3000]}\n```\n"
 
         # Add constraint section if we have compatible formats
         format_constraint = ""
@@ -832,8 +853,17 @@ Recommend formats for ALL {len(engine_keys)} engines: {', '.join(engine_keys)}
 
         This is a fallback/utility method when you already know the format.
         """
-        # Simplified prompt generation without full curator analysis
-        data_str = json.dumps(extracted_data, indent=2, default=str)[:5000]
+        # Sanitize data before including in prompt
+        sanitized_data = sanitize_for_display(
+            extracted_data,
+            format_keys=True,
+            convert_scores=True,
+            hide_score_fields=False,
+        )
+        data_str = json.dumps(sanitized_data, indent=2, default=str)[:5000]
+
+        # Get display instructions
+        display_instructions = get_display_instructions()
 
         prompt = f"""You are generating a Gemini prompt for a {format_key} visualization.
 
@@ -845,6 +875,11 @@ Generate a detailed prompt that:
 2. Maps data fields to visual properties
 3. Includes styling for {style} presentation
 4. Requests clear labels and legend
+5. NEVER displays raw numeric scores (0.85, 0.75) on the visualization
+6. Converts all snake_case identifiers to Title Case with spaces
+
+Include these display formatting rules in your generated prompt:
+{display_instructions}
 
 Output only the Gemini prompt, nothing else."""
 

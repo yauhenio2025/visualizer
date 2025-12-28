@@ -30,6 +30,8 @@ from enum import Enum
 
 import anthropic
 
+from .display_utils import get_display_instructions
+
 logger = logging.getLogger(__name__)
 
 
@@ -964,12 +966,16 @@ def merge_gemini_prompt_with_style(
     Returns:
         Combined prompt with style instructions integrated
     """
+    # Get display formatting instructions (anti-score, anti-snake_case)
+    display_instructions = get_display_instructions()
+
     return f"""{base_prompt}
 
 {style_instructions}
+{display_instructions}
 
-IMPORTANT: Apply the style instructions above to every visual decision.
-The style is as important as the data accuracy.
+IMPORTANT: Apply BOTH the style instructions AND display formatting rules above.
+The style and proper label formatting are as important as the data accuracy.
 """
 
 
@@ -1029,13 +1035,15 @@ FORMAT_BASE_PROMPTS = {
 
 LAYOUT: Force-directed or hierarchical layout showing nodes and their connections.
 - Nodes represent entities (actors, concepts, organizations)
-- Edges represent relationships with clear labels
+- Edges represent relationships with descriptive labels (NOT numeric values)
 - Node size can encode importance/centrality
-- Edge thickness can encode relationship strength
+- Edge thickness can encode relationship strength (NOT numeric labels)
 
 REQUIREMENTS:
 - Clear visual hierarchy with most important nodes prominent
 - Readable labels on all nodes and significant edges
+- NEVER display numeric scores (like 0.85, 0.75) on edges - use line thickness instead
+- Convert any snake_case identifiers to Title Case with spaces
 - Legend explaining node colors/sizes if used
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1049,8 +1057,9 @@ LAYOUT: Left-to-right flow showing how quantities move between categories.
 
 REQUIREMENTS:
 - Clear flow direction from left to right
-- Readable labels on all nodes
-- Flow widths proportional to values
+- Readable labels on all nodes (convert snake_case to Title Case)
+- Flow widths proportional to values (do NOT label flows with numbers)
+- NEVER display decimal scores on flows - width alone shows magnitude
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
 
@@ -1058,12 +1067,14 @@ REQUIREMENTS:
 
 LAYOUT: Four quadrants with labeled axes.
 - X-axis and Y-axis clearly labeled with the two dimensions
-- Items positioned based on their scores on both dimensions
+- Items positioned based on their values on both dimensions
 - Quadrant labels in each section
 
 REQUIREMENTS:
 - Clear axis labels and scale
-- Items as labeled points or bubbles
+- Items as labeled points or bubbles with readable names
+- Convert any snake_case identifiers to Title Case with spaces
+- NEVER display raw numeric scores (0.85, 0.75) next to items
 - Distinct quadrant backgrounds or borders
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1077,7 +1088,7 @@ LAYOUT: Horizontal or vertical timeline showing events in sequence.
 
 REQUIREMENTS:
 - Clear chronological flow
-- Readable event labels and dates
+- Readable event labels and dates (format snake_case to Title Case)
 - Visual hierarchy for major vs minor events
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1090,9 +1101,9 @@ LAYOUT: Grid showing values across two dimensions.
 - Optional annotations in cells
 
 REQUIREMENTS:
-- Clear row and column headers
+- Clear row and column headers (convert snake_case to Title Case)
 - Color legend showing value scale
-- Readable cell values if needed
+- NEVER show raw decimal scores like 0.85 - use color only
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
 
@@ -1104,8 +1115,8 @@ LAYOUT: Radial chart showing multiple dimensions from center.
 - Multiple series can be overlaid
 
 REQUIREMENTS:
-- All axis labels readable
-- Clear scale on each axis
+- All axis labels readable (convert snake_case to Title Case)
+- Clear scale on each axis (do NOT show decimal scores as labels)
 - Legend if multiple series
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1119,7 +1130,9 @@ LAYOUT: Top-down or left-right tree showing parent-child relationships.
 
 REQUIREMENTS:
 - Clear hierarchical structure
+- Convert all snake_case labels to Title Case with spaces
 - No overlapping labels
+- NEVER show numeric scores on connections
 - Consistent spacing between levels
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1133,8 +1146,9 @@ LAYOUT: 2D scatter plot with sized circles.
 
 REQUIREMENTS:
 - Clear axis labels and scales
+- Convert snake_case labels to Title Case with spaces
 - Legend for size and color if used
-- Labels on major bubbles
+- Labels on major bubbles (NOT numeric scores)
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
 
@@ -1146,8 +1160,9 @@ LAYOUT: Vertical parallel axes with lines connecting values.
 - Color can encode category or value
 
 REQUIREMENTS:
-- All axis labels readable
+- All axis labels readable (convert snake_case to Title Case)
 - Lines clearly distinguishable
+- NEVER label lines with raw decimal scores
 - Legend for color coding
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1157,11 +1172,12 @@ REQUIREMENTS:
 LAYOUT: Circular layout showing flows between categories.
 - Arcs around circle for each category
 - Chords connecting categories with flow between them
-- Chord width encodes flow magnitude
+- Chord width encodes flow magnitude (NOT numeric labels)
 
 REQUIREMENTS:
-- Category labels around perimeter
+- Category labels around perimeter (Title Case, no underscores)
 - Clear color coding
+- NEVER show decimal scores on chords - use width only
 - Legend explaining colors
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic""",
@@ -1178,11 +1194,13 @@ LAYOUT: Choose the most appropriate layout for the data structure.
 REQUIREMENTS:
 - 4K resolution (3840 x 2160)
 - Professional, clean aesthetic
+- Convert ALL snake_case identifiers to Title Case with spaces
+- NEVER display raw numeric scores (like 0.85, 0.75) - use visual encoding instead
 - Clear legend if needed
 - All text readable"""
 
 
-def generate_base_prompt(format_key: str, format_name: str = None) -> str:
+def generate_base_prompt(format_key: str, format_name: str = None, include_display_rules: bool = True) -> str:
     """
     Generate a base Gemini prompt for a given format.
 
@@ -1192,15 +1210,21 @@ def generate_base_prompt(format_key: str, format_name: str = None) -> str:
     Args:
         format_key: The format key (e.g., 'network_graph', 'sankey')
         format_name: Optional human-readable name for the format
+        include_display_rules: Whether to include display formatting rules (default True)
 
     Returns:
-        Base Gemini prompt for the format
+        Base Gemini prompt for the format with display rules
     """
     base = FORMAT_BASE_PROMPTS.get(format_key, DEFAULT_FORMAT_PROMPT)
 
     # Add format name header if provided
     if format_name and format_name.lower() != format_key.replace("_", " "):
-        return f"## {format_name}\n\n{base}"
+        base = f"## {format_name}\n\n{base}"
+
+    # Add display formatting rules
+    if include_display_rules:
+        display_instructions = get_display_instructions()
+        base = f"{base}\n{display_instructions}"
 
     return base
 
@@ -1219,4 +1243,7 @@ __all__ = [
     "curate_style",
     "get_quick_style",
     "merge_gemini_prompt_with_style",
+    "generate_base_prompt",
+    "FORMAT_BASE_PROMPTS",
+    "DEFAULT_FORMAT_PROMPT",
 ]

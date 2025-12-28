@@ -1021,9 +1021,19 @@ def format_template(
     """Format a template with analysis data."""
     template = get_template(output_type)
 
-    # Convert analysis data to formatted string
+    # Import display utilities for better formatting
     import json
-    analysis_str = json.dumps(analysis_data, indent=2, default=str)
+    from ..display_utils import sanitize_for_display
+
+    # Sanitize data for better readability in textual outputs
+    # Format keys to Title Case but keep score values (textual outputs can show them)
+    sanitized_data = sanitize_for_display(
+        analysis_data,
+        format_keys=True,
+        convert_scores=False,  # Keep numeric scores in textual outputs
+        hide_score_fields=False,
+    )
+    analysis_str = json.dumps(sanitized_data, indent=2, default=str)
 
     visual_str = visual_summary or "No visual output available for this analysis."
 

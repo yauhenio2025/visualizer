@@ -4190,6 +4190,26 @@ HTML_PAGE = '''<!DOCTYPE html>
             cursor: not-allowed;
         }
 
+        .toggle-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            transition: all 0.15s;
+        }
+        .toggle-label:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+        .toggle-label input[type="checkbox"] {
+            margin: 0;
+            accent-color: var(--success);
+        }
+
         /* ============================================================
            COLLAPSIBLE CATEGORY SECTIONS (for 70+ engines)
            ============================================================ */
@@ -7929,6 +7949,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                                     <span class="section-label" style="margin-bottom:0;">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
                                     <button class="feasibility-btn" onclick="checkFeasibility()" title="Analyze document to see which engines will work best">🔍 Check Feasibility</button>
                                     <span id="feasibility-status" class="feasibility-status" style="display:none;"></span>
+                                    <label id="show-recommended-toggle" class="toggle-label" style="display:none; font-size:0.75rem; cursor:pointer;">
+                                        <input type="checkbox" id="show-recommended-checkbox" onchange="toggleShowRecommended(this.checked)">
+                                        Show only recommended
+                                    </label>
                                 </div>
                                 <div class="view-mode-toggle">
                                     <button class="view-mode-btn active" onclick="setEngineViewMode('category')" id="view-mode-category" title="Group by category">📁</button>
@@ -8176,6 +8200,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Feasibility state
         let feasibilityData = null;  // Results from feasibility check
         let feasibilityLoading = false;
+        let showOnlyRecommended = false;  // Filter to show only high-feasibility engines
 
         // ==================== FEASIBILITY CHECK FUNCTIONS ====================
 
@@ -8242,6 +8267,12 @@ HTML_PAGE = '''<!DOCTYPE html>
                     statusEl.className = 'feasibility-status success';
                 }
 
+                // Show the "show only recommended" toggle
+                var toggleEl = document.getElementById('show-recommended-toggle');
+                if (toggleEl) {
+                    toggleEl.style.display = 'inline-flex';
+                }
+
                 // Re-render engines with feasibility data
                 if (engineViewMode === 'category') {
                     renderEnginesByCategory();
@@ -8267,6 +8298,27 @@ HTML_PAGE = '''<!DOCTYPE html>
                 return null;
             }
             return feasibilityData.engine_assessments[engineKey] || null;
+        }
+
+        // Toggle show only recommended engines
+        function toggleShowRecommended(checked) {
+            showOnlyRecommended = checked;
+            // Re-render engines
+            if (engineViewMode === 'category') {
+                renderEnginesByCategory();
+            } else {
+                renderEngines();
+            }
+        }
+
+        // Check if engine should be shown based on feasibility filter
+        function shouldShowEngine(engineKey) {
+            if (!showOnlyRecommended || !feasibilityData) {
+                return true;  // Show all if filter off or no data
+            }
+            // Show only high and medium feasibility
+            return feasibilityData.recommended_engines &&
+                   feasibilityData.recommended_engines.includes(engineKey);
         }
 
         // ==================== OUTPUT CURATOR FUNCTIONS ====================
@@ -9521,6 +9573,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                 });
             }
 
+            // Filter by feasibility if toggle is on
+            if (showOnlyRecommended && feasibilityData) {
+                filteredEngines = filteredEngines.filter(function(e) {
+                    return shouldShowEngine(e.engine_key);
+                });
+            }
+
             // If we have curator recommendations, highlight them
             var recommendedKeys = new Set();
             if (curatorRecommendations && curatorRecommendations.primary_recommendations) {
@@ -9595,6 +9654,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     return (e.engine_name || '').toLowerCase().includes(term) ||
                            (e.description || '').toLowerCase().includes(term) ||
                            (e.engine_key || '').toLowerCase().includes(term);
+                });
+            }
+
+            // Filter by feasibility if toggle is on
+            if (showOnlyRecommended && feasibilityData) {
+                filteredEngines = filteredEngines.filter(function(e) {
+                    return shouldShowEngine(e.engine_key);
                 });
             }
 
@@ -11200,6 +11266,19 @@ HTML_PAGE = '''<!DOCTYPE html>
         async function runAnalysis() {
             $('analyze-btn').disabled = true;
             $('analyze-btn').textContent = 'Preparing...';
+
+            // Wait for curator if it's still loading (max 10 seconds)
+            if (curatorLoading || curatorPending) {
+                $('analyze-btn').textContent = 'Waiting for curator...';
+                var waitStart = Date.now();
+                while ((curatorLoading || curatorPending) && (Date.now() - waitStart) < 10000) {
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                if (curatorLoading || curatorPending) {
+                    console.warn('[Submit] Curator timed out after 10s, proceeding with defaults');
+                }
+            }
+
             $('progress-section').classList.add('show');
             $('results-grid').innerHTML = '';
             $('results-gallery').style.display = 'none';

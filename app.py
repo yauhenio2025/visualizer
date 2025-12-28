@@ -1710,6 +1710,55 @@ def curator_quick_suggest():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/curator/feasibility', methods=['POST'])
+def check_feasibility():
+    """
+    Check which engines are likely to produce meaningful results for a document.
+
+    Request:
+    {
+        "document_content": "...",  // Document text
+        "engine_keys": ["engine1", "engine2"]  // Optional: specific engines to check
+    }
+
+    Returns feasibility assessment per engine with recommendations.
+    """
+    try:
+        data = request.json or {}
+        document_content = data.get('document_content', '')
+
+        if not document_content or len(document_content) < 100:
+            return jsonify({"error": "Document content required (min 100 chars)"}), 400
+
+        # Get user API keys if provided
+        llm_keys = {}
+        anthropic_key = request.headers.get('X-Anthropic-API-Key') or data.get('anthropic_api_key')
+        if anthropic_key:
+            llm_keys['anthropic_api_key'] = anthropic_key
+
+        payload = {
+            "document_content": document_content,
+            "llm_keys": llm_keys,
+        }
+
+        if data.get('engine_keys'):
+            payload['engine_keys'] = data['engine_keys']
+
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/feasibility",
+            headers=get_analyzer_headers(),
+            json=payload,
+            timeout=30.0,  # Give Claude time to analyze
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Feasibility check failed: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 def extract_pdf_from_base64(base64_content: str) -> str:
     """Extract text from base64-encoded PDF."""
     import base64
@@ -4068,6 +4117,77 @@ HTML_PAGE = '''<!DOCTYPE html>
             border-radius: 3px;
             margin-bottom: 0.5rem;
             align-self: flex-start;
+        }
+
+        /* Feasibility Indicators */
+        .engine-card.feasibility-high {
+            border-left: 3px solid var(--success);
+        }
+        .engine-card.feasibility-medium {
+            border-left: 3px solid var(--warning);
+        }
+        .engine-card.feasibility-low {
+            border-left: 3px solid var(--error);
+            opacity: 0.6;
+        }
+        .engine-card.feasibility-na {
+            border-left: 3px solid var(--muted);
+            opacity: 0.5;
+        }
+        .engine-card-compact.feasibility-high {
+            border-left: 3px solid var(--success);
+        }
+        .engine-card-compact.feasibility-medium {
+            border-left: 3px solid var(--warning);
+        }
+        .engine-card-compact.feasibility-low {
+            border-left: 3px solid var(--error);
+            opacity: 0.6;
+        }
+        .engine-card-compact.feasibility-na {
+            border-left: 3px solid var(--muted);
+            opacity: 0.5;
+        }
+
+        .feasibility-badge {
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+            text-transform: uppercase;
+        }
+        .feasibility-badge.high { color: var(--success); background: rgba(45,125,70,0.15); }
+        .feasibility-badge.medium { color: var(--warning); background: rgba(217,119,6,0.15); }
+        .feasibility-badge.low { color: var(--error); background: rgba(220,38,38,0.15); }
+        .feasibility-badge.na { color: var(--muted); background: rgba(107,114,128,0.15); }
+
+        .feasibility-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+        }
+        .feasibility-status.loading { color: var(--accent); background: rgba(37,99,235,0.1); }
+        .feasibility-status.success { color: var(--success); background: rgba(45,125,70,0.1); }
+        .feasibility-status.error { color: var(--error); background: rgba(220,38,38,0.1); }
+
+        .feasibility-btn {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .feasibility-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+        .feasibility-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* ============================================================
@@ -7805,7 +7925,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                         <!-- Single Engine Selection -->
                         <div id="engine-selection">
                             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-                                <span class="section-label" style="margin-bottom:0;">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
+                                <div style="display:flex; align-items:center; gap:0.75rem;">
+                                    <span class="section-label" style="margin-bottom:0;">Select Engine <span id="engine-count" style="color:var(--text-secondary);"></span></span>
+                                    <button class="feasibility-btn" onclick="checkFeasibility()" title="Analyze document to see which engines will work best">🔍 Check Feasibility</button>
+                                    <span id="feasibility-status" class="feasibility-status" style="display:none;"></span>
+                                </div>
                                 <div class="view-mode-toggle">
                                     <button class="view-mode-btn active" onclick="setEngineViewMode('category')" id="view-mode-category" title="Group by category">📁</button>
                                     <button class="view-mode-btn" onclick="setEngineViewMode('flat')" id="view-mode-flat" title="Flat list">☰</button>
@@ -8048,6 +8172,107 @@ HTML_PAGE = '''<!DOCTYPE html>
         let curatorLoading = false;  // Track if curator is in progress (to prevent race condition)
         let curatorDebounceTimer = null;  // Debounce timer for curator (wait for user to stop selecting)
         let curatorPending = false;  // Track if curator is scheduled but not yet started
+
+        // Feasibility state
+        let feasibilityData = null;  // Results from feasibility check
+        let feasibilityLoading = false;
+
+        // ==================== FEASIBILITY CHECK FUNCTIONS ====================
+
+        // Check engine feasibility for selected documents
+        async function checkFeasibility() {
+            if (selectedDocs.size === 0) {
+                showNotification('Please select documents first', 'warning');
+                return;
+            }
+
+            if (feasibilityLoading) return;
+            feasibilityLoading = true;
+
+            var statusEl = document.getElementById('feasibility-status');
+            if (statusEl) {
+                statusEl.style.display = 'inline-block';
+                statusEl.textContent = 'Checking feasibility...';
+                statusEl.className = 'feasibility-status loading';
+            }
+
+            try {
+                // Get first document content
+                var firstDocPath = Array.from(selectedDocs)[0];
+                var firstDoc = scannedDocs.find(function(d) { return d.path === firstDocPath; });
+
+                if (!firstDoc) {
+                    throw new Error('Could not find selected document');
+                }
+
+                // Read document content
+                var content = '';
+                if (firstDoc.content) {
+                    content = firstDoc.content;
+                } else if (firstDoc.file) {
+                    var fileData = await readFileContent(firstDoc.file);
+                    content = fileData.content || '';
+                }
+
+                if (!content || content.length < 100) {
+                    throw new Error('Document content too short for analysis');
+                }
+
+                // Call feasibility API
+                var response = await fetch('/api/analyzer/curator/feasibility', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLLMHeaders()
+                    },
+                    body: JSON.stringify({
+                        document_content: content.substring(0, 100000)  // Limit to 100k chars
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Feasibility check failed');
+                }
+
+                feasibilityData = await response.json();
+                console.log('Feasibility data:', feasibilityData);
+
+                // Update status
+                if (statusEl) {
+                    var highCount = feasibilityData.high_feasibility ? feasibilityData.high_feasibility.length : 0;
+                    var lowCount = feasibilityData.discouraged_engines ? feasibilityData.discouraged_engines.length : 0;
+                    statusEl.textContent = highCount + ' recommended, ' + lowCount + ' discouraged';
+                    statusEl.className = 'feasibility-status success';
+                }
+
+                // Re-render engines with feasibility data
+                if (engineViewMode === 'category') {
+                    renderEnginesByCategory();
+                } else {
+                    renderEngines();
+                }
+
+                showNotification('Feasibility check complete - engines marked', 'success');
+
+            } catch (error) {
+                console.error('Feasibility check error:', error);
+                if (statusEl) {
+                    statusEl.textContent = 'Check failed';
+                    statusEl.className = 'feasibility-status error';
+                }
+                showNotification('Feasibility check failed: ' + error.message, 'error');
+            } finally {
+                feasibilityLoading = false;
+            }
+        }
+
+        // Get feasibility level for an engine
+        function getEngineFeasibility(engineKey) {
+            if (!feasibilityData || !feasibilityData.engine_assessments) {
+                return null;
+            }
+            return feasibilityData.engine_assessments[engineKey] || null;
+        }
 
         // ==================== OUTPUT CURATOR FUNCTIONS ====================
 
@@ -9330,10 +9555,21 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
                 var catIcon = categoryIcons[e.category] || '';
                 var isSelected = selectedEngines.some(function(s) { return s.engine_key === e.engine_key; });
-                return '<div class="engine-card ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
+
+                // Add feasibility class and badge
+                var feasibilityClass = '';
+                var feasibilityBadge = '';
+                var feas = getEngineFeasibility(e.engine_key);
+                if (feas) {
+                    feasibilityClass = 'feasibility-' + feas.level;
+                    var levelText = feas.level === 'n/a' ? 'N/A' : feas.level.charAt(0).toUpperCase() + feas.level.slice(1);
+                    feasibilityBadge = '<span class="feasibility-badge ' + feas.level + '" title="' + feas.reason + '">' + levelText + '</span>';
+                }
+
+                return '<div class="engine-card ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + ' ' + feasibilityClass + '" ' +
                 'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
                 recInfo +
-                '<div class="name">' + catIcon + ' ' + displayName + '</div>' +
+                '<div class="name">' + catIcon + ' ' + displayName + feasibilityBadge + '</div>' +
                 '<div class="desc">' + shortDesc + '</div>' +
                 '</div>';
             }).join('');
@@ -9455,10 +9691,20 @@ HTML_PAGE = '''<!DOCTYPE html>
                 recBadge = '<div class="rec-badge" title="' + (rec ? rec.rationale : '') + '">AI (' + (rec ? Math.round(rec.confidence * 100) : '') + '%)</div>';
             }
 
-            return '<div class="engine-card-compact ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + '" ' +
+            // Add feasibility class and badge
+            var feasibilityClass = '';
+            var feasibilityBadge = '';
+            var feas = getEngineFeasibility(e.engine_key);
+            if (feas) {
+                feasibilityClass = 'feasibility-' + feas.level;
+                var levelText = feas.level === 'n/a' ? 'N/A' : feas.level.charAt(0).toUpperCase() + feas.level.slice(1);
+                feasibilityBadge = '<span class="feasibility-badge ' + feas.level + '" title="' + feas.reason + '">' + levelText + '</span>';
+            }
+
+            return '<div class="engine-card-compact ' + (isSelected ? 'selected' : '') + ' ' + (isRecommended ? 'recommended' : '') + ' ' + feasibilityClass + '" ' +
                    'onclick="selectEngine(\\'' + e.engine_key + '\\')">' +
                    recBadge +
-                   '<div class="name">' + displayName + '</div>' +
+                   '<div class="name">' + displayName + feasibilityBadge + '</div>' +
                    '<div class="desc">' + shortDesc + '</div>' +
                    '</div>';
         }

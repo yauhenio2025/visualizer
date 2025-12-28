@@ -11599,6 +11599,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                             output: output,
                             s3_input_key: s3Key,
                             metadata: result.metadata || null,
+                            extended_info: result.extended_info || null,  // Include for library "By Input" grouping
                             isImage: !!output.image_url,
                             imageUrl: output.image_url || null,
                             content: output.content || output.html_content || '',

@@ -10974,6 +10974,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Generate unique run_id to group all jobs from this submission
             currentRunId = 'run_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            multiEngineResults = {};  // Reset previous run's results
 
             resetStages();
             resetProgressDetails();

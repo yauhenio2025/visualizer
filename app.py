@@ -8182,7 +8182,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         // Check engine feasibility for selected documents
         async function checkFeasibility() {
             if (selectedDocs.size === 0) {
-                showNotification('Please select documents first', 'warning');
+                alert('Please select documents first');
                 return;
             }
 
@@ -8221,10 +8221,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Call feasibility API
                 var response = await fetch('/api/analyzer/curator/feasibility', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getLLMHeaders()
-                    },
+                    headers: getApiHeaders(),
                     body: JSON.stringify({
                         document_content: content.substring(0, 100000)  // Limit to 100k chars
                     })
@@ -8252,15 +8249,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     renderEngines();
                 }
 
-                showNotification('Feasibility check complete - engines marked', 'success');
-
             } catch (error) {
                 console.error('Feasibility check error:', error);
                 if (statusEl) {
                     statusEl.textContent = 'Check failed';
                     statusEl.className = 'feasibility-status error';
                 }
-                showNotification('Feasibility check failed: ' + error.message, 'error');
+                alert('Feasibility check failed: ' + error.message);
             } finally {
                 feasibilityLoading = false;
             }

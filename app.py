@@ -7944,9 +7944,9 @@ HTML_PAGE = '''<!DOCTYPE html>
         <div id="library-view" class="view-content">
             <div class="library-header">
                 <div class="library-tabs">
-                    <button class="library-tab active" data-tab="jobs" onclick="switchLibraryTab('jobs')">
+                    <button class="library-tab active" data-tab="runs" onclick="switchLibraryTab('runs')">
                         <span class="tab-icon">📦</span>
-                        <span class="tab-label">By Jobs</span>
+                        <span class="tab-label">By Run</span>
                     </button>
                     <button class="library-tab" data-tab="outputs" onclick="switchLibraryTab('outputs')">
                         <span class="tab-icon">🎨</span>
@@ -8034,6 +8034,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let collectionMode = 'single';
         let engineMode = 'engine';  // 'engine', 'bundle', or 'pipeline'
         let currentJobId = null;
+        let currentRunId = null;  // Groups multiple engines submitted together
         let allResults = [];
         let currentCollectionName = null;  // Track imported collection name
 
@@ -9013,10 +9014,14 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Update URL hash (unless we're responding to a hash change)
             if (updateHash !== false) {
+                // If we're on a job URL (/job/xxx), navigate to root when switching views
+                var isJobUrl = window.location.pathname.match(/^\\/job\\/[a-f0-9-]+$/i);
+                var basePath = isJobUrl ? '/' : '';
+
                 if (viewId === 'library') {
-                    window.history.replaceState(null, '', '#library-' + currentLibraryTab);
+                    window.history.replaceState(null, '', basePath + '#library-' + currentLibraryTab);
                 } else {
-                    window.history.replaceState(null, '', '#' + viewId);
+                    window.history.replaceState(null, '', basePath + '#' + viewId);
                 }
             }
         }
@@ -9034,7 +9039,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                 var parts = hash.split('-');
                 if (parts.length > 1) {
                     var tab = parts[1];
-                    if (['jobs', 'outputs', 'inputs'].includes(tab)) {
+                    // Support 'runs', 'outputs', 'inputs' (also 'jobs' for backwards compatibility)
+                    if (tab === 'jobs') tab = 'runs';  // Redirect old URLs
+                    if (['runs', 'outputs', 'inputs'].includes(tab)) {
                         switchLibraryTab(tab, false);
                     }
                 }
@@ -10965,6 +10972,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             $('results-gallery').style.display = 'none';
             allResults = [];
 
+            // Generate unique run_id to group all jobs from this submission
+            currentRunId = 'run_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
             resetStages();
             resetProgressDetails();
             hideJobUrl();  // Hide previous job URL
@@ -11596,6 +11606,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                             engine_name: engineName,
                             engine_category: category,
                             job_id: engineData.job_id,
+                            run_id: currentRunId,  // Group all engines from same submission
                             output: output,
                             s3_input_key: s3Key,
                             metadata: result.metadata || null,
@@ -11941,6 +11952,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     key: displayKey,
                     title: displayKey.replace(/_/g, ' '),
                     job_id: currentJobId,
+                    run_id: currentRunId,  // Group all engines from same submission
                     output: output,
                     metadata: metadata,
                     extended_info: extInfo,
@@ -12974,7 +12986,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Library
-        let currentLibraryTab = 'jobs';  // 'jobs', 'outputs', 'inputs'
+        let currentLibraryTab = 'runs';  // 'runs', 'outputs', 'inputs'
 
         function switchLibraryTab(tab, updateHash) {
             currentLibraryTab = tab;
@@ -13233,33 +13245,40 @@ HTML_PAGE = '''<!DOCTYPE html>
                 case 'inputs':
                     renderLibraryByInputs(grid);
                     break;
-                case 'jobs':
+                case 'runs':
                 default:
-                    renderLibraryByJobs(grid);
+                    renderLibraryByRuns(grid);
                     break;
             }
         }
 
-        // ===== BY JOBS VIEW =====
-        function renderLibraryByJobs(grid) {
-            // Group items by job_id
+        // ===== BY RUN VIEW =====
+        // Groups items by run_id (items submitted together in same request)
+        // Falls back to job_id for legacy items without run_id
+        function renderLibraryByRuns(grid) {
             var groups = {};
             var ungrouped = [];
 
             libraryItems.forEach(function(item) {
-                if (item.job_id) {
-                    if (!groups[item.job_id]) {
-                        groups[item.job_id] = {
+                // Prefer run_id for grouping, fall back to job_id for legacy items
+                var groupKey = item.run_id || (item.job_id ? 'job_' + item.job_id : null);
+
+                if (groupKey) {
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = {
                             items: [],
                             addedAt: item.addedAt,
                             metadata: item.metadata || {},
-                            extended_info: item.extended_info || {}
+                            extended_info: item.extended_info || {},
+                            run_id: item.run_id,
+                            job_ids: new Set()
                         };
                     }
-                    groups[item.job_id].items.push(item);
+                    groups[groupKey].items.push(item);
+                    if (item.job_id) groups[groupKey].job_ids.add(item.job_id);
                     // Use earliest addedAt for the group
-                    if (item.addedAt && item.addedAt < groups[item.job_id].addedAt) {
-                        groups[item.job_id].addedAt = item.addedAt;
+                    if (item.addedAt && item.addedAt < groups[groupKey].addedAt) {
+                        groups[groupKey].addedAt = item.addedAt;
                     }
                 } else {
                     ungrouped.push(item);
@@ -13267,18 +13286,18 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
 
             // Sort groups by date (newest first)
-            var sortedJobIds = Object.keys(groups).sort(function(a, b) {
+            var sortedGroupKeys = Object.keys(groups).sort(function(a, b) {
                 return new Date(groups[b].addedAt) - new Date(groups[a].addedAt);
             });
 
             // Render grouped items
-            sortedJobIds.forEach(function(jobId) {
-                var group = groups[jobId];
-                var groupEl = createJobGroup(jobId, group);
+            sortedGroupKeys.forEach(function(groupKey) {
+                var group = groups[groupKey];
+                var groupEl = createRunGroup(groupKey, group);
                 grid.appendChild(groupEl);
             });
 
-            // Render ungrouped items (legacy items without job_id)
+            // Render ungrouped items (legacy items without job_id or run_id)
             if (ungrouped.length > 0) {
                 var ungroupedSection = document.createElement('div');
                 ungroupedSection.className = 'job-group';
@@ -14082,6 +14101,127 @@ HTML_PAGE = '''<!DOCTYPE html>
             groupEl.appendChild(itemsContainer);
 
             return groupEl;
+        }
+
+        // Create a group element for a run (multiple engines submitted together)
+        function createRunGroup(runKey, group) {
+            var groupEl = document.createElement('div');
+            groupEl.className = 'job-group run-group';
+            groupEl.dataset.runId = runKey;
+
+            // Deduplicate items by key
+            var seen = {};
+            var uniqueItems = [];
+            group.items.forEach(function(item) {
+                var itemKey = (item.job_id || '') + '::' + (item.key || item.title);
+                if (!seen[itemKey]) {
+                    seen[itemKey] = true;
+                    uniqueItems.push(item);
+                }
+            });
+
+            // Get extended info for display
+            var extInfo = group.extended_info || {};
+            var collectionName = extInfo.collection_name || '';
+            var docsTotal = extInfo.documents_total || 0;
+
+            // Get document names from extended_info
+            var docNames = [];
+            if (extInfo.documents && Array.isArray(extInfo.documents)) {
+                docNames = extInfo.documents.map(function(d) {
+                    return d.extracted_title || d.title || d.name || 'Untitled';
+                });
+            }
+            var docDisplay = docNames.length > 0 ? docNames[0] : (collectionName || 'Document');
+            if (docNames.length > 1) docDisplay += ' +' + (docNames.length - 1) + ' more';
+
+            // Get unique engine names from items
+            var engineNames = [];
+            var seenEngines = {};
+            uniqueItems.forEach(function(item) {
+                var name = item.engine_name || item.key || item.title;
+                if (!seenEngines[name]) {
+                    seenEngines[name] = true;
+                    engineNames.push(name);
+                }
+            });
+            var enginesDisplay = engineNames.slice(0, 3).join(', ');
+            if (engineNames.length > 3) enginesDisplay += ' +' + (engineNames.length - 3) + ' more';
+
+            // Count unique jobs
+            var jobCount = group.job_ids ? group.job_ids.size : 1;
+
+            var dateStr = group.addedAt ? new Date(group.addedAt).toLocaleDateString() : '';
+            var timeStr = group.addedAt ? new Date(group.addedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+
+            var header = document.createElement('div');
+            header.className = 'job-group-header';
+
+            // Build header with run info
+            var headerHtml = '<div class="job-group-top-row">' +
+                '<span class="job-group-toggle">▼</span>' +
+                '<div class="job-group-pipeline">' +
+                    '<div class="job-group-pipeline-type">Run</div>' +
+                    '<div class="job-group-pipeline-name">' + enginesDisplay.replace(/_/g, ' ') + '</div>' +
+                '</div>' +
+                '<div class="job-group-meta">' +
+                    '<span class="job-group-count" title="' + jobCount + ' jobs, ' + uniqueItems.length + ' outputs">' +
+                        jobCount + ' engine' + (jobCount !== 1 ? 's' : '') + ', ' +
+                        uniqueItems.length + ' output' + (uniqueItems.length !== 1 ? 's' : '') +
+                    '</span>' +
+                    '<span class="job-group-date">' + dateStr + ' ' + timeStr + '</span>' +
+                    '<button class="job-group-delete" onclick="event.stopPropagation(); deleteRun(&apos;' + runKey + '&apos;)" title="Delete this run">&times;</button>' +
+                '</div>' +
+            '</div>';
+
+            // Add document info row
+            headerHtml += '<div class="job-group-collection">' +
+                '<span class="job-group-collection-icon">📄</span>' +
+                '<span class="job-group-collection-name">' + docDisplay + '</span>' +
+                (docsTotal > 1 ? '<span class="job-group-docs-count">(' + docsTotal + ' docs)</span>' : '') +
+            '</div>';
+
+            header.innerHTML = headerHtml;
+
+            header.onclick = function(e) {
+                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
+                    groupEl.classList.toggle('collapsed');
+                }
+            };
+
+            var itemsContainer = document.createElement('div');
+            itemsContainer.className = 'job-group-items';
+
+            uniqueItems.forEach(function(item) {
+                var card = createLibraryCard(item, item._libraryIndex);
+                itemsContainer.appendChild(card);
+            });
+
+            groupEl.appendChild(header);
+            groupEl.appendChild(itemsContainer);
+
+            return groupEl;
+        }
+
+        // Delete all items from a run
+        function deleteRun(runKey) {
+            if (!confirm('Delete all outputs from this run?')) return;
+
+            // Remove items matching this run_id OR job_id (for legacy job_ prefixed keys)
+            libraryItems = libraryItems.filter(function(item) {
+                if (item.run_id === runKey) return false;
+                if (runKey.startsWith('job_') && item.job_id === runKey.slice(4)) return false;
+                return true;
+            });
+
+            // Update localStorage
+            try {
+                localStorage.setItem('visualizer_library', JSON.stringify(libraryItems));
+            } catch (e) {
+                console.error('Failed to save library:', e);
+            }
+
+            renderLibrary();
         }
 
         // Navigate to full job view

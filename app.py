@@ -8487,7 +8487,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 curatorLoading = false;
                 updateCuratorStatus();
                 updateAnalyzeButton();
-                renderSelectedEngines();  // Re-render to show curator format badges
+                renderSelectedEnginesPanel();  // Re-render to show curator format badges
 
                 return data;
 
@@ -8578,7 +8578,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 curatorLoading = false;
                 updateCuratorStatus();
                 updateAnalyzeButton();
-                renderSelectedEngines();  // Re-render to show curator format badges
+                renderSelectedEnginesPanel();  // Re-render to show curator format badges
 
                 return data;
 

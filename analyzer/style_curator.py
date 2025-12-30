@@ -1017,20 +1017,42 @@ Choose wisely - the style will fundamentally shape how readers understand the da
         # Score each style based on affinities
         style_scores = {school: 0.0 for school in StyleSchool}
 
-        # Engine affinity (weight: 3)
-        engine_styles = ENGINE_STYLE_AFFINITY.get(engine_key, ENGINE_STYLE_AFFINITY["_default"])
-        for i, school in enumerate(engine_styles):
-            style_scores[school] += (3 - i) * 3  # First choice gets 9, second gets 6
+        # Check if audience is a "strong preference" type (activist, etc.)
+        # These audiences explicitly want a specific style - should be decisive
+        strong_preference_audiences = {"activist"}  # Audiences where style choice is paramount
+        is_strong_preference = audience in strong_preference_audiences
 
-        # Format affinity (weight: 2)
-        format_styles = FORMAT_STYLE_AFFINITY.get(format_key, FORMAT_STYLE_AFFINITY["_default"])
-        for i, school in enumerate(format_styles):
-            style_scores[school] += (2 - i) * 2  # First choice gets 4, second gets 2
+        if is_strong_preference:
+            # For strong preference audiences, audience choice is DECISIVE
+            # Give massive weight to audience-preferred styles
+            audience_styles = AUDIENCE_STYLE_AFFINITY.get(audience, AUDIENCE_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(audience_styles):
+                style_scores[school] += (3 - i) * 10  # First choice gets 30, second gets 20
 
-        # Audience affinity (weight: 1)
-        audience_styles = AUDIENCE_STYLE_AFFINITY.get(audience, AUDIENCE_STYLE_AFFINITY["_default"])
-        for i, school in enumerate(audience_styles):
-            style_scores[school] += (2 - i)  # First choice gets 2, second gets 1
+            # Engine/format still contribute but much less
+            engine_styles = ENGINE_STYLE_AFFINITY.get(engine_key, ENGINE_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(engine_styles):
+                style_scores[school] += (3 - i)  # First choice gets 3, second gets 2
+
+            format_styles = FORMAT_STYLE_AFFINITY.get(format_key, FORMAT_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(format_styles):
+                style_scores[school] += (2 - i)  # First choice gets 2, second gets 1
+        else:
+            # Normal audiences: balanced scoring
+            # Engine affinity (weight: 3)
+            engine_styles = ENGINE_STYLE_AFFINITY.get(engine_key, ENGINE_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(engine_styles):
+                style_scores[school] += (3 - i) * 3  # First choice gets 9, second gets 6
+
+            # Format affinity (weight: 2)
+            format_styles = FORMAT_STYLE_AFFINITY.get(format_key, FORMAT_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(format_styles):
+                style_scores[school] += (2 - i) * 2  # First choice gets 4, second gets 2
+
+            # Audience affinity (weight: 1)
+            audience_styles = AUDIENCE_STYLE_AFFINITY.get(audience, AUDIENCE_STYLE_AFFINITY["_default"])
+            for i, school in enumerate(audience_styles):
+                style_scores[school] += (2 - i)  # First choice gets 2, second gets 1
 
         # Find the winner
         best_school = max(style_scores, key=lambda s: style_scores[s])
@@ -1040,6 +1062,11 @@ Choose wisely - the style will fundamentally shape how readers understand the da
         scores = sorted(style_scores.values(), reverse=True)
         margin = (scores[0] - scores[1]) / scores[0] if scores[0] > 0 else 0
         confidence = min(0.95, 0.6 + margin * 0.35)
+
+        # Log style selection for debugging
+        logger.info(f"Style selected: {best_school.value} (score={style_scores[best_school]:.0f}) for engine={engine_key}, format={format_key}, audience={audience}")
+        if is_strong_preference:
+            logger.info(f"  Strong preference audience '{audience}' - style is decisive")
 
         return StyleRecommendation(
             school=best_school,

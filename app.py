@@ -1717,7 +1717,8 @@ def check_feasibility():
 
     Request:
     {
-        "document_content": "...",  // Document text
+        "document_content": "...",  // Document text OR base64-encoded PDF
+        "encoding": "text|base64",  // Optional: if base64, will extract PDF text
         "engine_keys": ["engine1", "engine2"]  // Optional: specific engines to check
     }
 
@@ -1726,9 +1727,18 @@ def check_feasibility():
     try:
         data = request.json or {}
         document_content = data.get('document_content', '')
+        encoding = data.get('encoding', 'text')
 
         if not document_content or len(document_content) < 100:
             return jsonify({"error": "Document content required (min 100 chars)"}), 400
+
+        # If content is base64-encoded PDF, extract text first
+        if encoding == 'base64':
+            print(f"[FEASIBILITY] Extracting text from base64 PDF ({len(document_content)} chars)")
+            document_content = extract_pdf_from_base64(document_content)
+            print(f"[FEASIBILITY] Extracted {len(document_content)} chars of text")
+            if document_content.startswith('['):  # Error message
+                return jsonify({"error": f"PDF extraction failed: {document_content}"}), 400
 
         # Get user API keys if provided
         llm_keys = {}
@@ -8244,23 +8254,32 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Read document content
                 var content = '';
+                var encoding = 'text';
                 if (firstDoc.content) {
                     content = firstDoc.content;
+                    // Check if this is a PDF (base64 encoded)
+                    if (firstDoc.path && firstDoc.path.toLowerCase().endsWith('.pdf')) {
+                        encoding = 'base64';
+                    }
                 } else if (firstDoc.file) {
                     var fileData = await readFileContent(firstDoc.file);
                     content = fileData.content || '';
+                    encoding = fileData.encoding || 'text';
                 }
 
                 if (!content || content.length < 100) {
                     throw new Error('Document content too short for analysis');
                 }
 
+                console.log('[FEASIBILITY] Sending content with encoding:', encoding, 'length:', content.length);
+
                 // Call feasibility API
                 var response = await fetch('/api/analyzer/curator/feasibility', {
                     method: 'POST',
                     headers: getApiHeaders(),
                     body: JSON.stringify({
-                        document_content: content.substring(0, 100000)  // Limit to 100k chars
+                        document_content: content.substring(0, 500000),  // Allow larger for base64 PDFs
+                        encoding: encoding
                     })
                 });
 

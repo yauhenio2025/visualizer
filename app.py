@@ -8344,10 +8344,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                 btn.classList.toggle('active', btn.dataset.audience === audience);
             });
 
-            // Re-call curator if we have selected engines (immediate, since audience changed)
+            // Audience changed - clear any existing curator recommendations so user can re-curate
+            // (Manual trigger only - user must click button)
             if (selectedEngines.length > 0) {
-                var engineKeys = selectedEngines.map(function(e) { return e.engine_key; });
-                triggerCuratorNow();  // Immediate trigger for audience change
+                curatorRecommendations = null;  // Reset so button shows again
+                updateCuratorStatus();
             }
         }
 
@@ -8399,6 +8400,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                 if (curateBtn) curateBtn.disabled = true;
             } else if (curatorPending) {
                 if (status) status.innerHTML = '⏱️ Waiting... <button class="btn btn-sm btn-primary" onclick="triggerCuratorNow()" style="padding: 2px 8px; font-size: 11px; margin-left: 8px;">Curate Now</button>';
+                if (curateBtn) curateBtn.disabled = false;
+            } else if (selectedEngines.length > 0 && !curatorRecommendations) {
+                // Engines selected but no curation done yet - show prominent button
+                if (status) status.innerHTML = '<button class="btn btn-sm btn-warning" onclick="triggerCuratorNow()" style="padding: 4px 12px; font-size: 12px; font-weight: bold;">🧠 Get AI Recommendations</button>';
                 if (curateBtn) curateBtn.disabled = false;
             } else {
                 if (status) status.innerHTML = '';
@@ -10600,12 +10605,14 @@ HTML_PAGE = '''<!DOCTYPE html>
             renderOutputModes();
             updateAnalyzeButton();
 
-            // 🧠 Trigger Output Curator (Opus 4.5) for intelligent format recommendations
-            // Uses debounced batch API - waits 3 seconds for user to stop selecting
-            // User can click "Curate Now" button to trigger immediately
+            // 🧠 Output Curator (Opus 4.5) - MANUAL TRIGGER ONLY
+            // User must click "Curate" button to get AI recommendations
+            // No auto-curation on engine selection
             if (selectedEngines.length > 0) {
-                var allEngineKeys = [...new Set(selectedEngines.map(function(e) { return e.engine_key; }))];
-                scheduleCurator(allEngineKeys);  // Debounced - waits 3s before calling API
+                // Show curator panel in ready state (not auto-curating)
+                var panel = document.getElementById('curator-panel');
+                if (panel) panel.style.display = 'block';
+                updateCuratorStatus();  // Will show "Ready to curate" with button
             } else {
                 // No engines selected - cancel any pending curator and hide panel
                 if (curatorDebounceTimer) {

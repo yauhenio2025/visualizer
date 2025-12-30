@@ -41,6 +41,7 @@ class StyleSchool(Enum):
     FT_BURN_MURDOCH = "ft_burn_murdoch"
     LUPI_DATA_HUMANISM = "lupi_data_humanism"
     STEFANER_TRUTH_BEAUTY = "stefaner_truth_beauty"
+    ACTIVIST_AGITPROP = "activist_agitprop"
 
 
 @dataclass
@@ -539,6 +540,101 @@ STYLE INSTRUCTIONS (Moritz Stefaner / Truth & Beauty):
 )
 
 
+ACTIVIST_AGITPROP_STYLE = StyleGuide(
+    school=StyleSchool.ACTIVIST_AGITPROP,
+    name="Activist / Agitprop / Mobilization Graphics",
+    philosophy="""
+    Inspired by Soviet constructivism, protest graphics, and movement media:
+    - PROVOKE: Design to evoke emotional response and urgency
+    - CONTRAST: Stark visual opposition between heroes and villains
+    - BOLD: High-contrast, attention-grabbing compositions
+    - CLEAR: One unmistakable message per visualization
+    - ACTION: Every graphic implies "what you should do"
+    - SHAREABLE: Optimized for social media impact and virality
+    - RIGHTEOUS: Frame the issue as moral imperative, not neutral analysis
+    """,
+    color_palette={
+        "primary": "#CC0000",  # Revolutionary red
+        "secondary": "#000000",  # Stark black
+        "tertiary": "#FFFFFF",  # Pure white for contrast
+        "accent": "#FFD700",  # Gold/yellow for emphasis
+        "warning": "#FF4500",  # Orange-red for danger
+        "positive": "#228B22",  # Forest green (hope)
+        "background": "#1a1a1a",  # Dark background for drama
+    },
+    typography={
+        "primary_font": "Impact, Helvetica Black, Arial Black, sans-serif",
+        "title_font": "Impact, Helvetica Black, sans-serif",
+        "caption_font": "Arial, Helvetica, sans-serif",
+        "number_font": "Impact, Arial Black, sans-serif",
+        "title_size": "48-72px",  # BIG headlines
+        "caption_size": "14-16px",
+    },
+    layout_rules=[
+        "MAXIMUM visual impact - fill the frame",
+        "One dominant visual element - no visual democracy",
+        "Text should SHOUT - use all caps for key messages",
+        "High contrast ratios - nothing subtle",
+        "Arrows and visual direction guide the eye to the point",
+        "Use stark visual metaphors (chains, scales, clocks, etc.)",
+    ],
+    annotation_style="Bold callouts, accusatory arrows, stark labels. Frame villains with red, heroes with white/gold.",
+    gemini_modifiers="""
+STYLE INSTRUCTIONS (Activist / Agitprop / Mobilization Graphics):
+
+TONE:
+- This is NOT neutral analysis - take a clear moral position
+- Frame as INJUSTICE that demands response
+- Use power/victim dynamics explicitly
+- Imply urgency: "This is happening NOW"
+
+VISUAL APPROACH:
+- HIGH CONTRAST: Red/Black/White dominant palette
+- BOLD typography: Impact font, all caps for key messages
+- ONE CLEAR MESSAGE per visual
+- Stark visual metaphors: chains, scales, targets, crosshairs, clocks
+- Villains in red/dark, victims/heroes in white/gold
+- Dramatic lighting effects
+- Fill the frame - no empty space
+
+COMPOSITION:
+- Dominant central element (the INJUSTICE or the HERO)
+- Supporting data arranged to emphasize the point
+- Numbers should SHOCK: use comparison to make scale visceral
+- "X could pay for Y" style juxtapositions
+
+FORBIDDEN:
+- "Both sides" framing
+- Hedging language ("may", "possibly", "some argue")
+- Muted colors or subtle gradients
+- Complex legends that require study
+- Neutral tone
+
+EXAMPLES:
+- Show wealth inequality as visual scale imbalance
+- Depict corporate power as looming shadows over small figures
+- Use countdown clocks for climate deadlines
+- Show resource flows as blood/extraction imagery
+""",
+    best_for=[
+        "Power asymmetries and injustice",
+        "Resource extraction and inequality",
+        "Environmental urgency",
+        "Corporate accountability",
+        "Political mobilization content",
+        "Social media campaigns",
+        "Movement building materials",
+    ],
+    avoid_for=[
+        "Academic audiences expecting neutrality",
+        "Executive briefings requiring diplomatic tone",
+        "Complex multi-sided debates",
+        "Content requiring legal defensibility",
+        "Contexts where alienating opposition is counterproductive",
+    ],
+)
+
+
 # Consolidated style guide registry
 STYLE_GUIDES = {
     StyleSchool.TUFTE: TUFTE_STYLE,
@@ -546,6 +642,7 @@ STYLE_GUIDES = {
     StyleSchool.FT_BURN_MURDOCH: FT_BURN_MURDOCH_STYLE,
     StyleSchool.LUPI_DATA_HUMANISM: LUPI_DATA_HUMANISM_STYLE,
     StyleSchool.STEFANER_TRUTH_BEAUTY: STEFANER_TRUTH_BEAUTY_STYLE,
+    StyleSchool.ACTIVIST_AGITPROP: ACTIVIST_AGITPROP_STYLE,
 }
 
 
@@ -646,6 +743,7 @@ AUDIENCE_STYLE_AFFINITY = {
     "journalist": [StyleSchool.FT_BURN_MURDOCH, StyleSchool.NYT_COX],
     "academic": [StyleSchool.TUFTE, StyleSchool.STEFANER_TRUTH_BEAUTY],
     "creative": [StyleSchool.LUPI_DATA_HUMANISM, StyleSchool.STEFANER_TRUTH_BEAUTY],
+    "activist": [StyleSchool.ACTIVIST_AGITPROP, StyleSchool.LUPI_DATA_HUMANISM],  # Agitprop style for mobilization
     "_default": [StyleSchool.NYT_COX, StyleSchool.TUFTE],
 }
 

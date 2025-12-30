@@ -8017,6 +8017,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 <button class="audience-btn active" data-audience="analyst" onclick="setAudience('analyst')">Analyst</button>
                                 <button class="audience-btn" data-audience="executive" onclick="setAudience('executive')">Executive</button>
                                 <button class="audience-btn" data-audience="researcher" onclick="setAudience('researcher')">Researcher</button>
+                                <button class="audience-btn" data-audience="activist" onclick="setAudience('activist')" title="Agitprop style - bold, provocative, mobilizing">Activist</button>
                             </div>
 
                             <!-- Output Curator Panel (AI recommendations) -->

@@ -570,7 +570,7 @@ ACTIVIST_AGITPROP_STYLE = StyleGuide(
         "title_size": "48-72px",  # BIG headlines
         "caption_size": "14-16px",
     },
-    layout_rules=[
+    layout_principles=[
         "MAXIMUM visual impact - fill the frame",
         "One dominant visual element - no visual democracy",
         "Text should SHOUT - use all caps for key messages",

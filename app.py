@@ -9544,7 +9544,10 @@ HTML_PAGE = '''<!DOCTYPE html>
             'rhetoric': '&#128172;',    // Speech bubble
             'epistemology': '&#129504;', // Brain
             'scholarly': '&#127891;',   // Graduation cap
-            'market': '&#128176;'       // Money bag
+            'market': '&#128176;',      // Money bag
+            'methodology': '&#128300;', // Microscope
+            'systems': '&#9881;',       // Gear/Cog (for systems)
+            'institutional': '&#127963;' // Building
         };
 
         // Render category filter tabs

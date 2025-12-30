@@ -5042,21 +5042,32 @@ HTML_PAGE = '''<!DOCTYPE html>
         .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
         .btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
 
-        /* API Status */
+        /* API Status - subtle indicator */
         .api-status {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            gap: 0.35rem;
+            padding: 0.25rem 0.5rem;
             border-radius: var(--radius);
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-bottom: 1.25rem;
+            font-size: 0.65rem;
+            font-weight: 400;
+            margin-bottom: 0.75rem;
+            opacity: 0.7;
+            transition: opacity 0.3s;
         }
 
-        .api-status.connected { background: rgba(45,125,70,0.1); color: var(--success); }
-        .api-status.disconnected { background: rgba(179,58,58,0.1); color: var(--error); }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .api-status.connected {
+            background: transparent;
+            color: var(--success);
+            opacity: 0;  /* Hide when connected */
+            height: 0;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+        .api-status.disconnected { background: transparent; color: var(--text-muted); }
+        .status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
         /* Progress section */
         .progress-section {
@@ -9444,7 +9455,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 try {
-                    textEl.textContent = attempt === 0 ? 'Checking connection...' : 'Waking up services... (' + attempt + '/' + maxRetries + ')';
+                    textEl.textContent = attempt === 0 ? 'Connecting...' : 'Starting... (' + attempt + '/' + maxRetries + ')';
 
                     const controller = new AbortController();
                     const timeoutId = setTimeout(function() { controller.abort(); }, 30000); // 30s timeout

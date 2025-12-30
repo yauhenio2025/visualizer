@@ -1758,7 +1758,7 @@ def check_feasibility():
             f"{ANALYZER_API_URL}/v1/curator/feasibility",
             headers=get_analyzer_headers(),
             json=payload,
-            timeout=90.0,  # Give Claude time to analyze 70 engines (~35-45s typically)
+            timeout=150.0,  # Give Claude time to analyze 114 engines (~90-120s typically)
         )
         response.raise_for_status()
         return jsonify(response.json())

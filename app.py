@@ -5251,6 +5251,26 @@ HTML_PAGE = '''<!DOCTYPE html>
             cursor: not-allowed;
         }
 
+        .btn-danger-outline {
+            background: transparent;
+            color: var(--error);
+            border: 1px solid var(--error);
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-danger-outline:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        .cancel-job-section {
+            margin-top: 0.75rem;
+            text-align: center;
+        }
+
         .resume-hint {
             color: var(--text-muted);
             font-size: 0.85rem;
@@ -8075,6 +8095,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <span class="stage-badge" id="stage-curation">Curation</span>
                             <span class="stage-badge" id="stage-concretization">Concretization</span>
                             <span class="stage-badge" id="stage-rendering">Rendering</span>
+                        </div>
+                        <div id="cancel-job-section" class="cancel-job-section" style="display:none;">
+                            <button id="cancel-job-btn" class="btn btn-danger-outline" onclick="cancelCurrentJob()">✕ Cancel Job</button>
                         </div>
                         <div id="progress-warnings" class="progress-warnings" style="display:none;"></div>
                         <div id="job-url-section" class="job-url-section" style="display:none;">
@@ -11345,6 +11368,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             $('progress-section').classList.add('show');
+            $('cancel-job-section').style.display = 'block';  // Show cancel button
             $('results-grid').innerHTML = '';
             $('results-gallery').style.display = 'none';
             allResults = [];
@@ -13345,9 +13369,48 @@ HTML_PAGE = '''<!DOCTYPE html>
                 });
         }
 
+        function cancelCurrentJob() {
+            if (!currentJobId) {
+                alert('No job ID available to cancel');
+                return;
+            }
+
+            if (!confirm('Cancel this job? This cannot be undone.')) {
+                return;
+            }
+
+            var btn = $('cancel-job-btn');
+            btn.disabled = true;
+            btn.textContent = 'Cancelling...';
+
+            fetch('/api/analyzer/jobs/' + currentJobId, {
+                method: 'DELETE',
+                headers: getApiHeaders()
+            })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert('Cancel failed: ' + data.error);
+                        btn.disabled = false;
+                        btn.textContent = '✕ Cancel Job';
+                    } else {
+                        $('progress-text').textContent = 'Job cancelled';
+                        $('progress-text').style.color = 'var(--error)';
+                        $('cancel-job-section').style.display = 'none';
+                        finishAnalysis();
+                    }
+                })
+                .catch(function(error) {
+                    alert('Cancel failed: ' + error.message);
+                    btn.disabled = false;
+                    btn.textContent = '✕ Cancel Job';
+                });
+        }
+
         function finishAnalysis() {
             $('analyze-btn').disabled = false;
             updateAnalyzeButton();
+            $('cancel-job-section').style.display = 'none';  // Hide cancel button
 
             // Hide progress section after completion
             setTimeout(function() {
@@ -14274,6 +14337,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 // Start polling for this job
                 $('progress-section').classList.add('show');
+                $('cancel-job-section').style.display = 'block';  // Show cancel button
                 resetStages();
                 pollJobStatus(jobId);
 

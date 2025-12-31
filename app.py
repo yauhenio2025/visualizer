@@ -10904,8 +10904,8 @@ HTML_PAGE = '''<!DOCTYPE html>
             btn.disabled = true;
 
             // Get document content for smart match
-            var documentContent = await getFullDocumentContent();
-            if (!documentContent || documentContent.length < 100) {
+            var docData = await getFullDocumentContent();
+            if (!docData || !docData.content || docData.content.length < 100) {
                 resultDiv.innerHTML = '<div style="color:var(--warning);">Need more document content for analysis. Upload documents first.</div>';
                 btn.disabled = false;
                 return;
@@ -10924,7 +10924,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         'X-Anthropic-API-Key': keys.anthropic || ''
                     },
                     body: JSON.stringify({
-                        document_content: documentContent,
+                        document_content: docData.content,
+                        encoding: docData.encoding,
                         target_audience: audience,
                         num_recommendations: 5
                     })
@@ -10947,6 +10948,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         }
 
         // Get full document content for smart match (more thorough than curator sample)
+        // Returns {content: string, encoding: 'text'|'base64'}
         async function getFullDocumentContent() {
             var maxChars = 50000;  // Send more content for better analysis
             var contentParts = [];
@@ -10963,11 +10965,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     try {
                         var fileData = await readFileContent(doc.file);
                         if (fileData.encoding === 'base64') {
-                            // For PDFs, tell backend to extract
-                            // We'll pass the base64 content and set encoding
-                            content = fileData.content;
-                            // Return immediately for PDF - backend will handle extraction
-                            return content;  // This is base64
+                            // For PDFs, return immediately with encoding info
+                            return {content: fileData.content, encoding: 'base64'};
                         } else {
                             content = fileData.content || '';
                         }
@@ -10984,7 +10983,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             var fullContent = contentParts.join('\\n\\n---\\n\\n');
-            return fullContent.substring(0, maxChars);
+            return {content: fullContent.substring(0, maxChars), encoding: 'text'};
         }
 
         // Render smart match results

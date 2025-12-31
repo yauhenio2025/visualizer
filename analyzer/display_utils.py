@@ -241,6 +241,15 @@ def get_display_instructions() -> str:
     return """
 ## DISPLAY FORMATTING REQUIREMENTS (CRITICAL)
 
+⚠️ BRANDING & ATTRIBUTION - ABSOLUTELY FORBIDDEN:
+- DO NOT include any publication logos (no FT, NYT, WSJ, Bloomberg, etc.)
+- DO NOT include journalist names or bylines (no "John Burn-Murdoch", "Amanda Cox", etc.)
+- DO NOT include fake credits or attributions
+- DO NOT use copyrighted masthead designs or typography
+- The visualization must be ORIGINAL work, not attributed to any publication
+- Title should describe the CONTENT (e.g., "Stakeholder Power Analysis") NOT mimic a publication
+- This is a LEGAL requirement - violating it creates trademark/copyright issues
+
 LABEL FORMATTING:
 - Convert ALL snake_case and kebab-case identifiers to Title Case with spaces
 - Example: "technofascism_trajectory" → "Technofascism Trajectory"

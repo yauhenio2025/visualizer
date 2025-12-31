@@ -1769,6 +1769,105 @@ def check_feasibility():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/curator/smart-match', methods=['POST'])
+def smart_match():
+    """
+    Unified Smart Matcher - One-stop recommendation endpoint.
+
+    Combines feasibility check + smart selection + visualization curation.
+    Returns complete recommendations ready for immediate execution.
+
+    Request:
+    {
+        "document_content": "...",  // Document text OR base64-encoded PDF
+        "encoding": "text|base64",  // Optional: if base64, will extract PDF text
+        "analysis_goal": "...",     // Optional: what user wants to understand
+        "num_recommendations": 5,   // Optional: number of engines to recommend (1-10)
+        "target_audience": "analyst" // Optional: analyst, executive, researcher, activist
+    }
+
+    Returns:
+    {
+        "document_characteristics": {...},
+        "feasibility_summary": {"high_count": N, "medium_count": M, ...},
+        "smart_recommendations": [
+            {
+                "engine_key": "...",
+                "engine_name": "...",
+                "category": "...",
+                "archetype": "network|causal|temporal|...",
+                "confidence": 0.85,
+                "rationale": "Why this engine for this document",
+                "research_question": "...",
+                "target_audiences": ["analyst", "executive"],
+                "visualization": {
+                    "format_key": "quadrant_chart",
+                    "format_name": "Quadrant Chart",
+                    "style_school": "tufte",
+                    "rationale": "...",
+                    "gemini_prompt": "..."
+                },
+                "complementary_engines": ["engine1", "engine2"]
+            }
+        ],
+        "all_feasible_engines": ["engine1", "engine2", ...],
+        "analysis_strategy": "..."
+    }
+    """
+    try:
+        data = request.json or {}
+        document_content = data.get('document_content', '')
+        encoding = data.get('encoding', 'text')
+
+        if not document_content or len(document_content) < 100:
+            return jsonify({"error": "Document content required (min 100 chars)"}), 400
+
+        # If content is base64-encoded PDF, extract text first
+        if encoding == 'base64':
+            print(f"[SMART-MATCH] Extracting text from base64 PDF ({len(document_content)} chars)")
+            document_content = extract_pdf_from_base64(document_content)
+            print(f"[SMART-MATCH] Extracted {len(document_content)} chars of text")
+            if document_content.startswith('['):  # Error message
+                return jsonify({"error": f"PDF extraction failed: {document_content}"}), 400
+
+        # Get user API keys if provided
+        llm_keys = {}
+        anthropic_key = request.headers.get('X-Anthropic-API-Key') or data.get('anthropic_api_key')
+        if anthropic_key:
+            llm_keys['anthropic_api_key'] = anthropic_key
+
+        payload = {
+            "document_content": document_content,
+            "llm_keys": llm_keys,
+        }
+
+        # Add optional parameters
+        if data.get('analysis_goal'):
+            payload['analysis_goal'] = data['analysis_goal']
+        if data.get('num_recommendations'):
+            payload['num_recommendations'] = data['num_recommendations']
+        if data.get('target_audience'):
+            payload['target_audience'] = data['target_audience']
+
+        print(f"[SMART-MATCH] Calling analyzer with {len(document_content)} chars, {payload.get('num_recommendations', 5)} recommendations")
+
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/smart-match",
+            headers=get_analyzer_headers(),
+            json=payload,
+            timeout=180.0,  # Give time for feasibility + selection + visualization (up to 3 mins)
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except httpx.HTTPError as e:
+        print(f"[SMART-MATCH] HTTP Error: {str(e)}")
+        return jsonify({"error": f"Smart match failed: {str(e)}"}), 500
+    except Exception as e:
+        print(f"[SMART-MATCH] Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 def extract_pdf_from_base64(base64_content: str) -> str:
     """Extract text from base64-encoded PDF."""
     import base64
@@ -4822,6 +4921,237 @@ HTML_PAGE = '''<!DOCTYPE html>
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
+        /* Smart Curator Tabs */
+        .curator-tabs {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .curator-tab {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text-secondary);
+        }
+
+        .curator-tab:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        .curator-tab.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .curator-tab-content {
+            margin-top: 0.75rem;
+        }
+
+        .curator-smart-controls,
+        .curator-manual-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .smart-match-select {
+            padding: 0.35rem 0.5rem;
+            font-size: 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        /* Smart Match Results */
+        .smart-match-result {
+            font-size: 0.85rem;
+        }
+
+        .smart-match-loading {
+            color: var(--accent);
+            font-style: italic;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .smart-match-summary {
+            background: var(--bg-input);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .smart-match-summary .doc-chars {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .smart-match-summary .feasibility-stats {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .smart-recommendations-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .smart-rec-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+
+        .smart-rec-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(45, 125, 70, 0.15);
+        }
+
+        .smart-rec-card.selected {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(45,125,70,0.08) 0%, rgba(45,125,70,0.02) 100%);
+        }
+
+        .smart-rec-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .smart-rec-engine {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+
+        .smart-rec-badges {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+
+        .smart-rec-badge {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .smart-rec-badge.archetype {
+            background: rgba(59, 130, 246, 0.1);
+            color: rgb(59, 130, 246);
+        }
+
+        .smart-rec-badge.confidence {
+            background: rgba(45, 125, 70, 0.1);
+            color: var(--accent);
+        }
+
+        .smart-rec-badge.category {
+            background: rgba(156, 163, 175, 0.2);
+            color: var(--text-secondary);
+        }
+
+        .smart-rec-rationale {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 0.5rem;
+        }
+
+        .smart-rec-viz {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--bg-input);
+            border-radius: 4px;
+            font-size: 0.7rem;
+        }
+
+        .smart-rec-viz-icon {
+            font-size: 1rem;
+        }
+
+        .smart-rec-viz-info {
+            flex: 1;
+        }
+
+        .smart-rec-viz-format {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .smart-rec-viz-style {
+            color: var(--text-muted);
+            font-size: 0.65rem;
+        }
+
+        .smart-rec-audiences {
+            display: flex;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .audience-chip {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            background: rgba(156, 163, 175, 0.15);
+            border-radius: 2px;
+            color: var(--text-secondary);
+        }
+
+        .smart-match-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .smart-match-strategy {
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: rgba(45, 125, 70, 0.05);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .btn-accent:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-accent:disabled {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border-color: var(--border);
+            cursor: not-allowed;
+        }
+
         .curator-rec-header {
             display: flex;
             align-items: center;
@@ -7837,15 +8167,45 @@ HTML_PAGE = '''<!DOCTYPE html>
                             </div>
                         </div>
 
-                        <!-- Smart Curator -->
+                        <!-- Smart Curator - Tabbed Interface -->
                         <div id="curator-section" class="curator-section">
                             <div class="curator-header">
                                 <span class="section-label">Smart Curator</span>
-                                <button class="btn btn-sm" onclick="getCuratorRecommendations()" id="curator-btn" disabled title="Upload documents first">
-                                    Get AI Recommendations
-                                </button>
+                                <div class="curator-tabs">
+                                    <button class="curator-tab active" onclick="setCuratorTab('smart')" id="curator-tab-smart" title="AI picks best engines + visualizations">
+                                        ✨ AI Match
+                                    </button>
+                                    <button class="curator-tab" onclick="setCuratorTab('manual')" id="curator-tab-manual" title="Check feasibility & pick manually">
+                                        🎛️ Manual
+                                    </button>
+                                </div>
                             </div>
-                            <div id="curator-result" class="curator-result"></div>
+
+                            <!-- AI Match Tab Content -->
+                            <div id="curator-smart-content" class="curator-tab-content">
+                                <div class="curator-smart-controls">
+                                    <button class="btn btn-sm btn-accent" onclick="getSmartMatch()" id="smart-match-btn" disabled title="Upload documents first">
+                                        🧠 Get Smart Recommendations
+                                    </button>
+                                    <select id="smart-match-audience" class="smart-match-select" title="Target audience">
+                                        <option value="analyst">For Analysts</option>
+                                        <option value="executive">For Executives</option>
+                                        <option value="researcher">For Researchers</option>
+                                        <option value="activist">For Activists</option>
+                                    </select>
+                                </div>
+                                <div id="smart-match-result" class="smart-match-result"></div>
+                            </div>
+
+                            <!-- Manual Tab Content (existing behavior) -->
+                            <div id="curator-manual-content" class="curator-tab-content" style="display:none;">
+                                <div class="curator-manual-controls">
+                                    <button class="btn btn-sm" onclick="getCuratorRecommendations()" id="curator-btn" disabled title="Upload documents first">
+                                        Get Suggestions
+                                    </button>
+                                </div>
+                                <div id="curator-result" class="curator-result"></div>
+                            </div>
                         </div>
 
                         <!-- Quick Start Section (shows when docs uploaded) -->
@@ -10502,6 +10862,287 @@ HTML_PAGE = '''<!DOCTYPE html>
             btn.disabled = false;
         }
 
+        // ==========================================
+        // Smart Curator Tab Functions
+        // ==========================================
+
+        var currentCuratorTab = 'smart';
+        var smartMatchData = null;  // Store smart match results
+
+        // Switch between Smart Match and Manual tabs
+        function setCuratorTab(tab) {
+            currentCuratorTab = tab;
+
+            // Update tab buttons
+            document.querySelectorAll('.curator-tab').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            $('curator-tab-' + tab).classList.add('active');
+
+            // Show/hide content
+            $('curator-smart-content').style.display = tab === 'smart' ? 'block' : 'none';
+            $('curator-manual-content').style.display = tab === 'manual' ? 'block' : 'none';
+        }
+
+        // Update smart match button state based on document selection
+        function updateSmartMatchButton() {
+            var btn = $('smart-match-btn');
+            if (!btn) return;
+            var hasSelectedDocs = selectedDocs.size > 0;
+            btn.disabled = !hasSelectedDocs;
+            btn.title = hasSelectedDocs ? 'Get AI-powered recommendations with visualizations' : 'Upload documents first';
+        }
+
+        // Get smart match recommendations
+        async function getSmartMatch() {
+            var resultDiv = $('smart-match-result');
+            var btn = $('smart-match-btn');
+            var audience = $('smart-match-audience').value || 'analyst';
+
+            // Show loading state while reading files
+            resultDiv.innerHTML = '<div class="smart-match-loading">📖 Reading documents...</div>';
+            btn.disabled = true;
+
+            // Get document content for smart match
+            var documentContent = await getFullDocumentContent();
+            if (!documentContent || documentContent.length < 100) {
+                resultDiv.innerHTML = '<div style="color:var(--warning);">Need more document content for analysis. Upload documents first.</div>';
+                btn.disabled = false;
+                return;
+            }
+
+            // Update loading state
+            resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing document feasibility + matching engines + curating visualizations...<br><small>This may take 1-2 minutes</small></div>';
+
+            try {
+                var keys = getStoredKeys();
+
+                var response = await fetch('/api/analyzer/curator/smart-match', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Anthropic-API-Key': keys.anthropic || ''
+                    },
+                    body: JSON.stringify({
+                        document_content: documentContent,
+                        target_audience: audience,
+                        num_recommendations: 5
+                    })
+                });
+
+                if (!response.ok) {
+                    var errorData = await response.json();
+                    throw new Error(errorData.error || 'Smart match request failed');
+                }
+
+                smartMatchData = await response.json();
+                renderSmartMatchResults(smartMatchData);
+
+            } catch (e) {
+                console.error('Smart match error:', e);
+                resultDiv.innerHTML = '<div style="color:var(--error);">Smart match failed: ' + e.message + '</div>';
+            }
+
+            btn.disabled = false;
+        }
+
+        // Get full document content for smart match (more thorough than curator sample)
+        async function getFullDocumentContent() {
+            var maxChars = 50000;  // Send more content for better analysis
+            var contentParts = [];
+
+            var selectedDocObjects = scannedDocs.filter(function(doc) {
+                return selectedDocs.has(doc.path);
+            });
+
+            for (var i = 0; i < selectedDocObjects.length; i++) {
+                var doc = selectedDocObjects[i];
+                var content = '';
+
+                if (doc.file && doc.file instanceof File) {
+                    try {
+                        var fileData = await readFileContent(doc.file);
+                        if (fileData.encoding === 'base64') {
+                            // For PDFs, tell backend to extract
+                            // We'll pass the base64 content and set encoding
+                            content = fileData.content;
+                            // Return immediately for PDF - backend will handle extraction
+                            return content;  // This is base64
+                        } else {
+                            content = fileData.content || '';
+                        }
+                    } catch (e) {
+                        console.error('Error reading file:', e);
+                    }
+                } else if (doc.content) {
+                    content = doc.content;
+                }
+
+                if (content) {
+                    contentParts.push(content);
+                }
+            }
+
+            var fullContent = contentParts.join('\\n\\n---\\n\\n');
+            return fullContent.substring(0, maxChars);
+        }
+
+        // Render smart match results
+        function renderSmartMatchResults(data) {
+            var resultDiv = $('smart-match-result');
+
+            // Document characteristics summary
+            var chars = data.document_characteristics || {};
+            var feas = data.feasibility_summary || {};
+
+            var html = '<div class="smart-match-summary">';
+            html += '<div class="doc-chars">' + (chars.type || 'Document') + '</div>';
+            html += '<div class="feasibility-stats">';
+            html += '✅ ' + feas.high_count + ' high feasibility • ';
+            html += '⚡ ' + feas.medium_count + ' medium • ';
+            html += '⚠️ ' + feas.low_count + ' low • ';
+            html += 'Total: ' + feas.total_checked + ' engines checked';
+            html += '</div>';
+            html += '</div>';
+
+            // Recommendations list
+            html += '<div class="smart-recommendations-list">';
+
+            var recs = data.smart_recommendations || [];
+            recs.forEach(function(rec, idx) {
+                var viz = rec.visualization || {};
+                var isSelected = selectedEngines.some(function(se) { return se.engine_key === rec.engine_key; });
+
+                html += '<div class="smart-rec-card' + (isSelected ? ' selected' : '') + '" onclick="toggleSmartRecEngine(\\'' + rec.engine_key + '\\', ' + idx + ')">';
+
+                // Header with engine name and badges
+                html += '<div class="smart-rec-header">';
+                html += '<div class="smart-rec-engine">' + rec.engine_name + '</div>';
+                html += '<div class="smart-rec-badges">';
+                html += '<span class="smart-rec-badge archetype">' + rec.archetype + '</span>';
+                html += '<span class="smart-rec-badge confidence">' + Math.round(rec.confidence * 100) + '%</span>';
+                html += '<span class="smart-rec-badge category">' + rec.category + '</span>';
+                html += '</div>';
+                html += '</div>';
+
+                // Rationale
+                html += '<div class="smart-rec-rationale">' + rec.rationale + '</div>';
+
+                // Visualization recommendation
+                html += '<div class="smart-rec-viz">';
+                html += '<span class="smart-rec-viz-icon">📊</span>';
+                html += '<div class="smart-rec-viz-info">';
+                html += '<div class="smart-rec-viz-format">' + viz.format_name + '</div>';
+                html += '<div class="smart-rec-viz-style">Style: ' + (viz.style_school || 'standard') + '</div>';
+                html += '</div>';
+                html += '</div>';
+
+                // Target audiences
+                if (rec.target_audiences && rec.target_audiences.length > 0) {
+                    html += '<div class="smart-rec-audiences">';
+                    rec.target_audiences.forEach(function(aud) {
+                        html += '<span class="audience-chip">' + aud + '</span>';
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';  // End card
+            });
+
+            html += '</div>';  // End list
+
+            // Strategy
+            if (data.analysis_strategy) {
+                html += '<div class="smart-match-strategy">' +
+                    '<strong>Strategy:</strong> ' + data.analysis_strategy +
+                    '</div>';
+            }
+
+            // Action buttons
+            html += '<div class="smart-match-actions">';
+            html += '<button class="btn btn-sm btn-accent" onclick="useAllSmartRecommendations()">✨ Use All ' + recs.length + ' Recommendations</button>';
+            html += '<button class="btn btn-sm" onclick="clearSmartSelection()">Clear Selection</button>';
+            html += '</div>';
+
+            resultDiv.innerHTML = html;
+        }
+
+        // Toggle a smart recommendation engine
+        function toggleSmartRecEngine(engineKey, recIdx) {
+            if (!smartMatchData) return;
+
+            var rec = smartMatchData.smart_recommendations[recIdx];
+            if (!rec) return;
+
+            var existingIdx = selectedEngines.findIndex(function(se) {
+                return se.engine_key === engineKey;
+            });
+
+            if (existingIdx >= 0) {
+                // Remove from selection
+                selectedEngines.splice(existingIdx, 1);
+            } else {
+                // Add to selection with curated format
+                selectedEngines.push({
+                    engine_key: engineKey,
+                    output_mode: 'gemini_image',  // Default to visual
+                    format_key: rec.visualization.format_key,
+                    gemini_prompt: rec.visualization.gemini_prompt
+                });
+
+                // Store curated format info
+                curatorFormatKeys[engineKey] = rec.visualization.format_key;
+                curatorGeminiPrompts[engineKey] = rec.visualization.gemini_prompt;
+            }
+
+            // Re-render to update selection state
+            renderSmartMatchResults(smartMatchData);
+            renderSelectedEnginesPanel();
+            updateAnalyzeButton();
+        }
+
+        // Use all smart match recommendations
+        function useAllSmartRecommendations() {
+            if (!smartMatchData) return;
+
+            // Clear existing selection
+            selectedEngines = [];
+            curatorFormatKeys = {};
+            curatorGeminiPrompts = {};
+
+            // Add all recommendations
+            smartMatchData.smart_recommendations.forEach(function(rec) {
+                selectedEngines.push({
+                    engine_key: rec.engine_key,
+                    output_mode: 'gemini_image',
+                    format_key: rec.visualization.format_key,
+                    gemini_prompt: rec.visualization.gemini_prompt
+                });
+
+                curatorFormatKeys[rec.engine_key] = rec.visualization.format_key;
+                curatorGeminiPrompts[rec.engine_key] = rec.visualization.gemini_prompt;
+            });
+
+            // Switch to single engine mode to show selection
+            setEngineMode('engine');
+
+            // Re-render
+            renderSmartMatchResults(smartMatchData);
+            renderSelectedEnginesPanel();
+            renderEngines();
+            updateAnalyzeButton();
+        }
+
+        // Clear smart selection
+        function clearSmartSelection() {
+            selectedEngines = [];
+            if (smartMatchData) {
+                renderSmartMatchResults(smartMatchData);
+            }
+            renderSelectedEnginesPanel();
+            updateAnalyzeButton();
+        }
+
         // Check if output mode is compatible
         // With multi-engine selection, all modes are available (each engine has its own mode)
         function isOutputModeCompatible(mode) {
@@ -11102,6 +11743,7 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Also update curator button state
             updateCuratorButton();
+            updateSmartMatchButton();
         }
 
         // Intent-Based Analysis Functions

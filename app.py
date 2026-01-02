@@ -832,6 +832,47 @@ def extract_document_content(file_path: Path) -> Tuple[str, str]:
         return None, f"Error reading {file_path.name}: {str(e)}"
 
 
+@app.route('/api/analyzer/read-file', methods=['POST'])
+def read_file_api():
+    """
+    Read content from a single file.
+
+    Request: {"path": "/path/to/file.pdf", "max_chars": 10000}
+    Response: {"success": true, "content": "...", "encoding": "text"}
+    """
+    data = request.json or {}
+    file_path = data.get('path', '').strip()
+    max_chars = data.get('max_chars', 50000)
+
+    if not file_path:
+        return jsonify({"success": False, "error": "No path provided"})
+
+    path = Path(file_path).expanduser().resolve()
+
+    if not path.exists():
+        return jsonify({"success": False, "error": f"File not found: {file_path}"})
+
+    if not path.is_file():
+        return jsonify({"success": False, "error": "Path is not a file"})
+
+    content, error = read_file_content(path)
+
+    if error:
+        return jsonify({"success": False, "error": error})
+
+    # Truncate if needed
+    if content and len(content) > max_chars:
+        content = content[:max_chars]
+
+    return jsonify({
+        "success": True,
+        "content": content,
+        "encoding": "text",
+        "filename": path.name,
+        "chars_read": len(content) if content else 0
+    })
+
+
 @app.route('/api/analyzer/scan-folder', methods=['POST'])
 def scan_folder():
     """
@@ -11271,22 +11312,43 @@ HTML_PAGE = '''<!DOCTYPE html>
                 return selectedDocs.has(doc.path);
             });
 
+            console.log('[CollectionMatch] Processing ' + selectedDocObjects.length + ' selected documents');
+
             for (var i = 0; i < selectedDocObjects.length; i++) {
                 var doc = selectedDocObjects[i];
                 var content = '';
                 var encoding = 'text';
 
-                if (doc.file && doc.file instanceof File) {
-                    try {
+                try {
+                    if (doc.file && doc.file instanceof File) {
+                        // Drag-drop upload: read File object
                         var fileData = await readFileContent(doc.file);
                         content = fileData.content || '';
                         encoding = fileData.encoding || 'text';
-                    } catch (e) {
-                        console.error('Error reading file:', e);
-                        continue;
+                    } else if (doc.content) {
+                        // Web-saver import: already has content
+                        content = doc.content;
+                    } else if (doc.path) {
+                        // Local scan: need to read file from path
+                        console.log('[CollectionMatch] Reading local file: ' + doc.name);
+                        var fileResponse = await fetch('/api/analyzer/read-file', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ path: doc.path, max_chars: maxCharsPerDoc })
+                        });
+                        if (fileResponse.ok) {
+                            var fileData = await fileResponse.json();
+                            if (fileData.success) {
+                                content = fileData.content || '';
+                                encoding = fileData.encoding || 'text';
+                            } else {
+                                console.warn('[CollectionMatch] Failed to read ' + doc.name + ': ' + fileData.error);
+                            }
+                        }
                     }
-                } else if (doc.content) {
-                    content = doc.content;
+                } catch (e) {
+                    console.error('[CollectionMatch] Error reading ' + doc.name + ':', e);
+                    continue;
                 }
 
                 if (content && content.length > 50) {
@@ -11295,12 +11357,16 @@ HTML_PAGE = '''<!DOCTYPE html>
                         title: doc.name || doc.title || 'Document ' + (i + 1),
                         content: content.substring(0, maxCharsPerDoc),
                         encoding: encoding,
-                        source: doc.source || null,
-                        date: doc.date || null
+                        source: doc.source_name || doc.source || null,
+                        date: doc.date_published || doc.date || null
                     });
+                    console.log('[CollectionMatch] Added: ' + doc.name + ' (' + content.length + ' chars)');
+                } else {
+                    console.warn('[CollectionMatch] Skipped (no content): ' + doc.name);
                 }
             }
 
+            console.log('[CollectionMatch] Total documents with content: ' + documents.length);
             return documents;
         }
 

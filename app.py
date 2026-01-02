@@ -11625,6 +11625,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             renderCollectionSmartMatchResults(smartMatchData);
+            updateAnalyzeButton();
         }
 
         // Use all collection recommendations (both per-doc and collection-level)
@@ -11647,6 +11648,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
 
             renderCollectionSmartMatchResults(smartMatchData);
+            updateAnalyzeButton();
         }
 
         // Use only collection-level engines (for pattern discovery)
@@ -11664,6 +11666,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             });
 
             renderCollectionSmartMatchResults(smartMatchData);
+            updateAnalyzeButton();
         }
 
         // Toggle a smart recommendation engine

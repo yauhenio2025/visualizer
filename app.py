@@ -1868,6 +1868,117 @@ def smart_match():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analyzer/curator/collection-smart-match', methods=['POST'])
+def collection_smart_match():
+    """
+    Collection Smart Match - Recommendations for multi-document collections.
+
+    Unlike single-doc smart-match, this endpoint:
+    1. Strategically samples multiple documents
+    2. Analyzes collection coherence
+    3. Returns TWO recommendation sets:
+       - Per-document engines (run on each doc individually)
+       - Collection-level engines (reveal cross-document patterns)
+    4. Recommends pattern framework (conceptual/relational/temporal/etc.)
+    5. Predicts emergent patterns
+
+    Request:
+    {
+        "documents": [
+            {"id": "doc1", "title": "...", "content": "...", "source": "...", "date": "..."},
+            ...
+        ],
+        "analysis_goal": "...",  // Optional
+        "target_audience": "researcher",  // Optional
+        "num_per_doc_recommendations": 5,  // Optional
+        "num_collection_recommendations": 5  // Optional
+    }
+
+    Returns:
+    {
+        "collection_size": N,
+        "documents_sampled": M,
+        "collection_profile": {...},
+        "per_doc_recommendations": [...],
+        "collection_recommendations": [...],
+        "pattern_framework": {...},
+        "analysis_strategy": "..."
+    }
+    """
+    try:
+        data = request.json or {}
+        documents = data.get('documents', [])
+
+        if not documents or len(documents) < 2:
+            return jsonify({"error": "At least 2 documents required for collection analysis"}), 400
+
+        # Process documents - extract PDF text if needed
+        processed_docs = []
+        for doc in documents:
+            content = doc.get('content', '')
+
+            # If content is base64-encoded PDF, extract text
+            if doc.get('encoding') == 'base64' and content:
+                print(f"[COLLECTION-SMART-MATCH] Extracting text from PDF: {doc.get('title', 'unknown')}")
+                content = extract_pdf_from_base64(content)
+                if content.startswith('['):  # Error message
+                    print(f"[COLLECTION-SMART-MATCH] PDF extraction failed for {doc.get('title')}")
+                    content = ""  # Skip this doc
+
+            processed_docs.append({
+                "id": doc.get('id', str(len(processed_docs))),
+                "title": doc.get('title', 'Untitled'),
+                "content": content,
+                "source": doc.get('source'),
+                "date": doc.get('date'),
+            })
+
+        # Filter out docs with no content
+        processed_docs = [d for d in processed_docs if d['content'] and len(d['content']) > 50]
+
+        if len(processed_docs) < 2:
+            return jsonify({"error": "Need at least 2 documents with extractable content"}), 400
+
+        # Get user API keys
+        llm_keys = {}
+        anthropic_key = request.headers.get('X-Anthropic-API-Key') or data.get('anthropic_api_key')
+        if anthropic_key:
+            llm_keys['anthropic_api_key'] = anthropic_key
+
+        payload = {
+            "documents": processed_docs,
+            "llm_keys": llm_keys,
+        }
+
+        # Add optional parameters
+        if data.get('analysis_goal'):
+            payload['analysis_goal'] = data['analysis_goal']
+        if data.get('target_audience'):
+            payload['target_audience'] = data['target_audience']
+        if data.get('num_per_doc_recommendations'):
+            payload['num_per_doc_recommendations'] = data['num_per_doc_recommendations']
+        if data.get('num_collection_recommendations'):
+            payload['num_collection_recommendations'] = data['num_collection_recommendations']
+
+        print(f"[COLLECTION-SMART-MATCH] Calling analyzer with {len(processed_docs)} documents")
+
+        response = httpx.post(
+            f"{ANALYZER_API_URL}/v1/curator/collection-smart-match",
+            headers=get_analyzer_headers(),
+            json=payload,
+            timeout=180.0,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except httpx.HTTPError as e:
+        print(f"[COLLECTION-SMART-MATCH] HTTP Error: {str(e)}")
+        return jsonify({"error": f"Collection smart match failed: {str(e)}"}), 500
+    except Exception as e:
+        print(f"[COLLECTION-SMART-MATCH] Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 def extract_pdf_from_base64(base64_content: str) -> str:
     """Extract text from base64-encoded PDF."""
     import base64
@@ -5133,6 +5244,172 @@ HTML_PAGE = '''<!DOCTYPE html>
             font-size: 0.75rem;
             color: var(--text-secondary);
             line-height: 1.4;
+        }
+
+        /* Collection Smart Match Styles */
+        .collection-profile {
+            background: linear-gradient(135deg, rgba(45,125,70,0.08) 0%, rgba(45,125,70,0.02) 100%);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .collection-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .collection-badge {
+            background: var(--bg-input);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .collection-badge.coherence-high {
+            background: rgba(45, 125, 70, 0.15);
+            color: var(--accent);
+        }
+
+        .collection-badge.coherence-medium {
+            background: rgba(255, 193, 7, 0.15);
+            color: #b8860b;
+        }
+
+        .collection-badge.coherence-low {
+            background: rgba(220, 53, 69, 0.15);
+            color: #dc3545;
+        }
+
+        .collection-threads {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .thread-chip {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.15rem 0.4rem;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        .pattern-framework-box {
+            background: rgba(138, 43, 226, 0.06);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .framework-header {
+            font-size: 0.8rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .framework-rationale {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .likely-patterns {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .patterns-label, .ep-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        .pattern-chip {
+            background: rgba(138, 43, 226, 0.12);
+            color: #8b2be2;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 500;
+        }
+
+        .pattern-chip.small {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+        }
+
+        .rec-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .rec-section.collection-section {
+            background: rgba(138, 43, 226, 0.03);
+            border-radius: 8px;
+            padding: 0.75rem;
+            border: 1px solid rgba(138, 43, 226, 0.1);
+        }
+
+        .rec-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .rec-section-icon {
+            font-size: 1rem;
+        }
+
+        .rec-section-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text);
+        }
+
+        .rec-section-desc {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .smart-rec-card.collection-rec {
+            background: rgba(138, 43, 226, 0.02);
+            border-color: rgba(138, 43, 226, 0.15);
+        }
+
+        .smart-rec-card.collection-rec:hover {
+            border-color: #8b2be2;
+            box-shadow: 0 2px 8px rgba(138, 43, 226, 0.15);
+        }
+
+        .smart-rec-card.collection-rec.selected {
+            border-color: #8b2be2;
+            background: linear-gradient(135deg, rgba(138,43,226,0.1) 0%, rgba(138,43,226,0.02) 100%);
+        }
+
+        .smart-rec-badge.cross-doc {
+            background: rgba(138, 43, 226, 0.15);
+            color: #8b2be2;
+        }
+
+        .expected-patterns {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+            padding-top: 0.35rem;
+            border-top: 1px dashed var(--border);
         }
 
         .btn-accent {
@@ -10903,41 +11180,79 @@ HTML_PAGE = '''<!DOCTYPE html>
             resultDiv.innerHTML = '<div class="smart-match-loading">📖 Reading documents...</div>';
             btn.disabled = true;
 
-            // Get document content for smart match
-            var docData = await getFullDocumentContent();
-            if (!docData || !docData.content || docData.content.length < 100) {
-                resultDiv.innerHTML = '<div style="color:var(--warning);">Need more document content for analysis. Upload documents first.</div>';
-                btn.disabled = false;
-                return;
-            }
-
-            // Update loading state
-            resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing document feasibility + matching engines + curating visualizations...<br><small>This may take 1-2 minutes</small></div>';
+            // Check if this is a collection analysis (multiple docs in single collection mode)
+            var isCollectionAnalysis = collectionMode === 'single' && selectedDocs.size > 1;
 
             try {
                 var keys = getStoredKeys();
 
-                var response = await fetch('/api/analyzer/curator/smart-match', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Anthropic-API-Key': keys.anthropic || ''
-                    },
-                    body: JSON.stringify({
-                        document_content: docData.content,
-                        encoding: docData.encoding,
-                        target_audience: audience,
-                        num_recommendations: 5
-                    })
-                });
+                if (isCollectionAnalysis) {
+                    // COLLECTION MODE: Get documents as separate objects
+                    var documents = await getDocumentsForCollectionMatch();
+                    if (!documents || documents.length < 2) {
+                        resultDiv.innerHTML = '<div style="color:var(--warning);">Need at least 2 documents for collection analysis.</div>';
+                        btn.disabled = false;
+                        return;
+                    }
 
-                if (!response.ok) {
-                    var errorData = await response.json();
-                    throw new Error(errorData.error || 'Smart match request failed');
+                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing collection (' + documents.length + ' docs)...<br><small>Detecting patterns across documents • 1-2 minutes</small></div>';
+
+                    var response = await fetch('/api/analyzer/curator/collection-smart-match', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Anthropic-API-Key': keys.anthropic || ''
+                        },
+                        body: JSON.stringify({
+                            documents: documents,
+                            target_audience: audience,
+                            num_per_doc_recommendations: 5,
+                            num_collection_recommendations: 5
+                        })
+                    });
+
+                    if (!response.ok) {
+                        var errorData = await response.json();
+                        throw new Error(errorData.error || 'Collection smart match failed');
+                    }
+
+                    smartMatchData = await response.json();
+                    smartMatchData._isCollection = true;  // Flag for rendering
+                    renderCollectionSmartMatchResults(smartMatchData);
+
+                } else {
+                    // SINGLE DOC MODE: Original behavior
+                    var docData = await getFullDocumentContent();
+                    if (!docData || !docData.content || docData.content.length < 100) {
+                        resultDiv.innerHTML = '<div style="color:var(--warning);">Need more document content for analysis. Upload documents first.</div>';
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing document feasibility + matching engines + curating visualizations...<br><small>This may take 1-2 minutes</small></div>';
+
+                    var response = await fetch('/api/analyzer/curator/smart-match', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Anthropic-API-Key': keys.anthropic || ''
+                        },
+                        body: JSON.stringify({
+                            document_content: docData.content,
+                            encoding: docData.encoding,
+                            target_audience: audience,
+                            num_recommendations: 5
+                        })
+                    });
+
+                    if (!response.ok) {
+                        var errorData = await response.json();
+                        throw new Error(errorData.error || 'Smart match request failed');
+                    }
+
+                    smartMatchData = await response.json();
+                    renderSmartMatchResults(smartMatchData);
                 }
-
-                smartMatchData = await response.json();
-                renderSmartMatchResults(smartMatchData);
 
             } catch (e) {
                 console.error('Smart match error:', e);
@@ -10945,6 +11260,48 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
 
             btn.disabled = false;
+        }
+
+        // Get documents as separate objects for collection smart match
+        async function getDocumentsForCollectionMatch() {
+            var maxCharsPerDoc = 10000;  // Sample per document
+            var documents = [];
+
+            var selectedDocObjects = scannedDocs.filter(function(doc) {
+                return selectedDocs.has(doc.path);
+            });
+
+            for (var i = 0; i < selectedDocObjects.length; i++) {
+                var doc = selectedDocObjects[i];
+                var content = '';
+                var encoding = 'text';
+
+                if (doc.file && doc.file instanceof File) {
+                    try {
+                        var fileData = await readFileContent(doc.file);
+                        content = fileData.content || '';
+                        encoding = fileData.encoding || 'text';
+                    } catch (e) {
+                        console.error('Error reading file:', e);
+                        continue;
+                    }
+                } else if (doc.content) {
+                    content = doc.content;
+                }
+
+                if (content && content.length > 50) {
+                    documents.push({
+                        id: doc.path || 'doc_' + i,
+                        title: doc.name || doc.title || 'Document ' + (i + 1),
+                        content: content.substring(0, maxCharsPerDoc),
+                        encoding: encoding,
+                        source: doc.source || null,
+                        date: doc.date || null
+                    });
+                }
+            }
+
+            return documents;
         }
 
         // Get full document content for smart match (more thorough than curator sample)
@@ -11064,6 +11421,183 @@ HTML_PAGE = '''<!DOCTYPE html>
             html += '</div>';
 
             resultDiv.innerHTML = html;
+        }
+
+        // Render COLLECTION smart match results (two recommendation sections)
+        function renderCollectionSmartMatchResults(data) {
+            var resultDiv = $('smart-match-result');
+            var profile = data.collection_profile || {};
+            var framework = data.pattern_framework || {};
+
+            var html = '';
+
+            // Collection profile header
+            html += '<div class="collection-profile">';
+            html += '<div class="collection-header">';
+            html += '<span class="collection-badge">' + data.collection_size + ' docs</span>';
+            html += '<span class="collection-badge coherence-' + profile.coherence + '">' + profile.coherence + ' coherence</span>';
+            html += '<span class="collection-badge">' + profile.domain + '</span>';
+            html += '</div>';
+            html += '<div class="collection-threads">';
+            (profile.thematic_threads || []).forEach(function(thread) {
+                html += '<span class="thread-chip">' + thread + '</span>';
+            });
+            html += '</div>';
+            html += '</div>';
+
+            // Pattern Framework recommendation
+            html += '<div class="pattern-framework-box">';
+            html += '<div class="framework-header">🔮 Pattern Framework: <strong>' + framework.primary_framework.toUpperCase() + '</strong></div>';
+            html += '<div class="framework-rationale">' + framework.rationale + '</div>';
+            html += '<div class="likely-patterns">';
+            html += '<span class="patterns-label">Likely patterns:</span> ';
+            (framework.likely_patterns || []).forEach(function(p) {
+                html += '<span class="pattern-chip">' + p + '</span>';
+            });
+            html += '</div>';
+            html += '</div>';
+
+            // PER-DOCUMENT Recommendations section
+            html += '<div class="rec-section">';
+            html += '<div class="rec-section-header">';
+            html += '<span class="rec-section-icon">📄</span>';
+            html += '<span class="rec-section-title">Per-Document Engines</span>';
+            html += '<span class="rec-section-desc">Run on each document individually</span>';
+            html += '</div>';
+            html += '<div class="smart-recommendations-list">';
+
+            var perDocRecs = data.per_doc_recommendations || [];
+            perDocRecs.forEach(function(rec, idx) {
+                var isSelected = selectedEngines.some(function(se) { return se.engine_key === rec.engine_key; });
+
+                html += '<div class="smart-rec-card' + (isSelected ? ' selected' : '') + '" onclick="toggleCollectionRecEngine(\\'' + rec.engine_key + '\\', \\'per_doc\\', ' + idx + ')">';
+                html += '<div class="smart-rec-header">';
+                html += '<div class="smart-rec-engine">' + rec.engine_name + '</div>';
+                html += '<div class="smart-rec-badges">';
+                html += '<span class="smart-rec-badge confidence">' + Math.round(rec.confidence * 100) + '%</span>';
+                html += '<span class="smart-rec-badge category">' + rec.category + '</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="smart-rec-rationale">' + rec.rationale + '</div>';
+                html += '</div>';
+            });
+            html += '</div></div>';
+
+            // COLLECTION-LEVEL Recommendations section
+            html += '<div class="rec-section collection-section">';
+            html += '<div class="rec-section-header">';
+            html += '<span class="rec-section-icon">🔗</span>';
+            html += '<span class="rec-section-title">Collection Analysis Engines</span>';
+            html += '<span class="rec-section-desc">Reveal cross-document patterns</span>';
+            html += '</div>';
+            html += '<div class="smart-recommendations-list">';
+
+            var collectionRecs = data.collection_recommendations || [];
+            collectionRecs.forEach(function(rec, idx) {
+                var isSelected = selectedEngines.some(function(se) { return se.engine_key === rec.engine_key; });
+
+                html += '<div class="smart-rec-card collection-rec' + (isSelected ? ' selected' : '') + '" onclick="toggleCollectionRecEngine(\\'' + rec.engine_key + '\\', \\'collection\\', ' + idx + ')">';
+                html += '<div class="smart-rec-header">';
+                html += '<div class="smart-rec-engine">' + rec.engine_name + '</div>';
+                html += '<div class="smart-rec-badges">';
+                html += '<span class="smart-rec-badge cross-doc">' + rec.cross_doc_value + ' cross-doc</span>';
+                html += '<span class="smart-rec-badge confidence">' + Math.round(rec.confidence * 100) + '%</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="smart-rec-rationale">' + rec.rationale + '</div>';
+                if (rec.expected_patterns && rec.expected_patterns.length > 0) {
+                    html += '<div class="expected-patterns">';
+                    html += '<span class="ep-label">Expected patterns:</span> ';
+                    rec.expected_patterns.forEach(function(p) {
+                        html += '<span class="pattern-chip small">' + p + '</span>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+            });
+            html += '</div></div>';
+
+            // Strategy
+            if (data.analysis_strategy) {
+                html += '<div class="smart-match-strategy">' +
+                    '<strong>Strategy:</strong> ' + data.analysis_strategy +
+                    '</div>';
+            }
+
+            // Action buttons
+            html += '<div class="smart-match-actions">';
+            html += '<button class="btn btn-sm btn-accent" onclick="useAllCollectionRecommendations()">✨ Use All Recommendations</button>';
+            html += '<button class="btn btn-sm" onclick="useCollectionEnginesOnly()">🔗 Collection Engines Only</button>';
+            html += '<button class="btn btn-sm" onclick="clearSmartSelection()">Clear</button>';
+            html += '</div>';
+
+            resultDiv.innerHTML = html;
+        }
+
+        // Toggle engine from collection recommendations
+        function toggleCollectionRecEngine(engineKey, recType, recIdx) {
+            if (!smartMatchData) return;
+
+            var recs = recType === 'collection'
+                ? smartMatchData.collection_recommendations
+                : smartMatchData.per_doc_recommendations;
+            var rec = recs[recIdx];
+            if (!rec) return;
+
+            var existingIdx = selectedEngines.findIndex(function(se) {
+                return se.engine_key === engineKey;
+            });
+
+            if (existingIdx >= 0) {
+                selectedEngines.splice(existingIdx, 1);
+            } else {
+                selectedEngines.push({
+                    engine_key: rec.engine_key,
+                    engine_name: rec.engine_name,
+                    category: rec.category
+                });
+            }
+
+            renderCollectionSmartMatchResults(smartMatchData);
+        }
+
+        // Use all collection recommendations (both per-doc and collection-level)
+        function useAllCollectionRecommendations() {
+            if (!smartMatchData || !smartMatchData._isCollection) return;
+
+            selectedEngines = [];
+
+            var allRecs = (smartMatchData.per_doc_recommendations || [])
+                .concat(smartMatchData.collection_recommendations || []);
+
+            allRecs.forEach(function(rec) {
+                if (!selectedEngines.some(function(se) { return se.engine_key === rec.engine_key; })) {
+                    selectedEngines.push({
+                        engine_key: rec.engine_key,
+                        engine_name: rec.engine_name,
+                        category: rec.category
+                    });
+                }
+            });
+
+            renderCollectionSmartMatchResults(smartMatchData);
+        }
+
+        // Use only collection-level engines (for pattern discovery)
+        function useCollectionEnginesOnly() {
+            if (!smartMatchData || !smartMatchData._isCollection) return;
+
+            selectedEngines = [];
+
+            (smartMatchData.collection_recommendations || []).forEach(function(rec) {
+                selectedEngines.push({
+                    engine_key: rec.engine_key,
+                    engine_name: rec.engine_name,
+                    category: rec.category
+                });
+            });
+
+            renderCollectionSmartMatchResults(smartMatchData);
         }
 
         // Toggle a smart recommendation engine

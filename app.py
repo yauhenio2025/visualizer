@@ -8604,10 +8604,11 @@ HTML_PAGE = '''<!DOCTYPE html>
                             <!-- Audience Selector -->
                             <div class="audience-selector" id="audience-selector">
                                 <span style="font-size: 0.65rem; color: var(--text-muted); margin-right: 0.3rem;">Audience:</span>
-                                <button class="audience-btn active" data-audience="analyst" onclick="setAudience('analyst')">Analyst</button>
-                                <button class="audience-btn" data-audience="executive" onclick="setAudience('executive')">Executive</button>
-                                <button class="audience-btn" data-audience="researcher" onclick="setAudience('researcher')">Researcher</button>
-                                <button class="audience-btn" data-audience="activist" onclick="setAudience('activist')" title="Agitprop style - bold, provocative, mobilizing">Activist</button>
+                                <button class="audience-btn active" data-audience="analyst" onclick="setAudience('analyst')" title="Data-dense, professional, comprehensive">Analyst</button>
+                                <button class="audience-btn" data-audience="executive" onclick="setAudience('executive')" title="Helicopter view - top 3-5 points only">Executive</button>
+                                <button class="audience-btn" data-audience="researcher" onclick="setAudience('researcher')" title="Academic rigor, methodology, citations">Researcher</button>
+                                <button class="audience-btn" data-audience="activist" onclick="setAudience('activist')" title="Action-oriented, power dynamics, human-centered">Activist</button>
+                                <button class="audience-btn" data-audience="social_movements" onclick="setAudience('social_movements')" title="AGITPROP - bold, mobilizing, collective action">Movement</button>
                             </div>
 
                             <!-- Visual output mode cards -->
@@ -12053,7 +12054,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             engine: engineKey,
                             output_mode: selectedEngines[0].output_mode,
                             collection_mode: collectionMode,
-                            collection_name: currentCollectionName
+                            collection_name: currentCollectionName,
+                            context: { target_audience: currentAudience }  // Pass audience for visual styling
                         };
 
                         // Note: format_key and gemini_prompt are now loaded from DB by the backend
@@ -12076,7 +12078,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 engine: engineEntry.engine_key,
                                 output_mode: engineEntry.output_mode,
                                 collection_mode: collectionMode,
-                                collection_name: currentCollectionName
+                                collection_name: currentCollectionName,
+                                context: { target_audience: currentAudience }  // Pass audience for visual styling
                             };
 
                             // Note: format_key and gemini_prompt are now loaded from DB by the backend
@@ -12126,7 +12129,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             engines: selectedEngines.map(function(e) { return e.engine_key; }),
                             output_modes: multiOutputModes,
                             collection_mode: collectionMode,
-                            collection_name: currentCollectionName
+                            collection_name: currentCollectionName,
+                            context: { target_audience: currentAudience }  // Pass audience for visual styling
                         };
 
                         // Note: format_keys and gemini_prompts are now loaded from DB by the backend
@@ -12157,7 +12161,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                         const payload = {
                             bundle: selectedBundle,
                             output_modes: outputModes,
-                            collection_name: currentCollectionName
+                            collection_name: currentCollectionName,
+                            context: { target_audience: currentAudience }  // Pass audience for visual styling
                         };
 
                         if (docData.type === 'paths') {
@@ -12182,7 +12187,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             const payload = {
                                 bundle: selectedBundle,
                                 output_modes: outputModes,
-                                collection_name: currentCollectionName
+                                collection_name: currentCollectionName,
+                                context: { target_audience: currentAudience }  // Pass audience for visual styling
                             };
 
                             if (docData.type === 'paths') {
@@ -12242,7 +12248,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     const payload = {
                         intent: intentText,
                         output_modes: outputModes.length > 0 ? outputModes : ['gemini_image'],
-                        collection_name: currentCollectionName
+                        collection_name: currentCollectionName,
+                        context: { target_audience: currentAudience }  // Pass audience for visual styling
                     };
 
                     if (docData.type === 'paths') {
@@ -12266,7 +12273,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                             pipeline: selectedPipeline,
                             output_mode: pipelineMode,
                             include_intermediate_outputs: true,
-                            collection_name: currentCollectionName
+                            collection_name: currentCollectionName,
+                            context: { target_audience: currentAudience }  // Pass audience for visual styling
                         };
 
                         if (docData.type === 'paths') {
@@ -12287,7 +12295,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 pipeline: selectedPipeline,
                                 output_mode: mode,
                                 include_intermediate_outputs: true,
-                                collection_name: currentCollectionName
+                                collection_name: currentCollectionName,
+                                context: { target_audience: currentAudience }  // Pass audience for visual styling
                             };
 
                             if (docData.type === 'paths') {

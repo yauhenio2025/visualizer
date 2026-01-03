@@ -10277,17 +10277,21 @@ HTML_PAGE = '''<!DOCTYPE html>
             var compatibleModes = outputModes;
 
             // Separate into three categories
+            // Visual modes: gemini_* plus smart_table (which renders as Gemini image)
+            var visualModeKeys = ['smart_table'];  // Non-gemini modes that are visual
+            var isVisualMode = function(key) { return key.startsWith('gemini_') || visualModeKeys.includes(key); };
+
             var analysisReports = compatibleModes.filter(function(m) { return analysisReportTypes.includes(m.mode_key); });
-            var visualModes = compatibleModes.filter(function(m) { return m.mode_key.startsWith('gemini_'); });
+            var visualModes = compatibleModes.filter(function(m) { return isVisualMode(m.mode_key); });
             var dataFormats = compatibleModes.filter(function(m) {
-                return !m.mode_key.startsWith('gemini_') && !analysisReportTypes.includes(m.mode_key);
+                return !isVisualMode(m.mode_key) && !analysisReportTypes.includes(m.mode_key);
             });
 
             // Count selected per category
             var reportsSelected = selectedOutputModes.filter(function(m) { return analysisReportTypes.includes(m); }).length;
-            var visualSelected = selectedOutputModes.filter(function(m) { return m.startsWith('gemini_'); }).length;
+            var visualSelected = selectedOutputModes.filter(function(m) { return isVisualMode(m); }).length;
             var dataSelected = selectedOutputModes.filter(function(m) {
-                return !m.startsWith('gemini_') && !analysisReportTypes.includes(m);
+                return !isVisualMode(m) && !analysisReportTypes.includes(m);
             }).length;
 
             // Update count display

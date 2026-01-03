@@ -8772,6 +8772,7 @@ HTML_PAGE = '''<!DOCTYPE html>
         let selectedPipeline = null;  // Meta-engine selection
         let selectedTier = null;  // Filter pipelines by tier
         let selectedCategory = null;  // Filter engines by category
+        let curatorRecommendations = null;  // Smart match recommendations (engines)
         let collectionMode = 'single';
         let engineMode = 'engine';  // 'engine', 'bundle', or 'pipeline'
         let currentJobId = null;

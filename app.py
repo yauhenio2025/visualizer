@@ -4856,163 +4856,6 @@ HTML_PAGE = '''<!DOCTYPE html>
             border-bottom: 1px solid var(--border);
         }
 
-        /* ============================================================
-           OUTPUT CURATOR PANEL - AI recommendations
-           ============================================================ */
-        .curator-panel {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: var(--radius);
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .curator-panel.loading {
-            opacity: 0.7;
-        }
-
-        .curator-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-        }
-
-        .curator-title {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--accent);
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-        }
-
-        .curator-title .opus-badge {
-            font-size: 0.55rem;
-            padding: 0.1rem 0.3rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 3px;
-        }
-
-        .curator-loading {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        .curator-analysis {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-            padding: 0.4rem;
-            background: var(--bg-input);
-            border-radius: 3px;
-            line-height: 1.4;
-        }
-
-        .curator-recommendations {
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .curator-rec {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            padding: 0.5rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .curator-rec:hover {
-            border-color: var(--accent-muted);
-        }
-
-        .curator-rec.primary {
-            border-color: var(--accent);
-            border-width: 2px;
-        }
-
-        .curator-rec.selected {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
-        .curator-rec-badge {
-            font-size: 0.55rem;
-            font-weight: 600;
-            padding: 0.15rem 0.3rem;
-            border-radius: 2px;
-            white-space: nowrap;
-        }
-
-        .curator-rec.primary .curator-rec-badge {
-            background: var(--accent);
-            color: white;
-        }
-
-        .curator-rec.secondary .curator-rec-badge {
-            background: var(--bg-hover);
-            color: var(--text-secondary);
-        }
-
-        .curator-rec.selected .curator-rec-badge {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .curator-rec-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .curator-rec-name {
-            font-size: 0.75rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-        }
-
-        .curator-rec-confidence {
-            font-size: 0.6rem;
-            color: var(--text-muted);
-        }
-
-        .curator-rec.selected .curator-rec-confidence {
-            color: rgba(255,255,255,0.7);
-        }
-
-        .curator-rec-rationale {
-            font-size: 0.65rem;
-            color: var(--text-secondary);
-            margin-top: 0.2rem;
-            line-height: 1.3;
-        }
-
-        .curator-rec.selected .curator-rec-rationale {
-            color: rgba(255,255,255,0.85);
-        }
-
-        .curator-thinking {
-            font-size: 0.6rem;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-            padding-top: 0.4rem;
-            border-top: 1px solid var(--border);
-            font-style: italic;
-        }
-
-        .curator-thinking-toggle {
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
         /* Audience selector */
         .audience-selector {
             display: flex;
@@ -8767,21 +8610,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 <button class="audience-btn" data-audience="activist" onclick="setAudience('activist')" title="Agitprop style - bold, provocative, mobilizing">Activist</button>
                             </div>
 
-                            <!-- Output Curator Panel (AI recommendations) -->
-                            <div id="curator-panel" class="curator-panel" style="display:none;">
-                                <div class="curator-header">
-                                    <div class="curator-title">
-                                        🧠 Output Curator
-                                        <span class="opus-badge">Opus 4.5</span>
-                                    </div>
-                                    <span id="curator-status" class="curator-loading"></span>
-                                </div>
-                                <div id="curator-analysis" class="curator-analysis"></div>
-                                <div id="curator-recommendations" class="curator-recommendations"></div>
-                                <div id="curator-thinking" class="curator-thinking"></div>
-                            </div>
-
-                            <!-- Visual output mode cards (manual selection fallback) -->
+                            <!-- Visual output mode cards -->
                             <div id="output-mode-cards" class="output-mode-cards"></div>
                             <!-- Fallback dropdown (hidden, used for submission) -->
                             <select id="output-mode" style="display:none;">
@@ -8943,7 +8772,6 @@ HTML_PAGE = '''<!DOCTYPE html>
         let selectedPipeline = null;  // Meta-engine selection
         let selectedTier = null;  // Filter pipelines by tier
         let selectedCategory = null;  // Filter engines by category
-        let curatorRecommendations = null;  // AI recommendations
         let collectionMode = 'single';
         let engineMode = 'engine';  // 'engine', 'bundle', or 'pipeline'
         let currentJobId = null;
@@ -8961,14 +8789,8 @@ HTML_PAGE = '''<!DOCTYPE html>
         let libraryItems = [];
         let currentLightboxIndex = 0;
 
-        // Output Curator state
+        // Audience state (for audience-specific rendering)
         let currentAudience = 'analyst';  // analyst, executive, researcher
-        let curatorFormatKeys = {};  // Map of engine_key -> format_key (e.g., {'stakeholder_power_interest': 'quadrant_chart'})
-        let curatorCache = {};  // Cache curator responses by engine_key + audience
-        let curatorGeminiPrompts = {};  // Store Gemini prompts for use in submission
-        let curatorLoading = false;  // Track if curator is in progress (to prevent race condition)
-        let curatorDebounceTimer = null;  // Debounce timer for curator (wait for user to stop selecting)
-        let curatorPending = false;  // Track if curator is scheduled but not yet started
 
         // Feasibility state
         let feasibilityData = null;  // Results from feasibility check
@@ -9103,460 +8925,15 @@ HTML_PAGE = '''<!DOCTYPE html>
                    feasibilityData.recommended_engines.includes(engineKey);
         }
 
-        // ==================== OUTPUT CURATOR FUNCTIONS ====================
+        // ==================== AUDIENCE FUNCTIONS ====================
 
-        // Set audience and update UI
+        // Set audience and update UI (used for audience-aware rendering)
         function setAudience(audience) {
             currentAudience = audience;
 
             // Update button states
             document.querySelectorAll('.audience-btn').forEach(function(btn) {
                 btn.classList.toggle('active', btn.dataset.audience === audience);
-            });
-
-            // Audience changed - clear any existing curator recommendations so user can re-curate
-            // (Manual trigger only - user must click button)
-            if (selectedEngines.length > 0) {
-                curatorRecommendations = null;  // Reset so button shows again
-                updateCuratorStatus();
-            }
-        }
-
-        // Schedule curator with debounce (waits 3 seconds of inactivity)
-        function scheduleCurator(engineKeys) {
-            // Clear any existing timer
-            if (curatorDebounceTimer) {
-                clearTimeout(curatorDebounceTimer);
-            }
-
-            // Show the panel in pending state
-            var panel = document.getElementById('curator-panel');
-            if (panel) panel.style.display = 'block';
-
-            curatorPending = true;
-            updateCuratorStatus();
-
-            // Schedule curator call after 5 seconds of inactivity
-            curatorDebounceTimer = setTimeout(function() {
-                curatorPending = false;
-                if (engineKeys.length > 0) {
-                    callBatchOutputCurator(engineKeys);
-                }
-            }, 5000);  // 5 second debounce (user requested)
-        }
-
-        // Trigger curator immediately (cancels any pending debounce)
-        function triggerCuratorNow() {
-            if (curatorDebounceTimer) {
-                clearTimeout(curatorDebounceTimer);
-                curatorDebounceTimer = null;
-            }
-            curatorPending = false;
-
-            if (selectedEngines.length > 0) {
-                var engineKeys = [...new Set(selectedEngines.map(function(e) { return e.engine_key; }))];
-                callBatchOutputCurator(engineKeys);
-            }
-        }
-
-        // Update curator status indicator
-        function updateCuratorStatus() {
-            var status = document.getElementById('curator-status');
-            var panel = document.getElementById('curator-panel');
-            var curateBtn = document.getElementById('curate-now-btn');
-
-            if (curatorLoading) {
-                if (status) status.innerHTML = '⏳ Curating...';
-                if (curateBtn) curateBtn.disabled = true;
-            } else if (curatorPending) {
-                if (status) status.innerHTML = '⏱️ Waiting... <button class="btn btn-sm btn-primary" onclick="triggerCuratorNow()" style="padding: 2px 8px; font-size: 11px; margin-left: 8px;">Curate Now</button>';
-                if (curateBtn) curateBtn.disabled = false;
-            } else if (selectedEngines.length > 0 && !curatorRecommendations) {
-                // Engines selected but no curation done yet - show prominent button
-                if (status) status.innerHTML = '<button class="btn btn-sm btn-warning" onclick="triggerCuratorNow()" style="padding: 4px 12px; font-size: 12px; font-weight: bold;">🧠 Get AI Recommendations</button>';
-                if (curateBtn) curateBtn.disabled = false;
-            } else {
-                if (status) status.innerHTML = '';
-                if (curateBtn) curateBtn.disabled = false;
-            }
-        }
-
-        // Call the Output Curator API
-        async function callOutputCurator(engineKey, extractedData) {
-            var panel = document.getElementById('curator-panel');
-            var status = document.getElementById('curator-status');
-            var analysisDiv = document.getElementById('curator-analysis');
-            var recsDiv = document.getElementById('curator-recommendations');
-            var thinkingDiv = document.getElementById('curator-thinking');
-
-            // Show panel and loading state
-            panel.style.display = 'block';
-            panel.classList.add('loading');
-            status.textContent = 'Analyzing with Opus 4.5...';
-            analysisDiv.innerHTML = '';
-            recsDiv.innerHTML = '';
-            thinkingDiv.innerHTML = '';
-
-            // Check cache first
-            var cacheKey = engineKey + '_' + currentAudience;
-            if (curatorCache[cacheKey]) {
-                renderCuratorRecommendations(curatorCache[cacheKey]);
-                panel.classList.remove('loading');
-                status.textContent = '(cached)';
-                // Restore format_key from cached data
-                if (curatorCache[cacheKey].primary_recommendation) {
-                    curatorFormatKeys[engineKey] = curatorCache[cacheKey].primary_recommendation.format_key;
-                }
-                return curatorCache[cacheKey];
-            }
-
-            // Track that curator is loading (to prevent race condition with submission)
-            curatorLoading = true;
-            updateCuratorStatus();
-            updateAnalyzeButton();
-
-            // If no extracted data, create mock data based on engine type
-            if (!extractedData) {
-                extractedData = generateMockExtractedData(engineKey);
-            }
-
-            try {
-                var keys = getStoredKeys();
-
-                var response = await fetch('/api/analyzer/curate-output', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        engine_key: engineKey,
-                        extracted_data: extractedData,
-                        audience: currentAudience,
-                        thinking_budget: 16000,
-                        llm_keys: { anthropic: keys.anthropic }
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Curator API error: ' + response.status);
-                }
-
-                var data = await response.json();
-
-                // Cache the result
-                curatorCache[cacheKey] = data;
-
-                // Store format_key and Gemini prompt in the maps
-                if (data.primary_recommendation) {
-                    curatorFormatKeys[engineKey] = data.primary_recommendation.format_key;
-                    console.log('[Curator] Stored format_key for', engineKey, ':', data.primary_recommendation.format_key);
-                    if (data.primary_recommendation.gemini_prompt) {
-                        curatorGeminiPrompts[engineKey] = data.primary_recommendation.gemini_prompt;
-                    }
-                }
-
-                // Render recommendations
-                renderCuratorRecommendations(data);
-                panel.classList.remove('loading');
-                status.textContent = '';
-
-                // Curator finished loading - update button and re-render engines
-                curatorLoading = false;
-                updateCuratorStatus();
-                updateAnalyzeButton();
-                renderSelectedEnginesPanel();  // Re-render to show curator format badges
-
-                return data;
-
-            } catch (error) {
-                console.error('Curator error:', error);
-                panel.classList.remove('loading');
-                status.textContent = 'Error';
-                analysisDiv.innerHTML = '<div class="curator-error">Failed to get recommendations: ' + error.message + '</div>';
-
-                // Curator failed but we're no longer loading - still allow submission
-                curatorLoading = false;
-                updateCuratorStatus();
-                updateAnalyzeButton();
-
-                return null;
-            }
-        }
-
-        // Call the Batch Output Curator API (for multiple engines in ONE call)
-        async function callBatchOutputCurator(engineKeys) {
-            if (!engineKeys || engineKeys.length === 0) {
-                return null;
-            }
-
-            // For single engine, use the regular curator for richer output
-            if (engineKeys.length === 1) {
-                return callOutputCurator(engineKeys[0]);
-            }
-
-            var panel = document.getElementById('curator-panel');
-            var status = document.getElementById('curator-status');
-            var analysisDiv = document.getElementById('curator-analysis');
-            var recsDiv = document.getElementById('curator-recommendations');
-
-            // Show panel and loading state
-            panel.style.display = 'block';
-            panel.classList.add('loading');
-            status.textContent = 'Analyzing ' + engineKeys.length + ' engines with Opus 4.5...';
-            analysisDiv.innerHTML = '';
-            recsDiv.innerHTML = '';
-
-            // Track that curator is loading (to prevent race condition with submission)
-            curatorLoading = true;
-            updateCuratorStatus();
-            updateAnalyzeButton();
-
-            try {
-                var keys = getStoredKeys();
-
-                var response = await fetch('/api/analyzer/curate-output/batch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        engine_keys: engineKeys,
-                        audience: currentAudience,
-                        thinking_budget: 16000,
-                        llm_keys: { anthropic: keys.anthropic }
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Batch Curator API error: ' + response.status);
-                }
-
-                var data = await response.json();
-                console.log('[Curator] Batch recommendations:', data);
-
-                // Store format_keys for each engine
-                if (data.recommendations) {
-                    curatorFormatKeys = {};
-                    for (var engineKey in data.recommendations) {
-                        var rec = data.recommendations[engineKey];
-                        curatorFormatKeys[engineKey] = rec.format_key;
-                        if (rec.gemini_prompt) {
-                            curatorGeminiPrompts[engineKey] = rec.gemini_prompt;
-                        }
-                    }
-                    console.log('[Curator] Stored format_keys:', curatorFormatKeys);
-                }
-
-                // Render batch recommendations
-                renderBatchCuratorRecommendations(data.recommendations, engineKeys);
-
-                panel.classList.remove('loading');
-                status.textContent = '';
-
-                // Curator finished loading - update button and re-render engines to show formats
-                curatorLoading = false;
-                updateCuratorStatus();
-                updateAnalyzeButton();
-                renderSelectedEnginesPanel();  // Re-render to show curator format badges
-
-                return data;
-
-            } catch (error) {
-                console.error('Batch Curator error:', error);
-                panel.classList.remove('loading');
-                status.textContent = 'Error';
-                analysisDiv.innerHTML = '<div class="curator-error">Failed to get batch recommendations: ' + error.message + '</div>';
-
-                // Curator failed but we're no longer loading - still allow submission
-                curatorLoading = false;
-                updateCuratorStatus();
-                updateAnalyzeButton();
-
-                return null;
-            }
-        }
-
-        // Render batch curator recommendations (multiple engines)
-        function renderBatchCuratorRecommendations(recommendations, engineKeys) {
-            var analysisDiv = document.getElementById('curator-analysis');
-            var recsDiv = document.getElementById('curator-recommendations');
-
-            analysisDiv.innerHTML = '<div class="curator-section">' +
-                '<div class="curator-section-title">📊 Format Recommendations for ' + engineKeys.length + ' Engines</div>' +
-                '<div class="curator-section-content">Each engine will use its optimal visualization format.</div>' +
-            '</div>';
-
-            var recsHtml = '<div class="curator-section"><div class="curator-section-title">✨ Per-Engine Formats</div>';
-
-            engineKeys.forEach(function(engineKey) {
-                var rec = recommendations[engineKey];
-                if (rec) {
-                    var engineName = engineKey.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) { return l.toUpperCase(); });
-                    recsHtml += '<div class="curator-rec secondary">' +
-                        '<div class="curator-rec-header">' +
-                            '<span class="curator-rec-badge secondary">' + engineName.substring(0, 15) + '</span>' +
-                            '<span class="curator-rec-name">' + (rec.name || rec.format_key) + '</span>' +
-                            '<span class="curator-rec-confidence">' + Math.round((rec.confidence || 0.7) * 100) + '%</span>' +
-                        '</div>' +
-                        '<div class="curator-rec-rationale" style="font-size: 11px;">' + (rec.rationale || '').substring(0, 100) + '</div>' +
-                    '</div>';
-                }
-            });
-
-            recsHtml += '</div>';
-            recsDiv.innerHTML = recsHtml;
-        }
-
-        // Generate mock extracted data for demo/testing
-        function generateMockExtractedData(engineKey) {
-            // Engine type patterns
-            var patterns = {
-                power: { nodes: ['Actor A', 'Actor B', 'Actor C'], edges: [{from: 'A', to: 'B', weight: 0.8}], power_scores: [0.9, 0.6, 0.3] },
-                temporal: { events: [{date: '2024-01', event: 'Start'}, {date: '2024-06', event: 'Midpoint'}], timeline: [] },
-                argument: { claims: ['Main thesis', 'Sub-claim 1'], premises: ['Evidence 1', 'Evidence 2'], logical_structure: {} },
-                flow: { sources: ['A', 'B'], targets: ['C', 'D'], values: [100, 50, 30, 20] },
-                comparison: { items: ['Option A', 'Option B', 'Option C'], scores: [0.9, 0.7, 0.5], dimensions: ['Cost', 'Speed', 'Quality'] }
-            };
-
-            // Determine pattern based on engine key
-            if (engineKey.includes('power') || engineKey.includes('stakeholder') || engineKey.includes('actor')) {
-                return patterns.power;
-            } else if (engineKey.includes('temporal') || engineKey.includes('timeline') || engineKey.includes('evolution')) {
-                return patterns.temporal;
-            } else if (engineKey.includes('argument') || engineKey.includes('dialectical') || engineKey.includes('hypothesis')) {
-                return patterns.argument;
-            } else if (engineKey.includes('flow') || engineKey.includes('resource') || engineKey.includes('sankey')) {
-                return patterns.flow;
-            } else {
-                return patterns.comparison;
-            }
-        }
-
-        // Render curator recommendations in the UI
-        function renderCuratorRecommendations(data) {
-            var analysisDiv = document.getElementById('curator-analysis');
-            var recsDiv = document.getElementById('curator-recommendations');
-            var thinkingDiv = document.getElementById('curator-thinking');
-
-            // Data structure analysis
-            if (data.data_structure_analysis) {
-                analysisDiv.innerHTML = '<div class="curator-section">' +
-                    '<div class="curator-section-title">📊 Data Structure</div>' +
-                    '<div class="curator-section-content">' + data.data_structure_analysis + '</div>' +
-                '</div>';
-            }
-
-            // Recommendations
-            var recsHtml = '<div class="curator-section"><div class="curator-section-title">✨ Recommended Formats</div>';
-
-            // Primary recommendation
-            if (data.primary_recommendation) {
-                var primary = data.primary_recommendation;
-                // Note: format_key is stored in curatorFormatKeys map by callOutputCurator/callBatchOutputCurator
-                recsHtml += '<div class="curator-rec primary" onclick="selectRecommendedFormat(\\'' + primary.format_key + '\\', \\'' + primary.category + '\\')">' +
-                    '<div class="curator-rec-header">' +
-                        '<span class="curator-rec-badge primary">Primary</span>' +
-                        '<span class="curator-rec-name">' + (primary.name || primary.format_key) + '</span>' +
-                        '<span class="curator-rec-confidence">' + Math.round((primary.confidence || 0.8) * 100) + '%</span>' +
-                    '</div>' +
-                    '<div class="curator-rec-category">' + primary.category + '</div>' +
-                    '<div class="curator-rec-rationale">' + primary.rationale + '</div>';
-
-                // Show style information if available
-                if (primary.style_school && primary.style_name) {
-                    var styleEmoji = getStyleEmoji(primary.style_school);
-                    recsHtml += '<div class="curator-style-info">' +
-                        '<span class="style-badge style-' + primary.style_school + '">' + styleEmoji + ' ' + primary.style_name + '</span>' +
-                    '</div>';
-                }
-
-                // Show Gemini prompt preview if visual
-                if (primary.category === 'visual' && primary.gemini_prompt) {
-                    recsHtml += '<div class="gemini-prompt-preview">' +
-                        '<span class="gemini-prompt-label">Gemini Prompt:</span>' +
-                        '<code>' + primary.gemini_prompt.substring(0, 150) + '...</code>' +
-                    '</div>';
-                }
-
-                recsHtml += '</div>';
-            }
-
-            // Helper function for style emojis
-            function getStyleEmoji(school) {
-                var emojis = {
-                    'tufte': '📐',
-                    'nyt_cox': '📰',
-                    'ft_burn_murdoch': '📈',
-                    'lupi_data_humanism': '🎨',
-                    'stefaner_truth_beauty': '✨'
-                };
-                return emojis[school] || '🎯';
-            }
-
-            // Secondary recommendations
-            if (data.secondary_recommendations && data.secondary_recommendations.length > 0) {
-                data.secondary_recommendations.forEach(function(rec) {
-                    recsHtml += '<div class="curator-rec secondary" onclick="selectRecommendedFormat(\\'' + rec.format_key + '\\', \\'' + rec.category + '\\')">' +
-                        '<div class="curator-rec-header">' +
-                            '<span class="curator-rec-badge secondary">Alt</span>' +
-                            '<span class="curator-rec-name">' + (rec.name || rec.format_key) + '</span>' +
-                            '<span class="curator-rec-confidence">' + Math.round((rec.confidence || 0.5) * 100) + '%</span>' +
-                        '</div>' +
-                        '<div class="curator-rec-category">' + rec.category + '</div>' +
-                        '<div class="curator-rec-rationale">' + rec.rationale + '</div>' +
-                    '</div>';
-                });
-            }
-
-            recsHtml += '</div>';
-            recsDiv.innerHTML = recsHtml;
-
-            // Audience considerations
-            if (data.audience_considerations) {
-                recsHtml = '<div class="curator-section">' +
-                    '<div class="curator-section-title">👥 Audience Considerations</div>' +
-                    '<div class="curator-section-content">' + data.audience_considerations + '</div>' +
-                '</div>';
-                recsDiv.innerHTML += recsHtml;
-            }
-
-            // Thinking summary (collapsed by default)
-            if (data.thinking_summary) {
-                thinkingDiv.innerHTML = '<details class="curator-thinking-details">' +
-                    '<summary class="curator-thinking-summary">🧠 Reasoning Process</summary>' +
-                    '<div class="curator-thinking-content">' + data.thinking_summary + '</div>' +
-                '</details>';
-            }
-        }
-
-        // Select a recommended format (clicked from curator panel)
-        // This OVERRIDES the AI recommendations for ALL selected engines
-        function selectRecommendedFormat(formatKey, category) {
-            console.log('[Curator] User selected format_key:', formatKey, '- applying to all engines');
-
-            // Update format_key for ALL selected engines (user override)
-            selectedEngines.forEach(function(eng) {
-                curatorFormatKeys[eng.engine_key] = formatKey;
-            });
-            console.log('[Curator] Updated curatorFormatKeys:', curatorFormatKeys);
-
-            // Map curator format_key to our output modes
-            var modeKey = formatKey;
-
-            // Find and toggle the output mode
-            var modeCards = document.querySelectorAll('.output-format-chip');
-            modeCards.forEach(function(card) {
-                if (card.dataset.key === modeKey) {
-                    // Toggle selection
-                    if (selectedOutputModes.includes(modeKey)) {
-                        selectedOutputModes = selectedOutputModes.filter(function(m) { return m !== modeKey; });
-                    } else {
-                        selectedOutputModes.push(modeKey);
-                    }
-                    renderOutputModes();
-
-                    // Update selected engines to use this format
-                    selectedEngines.forEach(function(eng) {
-                        eng.output_mode = modeKey;
-                    });
-                    renderSelectedEnginesPanel();
-                }
             });
         }
 
@@ -11746,9 +11123,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     gemini_prompt: rec.visualization.gemini_prompt
                 });
 
-                // Store curated format info
-                curatorFormatKeys[engineKey] = rec.visualization.format_key;
-                curatorGeminiPrompts[engineKey] = rec.visualization.gemini_prompt;
+                // Note: format_key and gemini_prompt are stored in selectedEngines for display
+                // but the backend will load the actual prompts from DB
             }
 
             // Re-render to update selection state
@@ -11763,8 +11139,6 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Clear existing selection
             selectedEngines = [];
-            curatorFormatKeys = {};
-            curatorGeminiPrompts = {};
 
             // Add all recommendations
             smartMatchData.smart_recommendations.forEach(function(rec) {
@@ -11774,9 +11148,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     format_key: rec.visualization.format_key,
                     gemini_prompt: rec.visualization.gemini_prompt
                 });
-
-                curatorFormatKeys[rec.engine_key] = rec.visualization.format_key;
-                curatorGeminiPrompts[rec.engine_key] = rec.visualization.gemini_prompt;
+                // Note: format_key and gemini_prompt stored for display only
+                // Backend will load actual prompts from DB
             });
 
             // Switch to single engine mode to show selection
@@ -11917,11 +11290,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                 // Remove ALL entries for this engine
                 selectedEngines = selectedEngines.filter(function(e) { return e.engine_key !== key; });
 
-                // Hide curator panel if no engines selected
-                if (selectedEngines.length === 0) {
-                    var curatorPanel = document.getElementById('curator-panel');
-                    if (curatorPanel) curatorPanel.style.display = 'none';
-                }
+                // No special handling needed - DB prompts used automatically
             } else {
                 // Fetch recommendations for this engine (async, but don't block)
                 fetchOutputRecommendations(key).then(function(recs) {
@@ -11959,23 +11328,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             renderOutputModes();
             updateAnalyzeButton();
 
-            // 🧠 Output Curator (Opus 4.5) - MANUAL TRIGGER ONLY
-            // User must click "Curate" button to get AI recommendations
-            // No auto-curation on engine selection
-            if (selectedEngines.length > 0) {
-                // Show curator panel in ready state (not auto-curating)
-                var panel = document.getElementById('curator-panel');
-                if (panel) panel.style.display = 'block';
-                updateCuratorStatus();  // Will show "Ready to curate" with button
-            } else {
-                // No engines selected - cancel any pending curator and hide panel
-                if (curatorDebounceTimer) {
-                    clearTimeout(curatorDebounceTimer);
-                    curatorDebounceTimer = null;
-                }
-                curatorPending = false;
-                updateCuratorStatus();
-            }
+            // Note: Visual styles are now loaded from DB by the backend automatically
         }
 
         // Select Bundle
@@ -12134,8 +11487,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
                 var currentModeInfo = modeOptions.find(function(m) { return m.key === sel.output_mode; }) || modeOptions[0];
 
-                // Get curator's format recommendation for this engine
-                var curatorFormat = curatorFormatKeys[sel.engine_key];
+                // Get format recommendation from selected engine entry (set by smart-match)
+                var curatorFormat = sel.format_key;
                 var formatDisplay = curatorFormat ? curatorFormat.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); }) : null;
 
                 html += '<div class="selected-engine-chip">';
@@ -12381,11 +11734,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                     var formatCount = selectedOutputModes.length;
                     var jobCount = selectedEngines.length;
 
-                    // Check if curator is still loading - show status in button
-                    if (curatorLoading) {
-                        btn.textContent = '⏳ Optimizing formats... (Analyze now with defaults)';
-                        btn.title = 'AI curator is finding optimal visualization formats. Click now to use defaults, or wait for optimized formats.';
-                    } else if (formatCount > 1) {
+                    if (formatCount > 1) {
                         btn.textContent = 'Analyze with ' + engineCount + ' Engine' + (engineCount > 1 ? 's' : '') + ' × ' + formatCount + ' Formats (' + selectedDocs.size + ' doc' + (selectedDocs.size > 1 ? 's' : '') + ')';
                         btn.title = '';
                     } else {
@@ -12397,9 +11746,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                 }
             }
 
-            // Also update curator button state
-            updateCuratorButton();
+            // Also update smart match and curator button states
             updateSmartMatchButton();
+            updateCuratorButton();
         }
 
         // Intent-Based Analysis Functions
@@ -12653,18 +12002,6 @@ HTML_PAGE = '''<!DOCTYPE html>
             $('analyze-btn').disabled = true;
             $('analyze-btn').textContent = 'Preparing...';
 
-            // Wait for curator if it's still loading (max 10 seconds)
-            if (curatorLoading || curatorPending) {
-                $('analyze-btn').textContent = 'Waiting for curator...';
-                var waitStart = Date.now();
-                while ((curatorLoading || curatorPending) && (Date.now() - waitStart) < 10000) {
-                    await new Promise(r => setTimeout(r, 200));
-                }
-                if (curatorLoading || curatorPending) {
-                    console.warn('[Submit] Curator timed out after 10s, proceeding with defaults');
-                }
-            }
-
             $('progress-section').classList.add('show');
             $('cancel-job-section').style.display = 'block';  // Show cancel button
             $('results-grid').innerHTML = '';
@@ -12718,17 +12055,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                             collection_name: currentCollectionName
                         };
 
-                        // Add curator's format_key for this engine (from per-engine map)
-                        if (curatorFormatKeys[engineKey]) {
-                            payload.format_key = curatorFormatKeys[engineKey];
-                            console.log('[Submit] Including curator format_key for', engineKey, ':', curatorFormatKeys[engineKey]);
-                        }
-
-                        // Add curator's styled gemini_prompt if available (contains style instructions)
-                        if (curatorGeminiPrompts[engineKey]) {
-                            payload.gemini_prompt = curatorGeminiPrompts[engineKey];
-                            console.log('[Submit] Including styled gemini_prompt for', engineKey, '(length:', curatorGeminiPrompts[engineKey].length, ')');
-                        }
+                        // Note: format_key and gemini_prompt are now loaded from DB by the backend
 
                         if (docData.type === 'paths') {
                             payload.file_paths = docData.file_paths;
@@ -12751,15 +12078,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                                 collection_name: currentCollectionName
                             };
 
-                            // Add curator's format_key for this engine (from per-engine map)
-                            if (curatorFormatKeys[engineEntry.engine_key]) {
-                                payload.format_key = curatorFormatKeys[engineEntry.engine_key];
-                            }
-
-                            // Add curator's styled gemini_prompt if available (contains style instructions)
-                            if (curatorGeminiPrompts[engineEntry.engine_key]) {
-                                payload.gemini_prompt = curatorGeminiPrompts[engineEntry.engine_key];
-                            }
+                            // Note: format_key and gemini_prompt are now loaded from DB by the backend
 
                             if (docData.type === 'paths') {
                                 payload.file_paths = docData.file_paths;
@@ -12809,19 +12128,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                             collection_name: currentCollectionName
                         };
 
-                        // Add curator's format_keys map for per-engine visualization control
-                        if (Object.keys(curatorFormatKeys).length > 0) {
-                            payload.format_keys = curatorFormatKeys;
-                            console.log('[Submit] Including per-engine format_keys:', curatorFormatKeys);
-                        } else {
-                            console.warn('[Submit] No format_keys available! Curator may still be loading or failed. Using defaults.');
-                        }
-
-                        // Add curator's styled gemini_prompts map (contains style instructions)
-                        if (Object.keys(curatorGeminiPrompts).length > 0) {
-                            payload.gemini_prompts = curatorGeminiPrompts;
-                            console.log('[Submit] Including styled gemini_prompts for', Object.keys(curatorGeminiPrompts).length, 'engines');
-                        }
+                        // Note: format_keys and gemini_prompts are now loaded from DB by the backend
 
                         if (docData.type === 'paths') {
                             payload.file_paths = docData.file_paths;

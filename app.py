@@ -11474,8 +11474,9 @@ HTML_PAGE = '''<!DOCTYPE html>
                 { key: 'stakeholder_profile', label: '👤 Stakeholder Profile', short: '👤', category: 'analysis' },
                 { key: 'gap_analysis', label: '🎯 Gap Analysis', short: '🎯', category: 'analysis' },
                 { key: 'options_brief', label: '⚖️ Options Brief', short: '⚖️', category: 'analysis' },
+                // Visual table format (rendered as Gemini image)
+                { key: 'smart_table', label: '🗂️ Table Image', short: '🗂️', category: 'visual' },
                 // Data formats
-                { key: 'smart_table', label: '📊 Smart Table', short: '📊', category: 'data' },
                 { key: 'comparative_matrix_table', label: '📊 Matrix Table', short: '📊', category: 'data' },
             ];
 

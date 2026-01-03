@@ -10368,6 +10368,28 @@ HTML_PAGE = '''<!DOCTYPE html>
             }
             var dropdown = $('output-mode');
             if (dropdown && selectedOutputModes.length > 0) dropdown.value = selectedOutputModes[0];
+
+            // CRITICAL: Sync output modes to already-selected engines
+            // When user changes output format, update existing engine selections
+            if (selectedEngines.length > 0 && selectedOutputModes.length > 0) {
+                // Get unique engine keys
+                var uniqueEngineKeys = [...new Set(selectedEngines.map(e => e.engine_key))];
+
+                // Rebuild selectedEngines with new output modes
+                selectedEngines = [];
+                uniqueEngineKeys.forEach(function(engineKey) {
+                    selectedOutputModes.forEach(function(mode) {
+                        selectedEngines.push({
+                            engine_key: engineKey,
+                            output_mode: mode
+                        });
+                    });
+                });
+
+                // Re-render the selected engines panel
+                renderSelectedEnginesPanel();
+            }
+
             renderOutputModeCards();
             updateAnalyzeButton();
         }

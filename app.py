@@ -6701,6 +6701,26 @@ HTML_PAGE = '''<!DOCTYPE html>
             color: #dc2626;
             opacity: 1;
         }
+        .gallery-card-actions .btn-link {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text-muted);
+            padding: 0.5rem 0.6rem;
+            font-size: 1rem;
+            text-decoration: none;
+            opacity: 0.6;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gallery-card-actions .btn-link:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+            color: #2563eb;
+            opacity: 1;
+        }
 
         /* Modal */
         .result-modal {
@@ -6963,6 +6983,24 @@ HTML_PAGE = '''<!DOCTYPE html>
         .job-group-delete:hover {
             background: #fee2e2;
             color: #dc2626;
+        }
+        .job-group-link {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .job-group-link:hover {
+            background: #dbeafe;
+            color: #2563eb;
         }
         .job-group-view {
             padding: 0.35rem 0.75rem;
@@ -15836,6 +15874,8 @@ HTML_PAGE = '''<!DOCTYPE html>
 
             // Count unique jobs
             var jobCount = group.job_ids ? group.job_ids.size : 1;
+            // Get first job ID for linking
+            var firstJobId = group.job_ids && group.job_ids.size > 0 ? Array.from(group.job_ids)[0] : null;
 
             var dateStr = group.addedAt ? new Date(group.addedAt).toLocaleDateString() : '';
             var timeStr = group.addedAt ? new Date(group.addedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
@@ -15856,6 +15896,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         uniqueItems.length + ' output' + (uniqueItems.length !== 1 ? 's' : '') +
                     '</span>' +
                     '<span class="job-group-date">' + dateStr + ' ' + timeStr + '</span>' +
+                    (firstJobId ? '<a class="job-group-link" href="/job/' + firstJobId + '" onclick="event.stopPropagation()" title="Open job details" target="_blank">↗</a>' : '') +
                     '<button class="job-group-delete" onclick="event.stopPropagation(); deleteRun(&apos;' + runKey + '&apos;)" title="Delete this run">&times;</button>' +
                 '</div>' +
             '</div>';
@@ -16105,6 +16146,18 @@ HTML_PAGE = '''<!DOCTYPE html>
                 allResults = [data];
                 openResultModal(0);
             };
+
+            // Add job link button if job_id exists
+            if (data.job_id) {
+                var linkBtn = document.createElement('a');
+                linkBtn.href = '/job/' + data.job_id;
+                linkBtn.target = '_blank';
+                linkBtn.className = 'btn-link';
+                linkBtn.textContent = '↗';
+                linkBtn.title = 'Open job details';
+                linkBtn.onclick = function(e) { e.stopPropagation(); };
+                actions.appendChild(linkBtn);
+            }
 
             var deleteBtn = document.createElement('button');
             deleteBtn.textContent = 'Delete';

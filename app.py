@@ -10197,7 +10197,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             'structured_text_report': '📝',
             'executive_memo': '📋',
             'table': '📊',
-            'smart_table': '📊',
+            'smart_table': '🗂️',  // Visual table image
             'comparative_matrix_table': '📊',
             'mermaid': '🔷',
             'd3_interactive': '📈',
@@ -10231,7 +10231,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             'structured_text_report': 'Text Report',
             'executive_memo': 'Executive Memo',
             'table': 'Data Table',
-            'smart_table': 'Smart Table',
+            'smart_table': 'Table Image',  // Visual table rendered by Gemini
             'comparative_matrix_table': 'Matrix Table',
             'mermaid': 'Mermaid Diagram',
             'd3_interactive': 'D3 Interactive',

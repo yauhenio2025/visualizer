@@ -11274,7 +11274,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing collection (' + documents.length + ' docs)...<br><small>Detecting patterns across documents • 1-2 minutes</small></div>';
+                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing collection (' + documents.length + ' docs)...<br><small>Detecting patterns across documents • 2-3 minutes</small></div>';
+
+                    // Create abort controller with 5-minute timeout for collection-smart-match
+                    var collectionSmartMatchController = new AbortController();
+                    var collectionSmartMatchTimeout = setTimeout(function() {
+                        collectionSmartMatchController.abort();
+                    }, 300000);  // 5 minutes
 
                     var response = await fetch('/api/analyzer/curator/collection-smart-match', {
                         method: 'POST',
@@ -11287,8 +11293,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             target_audience: audience,
                             num_per_doc_recommendations: 5,
                             num_collection_recommendations: 5
-                        })
+                        }),
+                        signal: collectionSmartMatchController.signal
                     });
+                    clearTimeout(collectionSmartMatchTimeout);
 
                     if (!response.ok) {
                         var errorData = await response.json();
@@ -11308,7 +11316,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                         return;
                     }
 
-                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing document feasibility + matching engines + curating visualizations...<br><small>This may take 1-2 minutes</small></div>';
+                    resultDiv.innerHTML = '<div class="smart-match-loading">🧠 Analyzing document feasibility + matching engines + curating visualizations...<br><small>This may take 2-3 minutes</small></div>';
+
+                    // Create abort controller with 5-minute timeout for smart-match
+                    var smartMatchController = new AbortController();
+                    var smartMatchTimeout = setTimeout(function() {
+                        smartMatchController.abort();
+                    }, 300000);  // 5 minutes
 
                     var response = await fetch('/api/analyzer/curator/smart-match', {
                         method: 'POST',
@@ -11321,8 +11335,10 @@ HTML_PAGE = '''<!DOCTYPE html>
                             encoding: docData.encoding,
                             target_audience: audience,
                             num_recommendations: 5
-                        })
+                        }),
+                        signal: smartMatchController.signal
                     });
+                    clearTimeout(smartMatchTimeout);
 
                     if (!response.ok) {
                         var errorData = await response.json();

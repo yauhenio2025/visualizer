@@ -12138,7 +12138,7 @@ HTML_PAGE = '''<!DOCTYPE html>
                         // Create a synthetic response with combined job IDs
                         response = {
                             ok: true,
-                            json: async function() { return { job_ids: allJobIds }; }
+                            json: async function() { return { job_ids: allJobIds, success: true, job_id: allJobIds[0] }; }
                         };
                     } else {
                         // Multiple different engines - use multi endpoint

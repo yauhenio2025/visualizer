@@ -12646,9 +12646,13 @@ HTML_PAGE = '''<!DOCTYPE html>
                     function renderOutput(outputKey, output, modeKey) {
                         // Get S3 input key for re-analysis later
                         var s3Key = (window.jobS3Keys && window.jobS3Keys[engineData.job_id]) || null;
+                        // Include mode in key to differentiate same engine with different output modes
+                        var effectiveMode = modeKey || output.mode || '';
+                        var itemKey = effectiveMode && !outputKey.includes(effectiveMode) ?
+                            outputKey + '_' + effectiveMode : outputKey;
                         var resultData = {
-                            key: outputKey,
-                            title: formatEngineName(modeKey || outputKey),
+                            key: itemKey,
+                            title: formatEngineName(effectiveMode || outputKey),
                             engine_key: engineKey,
                             engine_name: engineName,
                             engine_category: category,
@@ -12992,7 +12996,9 @@ HTML_PAGE = '''<!DOCTYPE html>
             // Collect all outputs
             function collectOutput(engineKey, modeKey, output) {
                 count++;
-                var displayKey = modeKey ? engineKey + ' - ' + modeKey : engineKey;
+                // Always include output mode in key to differentiate same engine with different modes
+                var effectiveMode = modeKey || output.mode || '';
+                var displayKey = effectiveMode ? engineKey + ' - ' + effectiveMode : engineKey;
                 // Get S3 input key for this job (for re-analysis later)
                 var s3Key = (window.jobS3Keys && window.jobS3Keys[currentJobId]) || null;
                 var resultData = {
@@ -15114,13 +15120,14 @@ HTML_PAGE = '''<!DOCTYPE html>
             groupEl.className = 'job-group';
             groupEl.dataset.jobId = jobId;
 
-            // Deduplicate items by key (keep the latest one)
+            // Deduplicate items by job_id + key (keep the latest one)
             var seen = {};
             var uniqueItems = [];
             group.items.forEach(function(item) {
-                var key = item.key || item.title;
-                if (!seen[key]) {
-                    seen[key] = true;
+                // Include job_id in key to differentiate same engine with different output modes
+                var dedupeKey = (item.job_id || '') + '::' + (item.key || item.title);
+                if (!seen[dedupeKey]) {
+                    seen[dedupeKey] = true;
                     uniqueItems.push(item);
                 }
             });

@@ -11079,7 +11079,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                 selectedEngines.push({
                     engine_key: rec.engine_key,
                     engine_name: rec.engine_name,
-                    category: rec.category
+                    category: rec.category,
+                    output_mode: selectedOutputModes[0] || 'gemini_image'
                 });
             }
 
@@ -11101,7 +11102,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                     selectedEngines.push({
                         engine_key: rec.engine_key,
                         engine_name: rec.engine_name,
-                        category: rec.category
+                        category: rec.category,
+                        output_mode: selectedOutputModes[0] || 'gemini_image'
                     });
                 }
             });
@@ -11120,7 +11122,8 @@ HTML_PAGE = '''<!DOCTYPE html>
                 selectedEngines.push({
                     engine_key: rec.engine_key,
                     engine_name: rec.engine_name,
-                    category: rec.category
+                    category: rec.category,
+                    output_mode: selectedOutputModes[0] || 'gemini_image'
                 });
             });
 
